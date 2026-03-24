@@ -1,0 +1,28 @@
+:root {
+  /* Core Colors */
+  --bg: #060e20;
+  --bg-sidebar: #091328;
+  --bg-card: #141f38;
+  --bg-modal: #091328;
+  --bg-input: #141f38;
+  
+  /* Brand Colors */
+  --primary: #6dddff;
+  --primary-glow: rgba(109, 221, 255, 0.4);
+  --accent: #d277ff;
+  --danger: #ff5555;
+  --danger-bg: rgba(255, 60, 60, 0.1);
+  --danger-border: rgba(255, 60, 60, 0.3);
+
+  /* Text Colors */
+  --text: #dee5ff;
+  --text-dim: #a3aac4;
+  --text-inverse: #060e20;
+
+  /* Borders & Outlines */
+  --outline: rgba(109, 117, 140, 0.2);
+
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

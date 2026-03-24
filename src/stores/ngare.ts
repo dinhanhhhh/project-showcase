@@ -25,15 +25,16 @@ export const useNgareStore = defineStore('ngare', {
     },
 
     loadFromStorage() {
-      const saved = localStorage.getItem('ngare_game_state')
-      if (saved) {
-        this.gameState = JSON.parse(saved)
+      // persistedstate tự động hydrate từ localStorage khi store khởi tạo.
+      // Hàm này chỉ còn để sync engine.state với gameState từ store
+      if (this.gameState) {
+        this.engine.state = JSON.parse(JSON.stringify(this.gameState))
       }
     },
 
     resetGame() {
       this.gameState = null
-      localStorage.removeItem('ngare_game_state')
+      // persistedstate sẽ tự động xóa key trong localStorage khi gameState = null
     }
   },
 
