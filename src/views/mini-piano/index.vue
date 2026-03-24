@@ -3,6 +3,10 @@ import { ref } from 'vue'
 
 const audioContext = ref<AudioContext | null>(null)
 
+interface ExtendedWindow extends Window {
+  webkitAudioContext: typeof AudioContext
+}
+
 const notes = [
   { note: 'C', freq: 261.63, label: 'Đô' },
   { note: 'D', freq: 293.66, label: 'Rê' },
@@ -16,7 +20,8 @@ const notes = [
 
 const playNote = (freq: number) => {
   if (!audioContext.value) {
-    audioContext.value = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const AudioContextClass = window.AudioContext || (window as unknown as ExtendedWindow).webkitAudioContext
+    audioContext.value = new AudioContextClass()
   }
   
   const osc = audioContext.value.createOscillator()
@@ -49,14 +54,25 @@ const handlePress = (n: { note: string, freq: number }) => {
 <template>
   <div class="piano-container">
     <div class="piano-header">
-      <RouterLink class="back-link" to="/">← Về trang chủ</RouterLink>
-      <div class="piano-brand">VIBE MINI PIANO</div>
+      <RouterLink
+        class="back-link"
+        to="/"
+      >
+        ← Về trang chủ
+      </RouterLink>
+      <div class="piano-brand">
+        VIBE MINI PIANO
+      </div>
     </div>
 
     <main class="piano-body">
       <div class="piano-info">
-        <h1 class="title">Đàn Piano Mini</h1>
-        <p class="desc">Bấm phím để tạo ra những giai điệu tuyệt vời!</p>
+        <h1 class="title">
+          Đàn Piano Mini
+        </h1>
+        <p class="desc">
+          Bấm phím để tạo ra những giai điệu tuyệt vời!
+        </p>
       </div>
 
       <div class="keyboard">

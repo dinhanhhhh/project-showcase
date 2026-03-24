@@ -1,3 +1,5 @@
+import type { Stats } from '../types'
+
 export const COMMON_EVENTS = [
   {
     id: 'life_friend_invite',
@@ -187,7 +189,7 @@ export const COMMON_EVENTS = [
     minAge: 24,
     maxAge: 55,
     weight: 7,
-    condition: (s: any) => s.stress >= 60,
+    condition: (s: Stats) => s.stress >= 60,
     choices: [
       {
         text: 'Xin nghỉ phép dài',

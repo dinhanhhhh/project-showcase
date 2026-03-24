@@ -1,4 +1,4 @@
-import type { GameEvent } from '../types'
+import type { GameEvent, Stats } from '../types'
 
 export const CAREER_EVENTS: Record<string, GameEvent[]> = {
   programmer: [
@@ -132,7 +132,7 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Đề xuất thăng chức',
       description: 'Sếp đề xuất bạn lên vị trí quản lý. Ít code hơn, nhiều họp hơn.',
       weight: 5,
-      condition: (s: any) => s.skill >= 50,
+      condition: (s: Stats) => s.skill >= 50,
       choices: [
         {
           text: 'Nhận thăng chức',
@@ -234,7 +234,7 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Lên Giám đốc',
       description: 'Ban lãnh đạo đánh giá cao và đề bạt bạn lên vị trí giám đốc.',
       weight: 4,
-      condition: (s: any) => s.skill >= 50,
+      condition: (s: Stats) => s.skill >= 50,
       choices: [
         {
           text: 'Nhận vị trí',
@@ -313,7 +313,7 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Art Director',
       description: 'Được đề xuất lên vị trí Art Director, dẫn dắt team thiết kế.',
       weight: 4,
-      condition: (s: any) => s.skill >= 50,
+      condition: (s: Stats) => s.skill >= 50,
       choices: [
         {
           text: 'Nhận vị trí',
@@ -385,7 +385,7 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Head of Marketing',
       description: 'Công ty mời lên vị trí Head of Marketing.',
       weight: 4,
-      condition: (s: any) => s.skill >= 50,
+      condition: (s: Stats) => s.skill >= 50,
       choices: [
         {
           text: 'Nhận vị trí',
@@ -457,7 +457,7 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Trưởng khoa',
       description: 'Được đề cử làm Trưởng khoa. Trách nhiệm lớn.',
       weight: 4,
-      condition: (s: any) => s.skill >= 55,
+      condition: (s: Stats) => s.skill >= 55,
       choices: [
         {
           text: 'Nhận vị trí',
@@ -544,7 +544,7 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Phó Hiệu trưởng',
       description: 'Được đề cử Phó Hiệu trưởng nhờ thành tích giảng dạy.',
       weight: 4,
-      condition: (s: any) => s.skill >= 50,
+      condition: (s: Stats) => s.skill >= 50,
       choices: [
         {
           text: 'Nhận vị trí',

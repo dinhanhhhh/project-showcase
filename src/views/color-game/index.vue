@@ -50,17 +50,28 @@ onMounted(() => {
 <template>
   <div class="color-game-container">
     <div class="game-header">
-      <RouterLink class="back-link" to="/">← Về trang chủ</RouterLink>
+      <RouterLink
+        class="back-link"
+        to="/"
+      >
+        ← Về trang chủ
+      </RouterLink>
       <div class="stats">
         <span class="score">Điểm: {{ score }}</span>
       </div>
     </div>
 
     <main class="game-content">
-      <h1 class="title">Trò chơi Màu sắc</h1>
-      <p class="description">Tìm xem màu nào tương ứng với mã RGB dưới đây:</p>
+      <h1 class="title">
+        Trò chơi Màu sắc
+      </h1>
+      <p class="description">
+        Tìm xem màu nào tương ứng với mã RGB dưới đây:
+      </p>
       
-      <div class="target-code">{{ targetColor }}</div>
+      <div class="target-code">
+        {{ targetColor }}
+      </div>
 
       <div class="color-grid">
         <button 
@@ -69,12 +80,22 @@ onMounted(() => {
           class="color-btn"
           :style="{ backgroundColor: color }"
           @click="checkColor(color)"
-        ></button>
+        />
       </div>
 
-      <p class="message" :class="{ success: isGameOver }">{{ message }}</p>
+      <p
+        class="message"
+        :class="{ success: isGameOver }"
+      >
+        {{ message }}
+      </p>
       
-      <button class="reset-btn" @click="startNewGame">Đổi mã màu khác</button>
+      <button
+        class="reset-btn"
+        @click="startNewGame"
+      >
+        Đổi mã màu khác
+      </button>
     </main>
   </div>
 </template>

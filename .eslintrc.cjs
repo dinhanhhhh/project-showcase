@@ -1,5 +1,6 @@
 module.exports = {
   root: true,
+  ignorePatterns: ['dist', 'node_modules'],
   env: {
     browser: true,
     es2022: true,
@@ -12,5 +13,6 @@ module.exports = {
   },
   rules: {
     'vue/multi-word-component-names': 'off',
+    '@typescript-eslint/no-explicit-any': 'error',
   },
 }

@@ -54,6 +54,15 @@ let animationFrameId: number
 
 let isAnimating = false
 
+interface Particle {
+  x: number
+  y: number
+  r: number
+  dx: number
+  dy: number
+  alpha: number
+}
+
 const initParticles = () => {
   if (!enableParticles.value) return
   const canvas = canvasRef.value
@@ -62,7 +71,7 @@ const initParticles = () => {
   if (!ctx) return
   if (isAnimating) return
 
-  let particles: any[] = []
+  const particles: Particle[] = []
   const resize = () => {
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
@@ -142,13 +151,24 @@ const categories = computed(() => {
 
 <template>
   <div class="vibe-layout">
-    <canvas ref="canvasRef" class="nebula-canvas"></canvas>
+    <canvas
+      ref="canvasRef"
+      class="nebula-canvas"
+    />
 
     <!-- Sidebar -->
-    <aside class="sidebar" :class="{ collapsed: isSidebarCollapsed }">
+    <aside
+      class="sidebar"
+      :class="{ collapsed: isSidebarCollapsed }"
+    >
       <div class="logo-area">
-        <div class="v-logo">V</div>
-        <div class="v-brand" v-if="!isSidebarCollapsed">
+        <div class="v-logo">
+          V
+        </div>
+        <div
+          v-if="!isSidebarCollapsed"
+          class="v-brand"
+        >
           <span class="brand-name">Vibe</span>
           <span class="brand-tag">Platform</span>
         </div>
@@ -159,51 +179,109 @@ const categories = computed(() => {
           href="javascript:void(0)" 
           class="nav-item" 
           :class="{ active: !onlyShowFavorites && selectedCategory === 'all' && !searchQuery }"
-          @click="setView('home')"
           :data-tooltip="isSidebarCollapsed ? 'Trang chủ' : null"
+          @click="setView('home')"
         >
           <span class="icon">🏠</span>
-          <span class="label" v-if="!isSidebarCollapsed">Trang chủ</span>
+          <span
+            v-if="!isSidebarCollapsed"
+            class="label"
+          >Trang chủ</span>
         </a>
         <a 
           href="javascript:void(0)" 
           class="nav-item"
-          @click="setView('categories')"
           :data-tooltip="isSidebarCollapsed ? 'Danh mục' : null"
+          @click="setView('categories')"
         >
           <span class="icon">🔍</span>
-          <span class="label" v-if="!isSidebarCollapsed">Danh mục</span>
+          <span
+            v-if="!isSidebarCollapsed"
+            class="label"
+          >Danh mục</span>
         </a>
         <a 
           href="javascript:void(0)" 
           class="nav-item" 
           :class="{ active: onlyShowFavorites }"
-          @click="setView('favorites')"
           :data-tooltip="isSidebarCollapsed ? 'Yêu thích' : null"
+          @click="setView('favorites')"
         >
           <span class="icon">⭐</span>
-          <span class="label" v-if="!isSidebarCollapsed">Yêu thích</span>
+          <span
+            v-if="!isSidebarCollapsed"
+            class="label"
+          >Yêu thích</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" @click="isSettingsOpen = true" :data-tooltip="isSidebarCollapsed ? 'Cài đặt' : null">
+        <a
+          href="javascript:void(0)"
+          class="nav-item"
+          :data-tooltip="isSidebarCollapsed ? 'Cài đặt' : null"
+          @click="isSettingsOpen = true"
+        >
           <span class="icon">⚙️</span>
-          <span class="label" v-if="!isSidebarCollapsed">Cài đặt</span>
+          <span
+            v-if="!isSidebarCollapsed"
+            class="label"
+          >Cài đặt</span>
         </a>
       </nav>
 
       <!-- Re-styled Collapse Button at Bottom of Nav -->
-      <button class="collapse-trigger" @click="toggleSidebar" :data-tooltip="isSidebarCollapsed ? 'Mở rộng' : 'Thu nhỏ'">
+      <button
+        class="collapse-trigger"
+        :data-tooltip="isSidebarCollapsed ? 'Mở rộng' : 'Thu nhỏ'"
+        @click="toggleSidebar"
+      >
         <span class="t-icon">
-          <svg v-if="isSidebarCollapsed" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-          <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          <svg
+            v-if="isSidebarCollapsed"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          ><path d="m9 18 6-6-6-6" /></svg>
+          <svg
+            v-else
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          ><path d="m15 18-6-6 6-6" /></svg>
         </span>
-        <span class="label" v-if="!isSidebarCollapsed">Thu nhỏ thanh bên</span>
+        <span
+          v-if="!isSidebarCollapsed"
+          class="label"
+        >Thu nhỏ thanh bên</span>
       </button>
 
-      <div class="user-profile" :data-tooltip="isSidebarCollapsed ? userName : null" @click="isSettingsOpen = true" style="cursor: pointer;">
-        <div class="avatar">{{ userName.substring(0, 2).toUpperCase() }}</div>
-        <div class="user-info" v-if="!isSidebarCollapsed">
-          <div class="u-name">{{ userName }}</div>
-          <div class="u-role">{{ userRole }}</div>
+      <div
+        class="user-profile"
+        :data-tooltip="isSidebarCollapsed ? userName : null"
+        style="cursor: pointer;"
+        @click="isSettingsOpen = true"
+      >
+        <div class="avatar">
+          {{ userName.substring(0, 2).toUpperCase() }}
+        </div>
+        <div
+          v-if="!isSidebarCollapsed"
+          class="user-info"
+        >
+          <div class="u-name">
+            {{ userName }}
+          </div>
+          <div class="u-role">
+            {{ userRole }}
+          </div>
         </div>
       </div>
     </aside>
@@ -212,18 +290,30 @@ const categories = computed(() => {
     <main class="content-hub">
       <header class="hub-header">
         <div class="header-text">
-          <h1 class="display-title">Kiến tạo <span class="text-glow">thực tại số</span> của bạn.</h1>
-          <p class="body-text">Truy cập các ứng dụng mini hiệu năng cao từ một trung tâm đắm chìm duy nhất.</p>
+          <h1 class="display-title">
+            Kiến tạo <span class="text-glow">thực tại số</span> của bạn.
+          </h1>
+          <p class="body-text">
+            Truy cập các ứng dụng mini hiệu năng cao từ một trung tâm đắm chìm duy nhất.
+          </p>
         </div>
 
         <div class="search-wrap">
           <div class="search-box">
             <span class="s-icon">🔍</span>
-            <input v-model="searchQuery" type="text" placeholder="Tìm kiếm ứng dụng..." />
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Tìm kiếm ứng dụng..."
+            >
           </div>
           <div class="filter-box">
             <select v-model="selectedCategory">
-              <option v-for="cat in categories" :key="cat" :value="cat">
+              <option
+                v-for="cat in categories"
+                :key="cat"
+                :value="cat"
+              >
                 {{ cat === 'all' ? 'Tất cả' : (cat === 'game' ? 'Trò chơi' : (cat === 'creative' ? 'Sáng tạo' : cat)) }}
               </option>
             </select>
@@ -236,21 +326,32 @@ const categories = computed(() => {
         <h2 class="section-label">
           {{ onlyShowFavorites ? 'Ứng dụng yêu thích' : 'Vừa thêm gần đây' }}
         </h2>
-        <div v-if="filteredPages.length > 0" class="app-grid">
+        <div
+          v-if="filteredPages.length > 0"
+          class="app-grid"
+        >
           <RouterLink 
             v-for="page in filteredPages" 
             :key="page.slug" 
             :to="page.path"
             class="app-card"
           >
-            <div class="card-glow"></div>
+            <div class="card-glow" />
             <div class="card-content">
               <div class="app-header">
-                <div class="app-icon">{{ page.name.charAt(0) }}</div>
-                <div class="app-category">{{ page.category }}</div>
+                <div class="app-icon">
+                  {{ page.name.charAt(0) }}
+                </div>
+                <div class="app-category">
+                  {{ page.category }}
+                </div>
               </div>
-              <h3 class="app-name">{{ page.name }}</h3>
-              <p class="app-desc">{{ page.description }}</p>
+              <h3 class="app-name">
+                {{ page.name }}
+              </h3>
+              <p class="app-desc">
+                {{ page.description }}
+              </p>
               <div class="card-footer">
                 <span class="launch-btn">Khởi chạy</span>
                 <button
@@ -264,8 +365,13 @@ const categories = computed(() => {
           </RouterLink>
         </div>
 
-        <div v-else class="empty-state">
-          <div class="empty-icon">🕳️</div>
+        <div
+          v-else
+          class="empty-state"
+        >
+          <div class="empty-icon">
+            🕳️
+          </div>
           <p>Không tìm thấy ứng dụng nào khớp với tiêu chí của bạn.</p>
         </div>
       </section>
@@ -274,46 +380,91 @@ const categories = computed(() => {
       <div class="secondary-grid">
         <section class="mini-panel">
           <h3>Yêu thích đã ghim</h3>
-          <div v-if="store.favoritePages.length" class="mini-list">
-            <RouterLink v-for="p in store.favoritePages" :key="p.slug" :to="p.path" class="mini-item">
+          <div
+            v-if="store.favoritePages.length"
+            class="mini-list"
+          >
+            <RouterLink
+              v-for="p in store.favoritePages"
+              :key="p.slug"
+              :to="p.path"
+              class="mini-item"
+            >
               <span>{{ p.name }}</span>
               <span class="m-icon">↗</span>
             </RouterLink>
           </div>
-          <p v-else class="dim-text">Thêm ứng dụng vào mục yêu thích để truy cập nhanh.</p>
+          <p
+            v-else
+            class="dim-text"
+          >
+            Thêm ứng dụng vào mục yêu thích để truy cập nhanh.
+          </p>
         </section>
 
         <section class="mini-panel">
           <h3>Hoạt động gần đây</h3>
-          <div v-if="store.recentlyViewedPages.length" class="mini-list">
-            <RouterLink v-for="p in store.recentlyViewedPages" :key="p.slug" :to="p.path" class="mini-item">
+          <div
+            v-if="store.recentlyViewedPages.length"
+            class="mini-list"
+          >
+            <RouterLink
+              v-for="p in store.recentlyViewedPages"
+              :key="p.slug"
+              :to="p.path"
+              class="mini-item"
+            >
               <span>{{ p.name }}</span>
               <span class="m-icon">⌚</span>
             </RouterLink>
           </div>
-          <p v-else class="dim-text">Các ứng dụng gần đây của bạn sẽ xuất hiện ở đây.</p>
+          <p
+            v-else
+            class="dim-text"
+          >
+            Các ứng dụng gần đây của bạn sẽ xuất hiện ở đây.
+          </p>
         </section>
       </div>
     </main>
 
     <!-- Settings Modal -->
     <Teleport to="body">
-      <div class="settings-modal" v-if="isSettingsOpen">
-        <div class="overlay" @click="isSettingsOpen = false"></div>
+      <div
+        v-if="isSettingsOpen"
+        class="settings-modal"
+      >
+        <div
+          class="overlay"
+          @click="isSettingsOpen = false"
+        />
         <div class="modal-content">
           <header class="modal-header">
             <h2>Cài đặt hệ thống</h2>
-            <button class="close-btn" @click="isSettingsOpen = false">✕</button>
+            <button
+              class="close-btn"
+              @click="isSettingsOpen = false"
+            >
+              ✕
+            </button>
           </header>
 
           <section class="st-group">
             <label>Tên hiển thị</label>
-            <input type="text" v-model="userName" placeholder="Nhập tên..." />
+            <input
+              v-model="userName"
+              type="text"
+              placeholder="Nhập tên..."
+            >
           </section>
 
           <section class="st-group">
             <label>Vai trò</label>
-            <input type="text" v-model="userRole" placeholder="Nhập vai trò..." />
+            <input
+              v-model="userRole"
+              type="text"
+              placeholder="Nhập vai trò..."
+            >
           </section>
 
           <section class="st-group st-row">
@@ -322,8 +473,15 @@ const categories = computed(() => {
               <span class="desc">Tắt nếu máy bạn bị giật/lag.</span>
             </div>
             <div class="st-switch">
-              <input type="checkbox" id="ptSwitch" v-model="enableParticles" />
-              <label for="ptSwitch" class="toggle"></label>
+              <input
+                id="ptSwitch"
+                v-model="enableParticles"
+                type="checkbox"
+              >
+              <label
+                for="ptSwitch"
+                class="toggle"
+              />
             </div>
           </section>
 
@@ -332,7 +490,12 @@ const categories = computed(() => {
               <label>Xóa dữ liệu</label>
               <span class="desc">Gỡ ghim ứng dụng yêu thích và lịch sử.</span>
             </div>
-            <button class="btn-danger" @click="handleClearData">Xóa</button>
+            <button
+              class="btn-danger"
+              @click="handleClearData"
+            >
+              Xóa
+            </button>
           </section>
         </div>
       </div>

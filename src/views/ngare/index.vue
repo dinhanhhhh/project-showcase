@@ -551,12 +551,22 @@ onUnmounted(() => {
 
 <template>
   <div class="ngare-wrapper">
-    <canvas ref="canvasRef" class="particles-canvas"></canvas>
+    <canvas
+      ref="canvasRef"
+      class="particles-canvas"
+    />
 
     <!-- GLOBAL NAVIGATION -->
     <!-- Global nav: ẩn khi đang chơi game vì header game đã có đủ nút -->
-    <div v-if="currentScreen === 'intro' || currentScreen === 'create'" class="global-nav">
-      <RouterLink to="/" class="btn-home" title="Về trang chủ">
+    <div
+      v-if="currentScreen === 'intro' || currentScreen === 'create'"
+      class="global-nav"
+    >
+      <RouterLink
+        to="/"
+        class="btn-home"
+        title="Về trang chủ"
+      >
         <svg
           width="24"
           height="24"
@@ -573,8 +583,8 @@ onUnmounted(() => {
       <button
         v-if="currentScreen === 'create'"
         class="btn-home btn-back-screen"
-        @click="goBack"
         title="Quay lại"
+        @click="goBack"
       >
         <svg
           width="24"
@@ -590,21 +600,39 @@ onUnmounted(() => {
     </div>
 
     <!-- INTRO -->
-    <div v-if="currentScreen === 'intro'" class="screen active">
+    <div
+      v-if="currentScreen === 'intro'"
+      class="screen active"
+    >
       <div class="intro-container">
         <div class="intro-logo">
           <span class="logo-icon">🔀</span>
-          <h1 class="intro-title">Ngã Rẽ<br /><span class="highlight">Cuộc Đời</span></h1>
+          <h1 class="intro-title">
+            Ngã Rẽ<br><span class="highlight">Cuộc Đời</span>
+          </h1>
         </div>
-        <p class="intro-subtitle">Mỗi lựa chọn, một hành trình. Mỗi ngã rẽ, một cuộc đời.</p>
+        <p class="intro-subtitle">
+          Mỗi lựa chọn, một hành trình. Mỗi ngã rẽ, một cuộc đời.
+        </p>
         <div class="intro-features">
-          <div class="feature-tag">🎓 Tốt nghiệp đại học</div>
-          <div class="feature-tag">💼 Chọn sự nghiệp</div>
-          <div class="feature-tag">🔀 Đối mặt ngã rẽ</div>
-          <div class="feature-tag">🏆 Viết nên cuộc đời</div>
+          <div class="feature-tag">
+            🎓 Tốt nghiệp đại học
+          </div>
+          <div class="feature-tag">
+            💼 Chọn sự nghiệp
+          </div>
+          <div class="feature-tag">
+            🔀 Đối mặt ngã rẽ
+          </div>
+          <div class="feature-tag">
+            🏆 Viết nên cuộc đời
+          </div>
         </div>
         <div class="intro-actions">
-          <button class="btn-base btn-primary btn-glow" @click="currentScreen = 'create'">
+          <button
+            class="btn-base btn-primary btn-glow"
+            @click="currentScreen = 'create'"
+          >
             <span>Bắt Đầu Hành Trình</span>
             <svg
               width="20"
@@ -626,13 +654,24 @@ onUnmounted(() => {
               margin-top: 0.8rem;
             "
           >
-            <button v-if="hasSavedGame" class="btn-base btn-secondary" @click="loadGame">
+            <button
+              v-if="hasSavedGame"
+              class="btn-base btn-secondary"
+              @click="loadGame"
+            >
               <span>📂 Tiếp Tục Game Đã Lưu</span>
             </button>
-            <button class="btn-base btn-secondary" @click="openGallery">
+            <button
+              class="btn-base btn-secondary"
+              @click="openGallery"
+            >
               <span>📚 Bộ Sưu Tập Kết Cục</span>
             </button>
-            <button v-if="hasSavedGame" class="btn-base btn-danger" @click="deleteSaveGame">
+            <button
+              v-if="hasSavedGame"
+              class="btn-base btn-danger"
+              @click="deleteSaveGame"
+            >
               <span>🗑️ Xóa Dữ Liệu Lưu</span>
             </button>
           </div>
@@ -641,10 +680,17 @@ onUnmounted(() => {
     </div>
 
     <!-- CREATE -->
-    <div v-if="currentScreen === 'create'" class="screen active">
+    <div
+      v-if="currentScreen === 'create'"
+      class="screen active"
+    >
       <div class="create-container">
-        <h2 class="screen-title">Tạo Nhân Vật</h2>
-        <p class="screen-desc">Chọn nghề nghiệp khởi đầu cho hành trình của bạn.</p>
+        <h2 class="screen-title">
+          Tạo Nhân Vật
+        </h2>
+        <p class="screen-desc">
+          Chọn nghề nghiệp khởi đầu cho hành trình của bạn.
+        </p>
         <div class="form-group">
           <label>Tên của bạn</label>
           <input
@@ -654,7 +700,7 @@ onUnmounted(() => {
             maxlength="20"
             autocomplete="off"
             @keyup.enter="startNewGame"
-          />
+          >
         </div>
         <div class="create-split-layout">
           <div class="career-selection-side">
@@ -676,7 +722,10 @@ onUnmounted(() => {
           </div>
 
           <div class="career-preview-side">
-            <div v-if="careerPreview" class="career-preview">
+            <div
+              v-if="careerPreview"
+              class="career-preview"
+            >
               <div class="preview-header">
                 <span class="preview-icon">{{ careerPreview.emoji }}</span>
                 <div>
@@ -706,7 +755,10 @@ onUnmounted(() => {
                 </button>
               </div>
             </div>
-            <div v-else class="career-preview placeholder">
+            <div
+              v-else
+              class="career-preview placeholder"
+            >
               <div class="placeholder-content">
                 <span class="placeholder-icon">🖱️</span>
                 <p>Chọn một ngành nghề bên trái để xem thông số khởi đầu</p>
@@ -718,12 +770,20 @@ onUnmounted(() => {
     </div>
 
     <!-- GAME -->
-    <div v-if="currentScreen === 'game' && gameState" id="screen-game" class="screen active">
+    <div
+      v-if="currentScreen === 'game' && gameState"
+      id="screen-game"
+      class="screen active"
+    >
       <div class="game-layout">
         <header class="game-header">
           <div class="header-left">
             <!-- Nút Home — hiện cả trên mobile lẫn desktop, được đưa ra bên trái cho dễ thấy -->
-            <RouterLink to="/" class="btn-icon btn-icon-home" title="Về trang chủ">
+            <RouterLink
+              to="/"
+              class="btn-icon btn-icon-home"
+              title="Về trang chủ"
+            >
               <svg
                 width="16"
                 height="16"
@@ -738,9 +798,7 @@ onUnmounted(() => {
             </RouterLink>
             <div class="player-info">
               <span class="player-name">{{ gameState.name }}</span>
-              <span class="player-career"
-                >{{ gameState.careerEmoji }} {{ gameState.currentLevel }}</span
-              >
+              <span class="player-career">{{ gameState.careerEmoji }} {{ gameState.currentLevel }}</span>
             </div>
           </div>
           <div class="header-center">
@@ -754,20 +812,44 @@ onUnmounted(() => {
             </div>
           </div>
           <div class="header-right">
-            <button class="btn-icon" @click="isShopOpen = true" title="Cửa hàng">🛒</button>
-            <button class="btn-icon" @click="isInventoryOpen = true" title="Túi đồ">🎒</button>
+            <button
+              class="btn-icon"
+              title="Cửa hàng"
+              @click="isShopOpen = true"
+            >
+              🛒
+            </button>
+            <button
+              class="btn-icon"
+              title="Túi đồ"
+              @click="isInventoryOpen = true"
+            >
+              🎒
+            </button>
             <!-- Nút Ẩn/Hiện Nhật ký -->
             <button
               class="btn-icon hide-mobile"
-              @click="isSidebarCollapsed = !isSidebarCollapsed"
               :title="isSidebarCollapsed ? 'Hiện Nhật ký' : 'Ẩn Nhật ký'"
               :class="{ 'btn-icon-active': !isSidebarCollapsed }"
+              @click="isSidebarCollapsed = !isSidebarCollapsed"
             >
               📖
             </button>
             <!-- Nút Save - ẩn trên mobile (có trong Menu) -->
-            <button class="btn-icon hide-mobile" @click="saveGame" title="Lưu game">💾</button>
-            <button class="btn-icon" @click="isMenuOpen = true" title="Menu">☰</button>
+            <button
+              class="btn-icon hide-mobile"
+              title="Lưu game"
+              @click="saveGame"
+            >
+              💾
+            </button>
+            <button
+              class="btn-icon"
+              title="Menu"
+              @click="isMenuOpen = true"
+            >
+              ☰
+            </button>
           </div>
         </header>
 
@@ -792,16 +874,31 @@ onUnmounted(() => {
                   <span class="stat-value">{{ val }}</span>
                 </div>
                 <div class="stat-bar">
-                  <div class="stat-fill" :style="{ width: val + '%' }"></div>
+                  <div
+                    class="stat-fill"
+                    :style="{ width: val + '%' }"
+                  />
                 </div>
               </div>
             </div>
 
-            <div id="event-area" class="event-area">
-              <div v-if="currentEvent" class="event-card">
-                <div class="event-type">{{ currentEvent.type }}</div>
-                <h3 class="event-title">{{ currentEvent.title }}</h3>
-                <p class="event-desc">{{ currentEvent.description }}</p>
+            <div
+              id="event-area"
+              class="event-area"
+            >
+              <div
+                v-if="currentEvent"
+                class="event-card"
+              >
+                <div class="event-type">
+                  {{ currentEvent.type }}
+                </div>
+                <h3 class="event-title">
+                  {{ currentEvent.title }}
+                </h3>
+                <p class="event-desc">
+                  {{ currentEvent.description }}
+                </p>
                 <div class="event-choices">
                   <button
                     v-for="(choice, idx) in currentEvent.choices"
@@ -820,7 +917,10 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <aside class="game-timeline-sidebar" :class="{ 'sidebar-collapsed': isSidebarCollapsed }">
+          <aside
+            class="game-timeline-sidebar"
+            :class="{ 'sidebar-collapsed': isSidebarCollapsed }"
+          >
             <div class="timeline-panel">
               <h3 class="timeline-title">
                 <span class="title-icon">📜</span>
@@ -842,9 +942,12 @@ onUnmounted(() => {
                   "
                 >
                   <span class="timeline-year">{{ entry.age }} tuổi</span>
-                  <span class="timeline-dot"></span>
+                  <span class="timeline-dot" />
                   <div class="timeline-content">
-                    <span v-if="getMilestoneInfo(entry.text).is" class="ms-icon">{{
+                    <span
+                      v-if="getMilestoneInfo(entry.text).is"
+                      class="ms-icon"
+                    >{{
                       getMilestoneInfo(entry.text).icon
                     }}</span>
                     <span class="timeline-text">{{ entry.text }}</span>
@@ -858,25 +961,45 @@ onUnmounted(() => {
     </div>
 
     <!-- END -->
-    <div v-if="currentScreen === 'end'" class="screen active">
+    <div
+      v-if="currentScreen === 'end'"
+      class="screen active"
+    >
       <div class="end-container">
         <div class="end-header">
           <span class="end-icon">{{ calculateEnding().icon }}</span>
-          <h2 class="end-title">{{ calculateEnding().title }}</h2>
-          <p class="end-subtitle">{{ calculateEnding().subtitle }}</p>
+          <h2 class="end-title">
+            {{ calculateEnding().title }}
+          </h2>
+          <p class="end-subtitle">
+            {{ calculateEnding().subtitle }}
+          </p>
         </div>
-        <div v-if="gameState" class="end-stats">
-          <div v-for="(val, stat) in gameState.stats" :key="String(stat)" class="end-stat-card">
+        <div
+          v-if="gameState"
+          class="end-stats"
+        >
+          <div
+            v-for="(val, stat) in gameState.stats"
+            :key="String(stat)"
+            class="end-stat-card"
+          >
             <span class="es-icon">{{ getStatIcon(String(stat)) }}</span>
             <span class="es-value">{{ val }}</span>
             <span class="es-label">{{ getStatName(String(stat)) }}</span>
           </div>
         </div>
         <div class="end-actions">
-          <button class="btn-base btn-primary btn-glow" @click="restartGame">
+          <button
+            class="btn-base btn-primary btn-glow"
+            @click="restartGame"
+          >
             <span>🔄 Chơi Lại</span>
           </button>
-          <RouterLink to="/" class="btn-base btn-secondary">
+          <RouterLink
+            to="/"
+            class="btn-base btn-secondary"
+          >
             <span>🏠 Về Trang Chủ</span>
           </RouterLink>
         </div>
@@ -884,7 +1007,11 @@ onUnmounted(() => {
     </div>
 
     <!-- SHOP MODAL -->
-    <div v-if="isShopOpen" class="modal-overlay" @click.self="isShopOpen = false">
+    <div
+      v-if="isShopOpen"
+      class="modal-overlay"
+      @click.self="isShopOpen = false"
+    >
       <div class="modal-content modal-large">
         <h3>🛒 Cửa Hàng</h3>
         <div class="shop-tabs">
@@ -905,8 +1032,14 @@ onUnmounted(() => {
         </div>
         <div class="shop-content">
           <div v-show="shopTab === 'items'">
-            <div v-for="item in gameData?.passiveItems ?? []" :key="item.id" class="shop-item">
-              <div class="shop-item-icon">{{ item.name.split(' ')[0] }}</div>
+            <div
+              v-for="item in gameData?.passiveItems ?? []"
+              :key="item.id"
+              class="shop-item"
+            >
+              <div class="shop-item-icon">
+                {{ item.name.split(' ')[0] }}
+              </div>
               <div class="shop-item-info">
                 <div class="shop-item-header">
                   <span class="shop-item-name">{{
@@ -914,9 +1047,15 @@ onUnmounted(() => {
                   }}</span>
                   <span class="shop-item-price">💰 {{ item.cost }}</span>
                 </div>
-                <div class="shop-item-desc">{{ item.description }}</div>
+                <div class="shop-item-desc">
+                  {{ item.description }}
+                </div>
                 <div class="shop-item-actions">
-                  <button class="btn-buy" :disabled="!canBuyItem(item)" @click="buyItemFn(item)">
+                  <button
+                    class="btn-buy"
+                    :disabled="!canBuyItem(item)"
+                    @click="buyItemFn(item)"
+                  >
                     {{ (gameState?.inventory ?? []).includes(item.id) ? '✓ Đã có' : '🛒 Mua' }}
                   </button>
                 </div>
@@ -924,8 +1063,14 @@ onUnmounted(() => {
             </div>
           </div>
           <div v-show="shopTab === 'skills'">
-            <div v-for="skill in gameData?.activeSkills ?? []" :key="skill.id" class="shop-item">
-              <div class="shop-item-icon">{{ skill.name.split(' ')[0] }}</div>
+            <div
+              v-for="skill in gameData?.activeSkills ?? []"
+              :key="skill.id"
+              class="shop-item"
+            >
+              <div class="shop-item-icon">
+                {{ skill.name.split(' ')[0] }}
+              </div>
               <div class="shop-item-info">
                 <div class="shop-item-header">
                   <span class="shop-item-name">{{
@@ -933,7 +1078,9 @@ onUnmounted(() => {
                   }}</span>
                   <span class="shop-item-price">💰 {{ skill.cost }}</span>
                 </div>
-                <div class="shop-item-desc">{{ skill.description }}</div>
+                <div class="shop-item-desc">
+                  {{ skill.description }}
+                </div>
                 <div class="shop-item-actions">
                   <button
                     class="btn-buy"
@@ -949,12 +1096,21 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        <button class="modal-btn modal-close" @click="isShopOpen = false">✕ Đóng</button>
+        <button
+          class="modal-btn modal-close"
+          @click="isShopOpen = false"
+        >
+          ✕ Đóng
+        </button>
       </div>
     </div>
 
     <!-- INVENTORY MODAL -->
-    <div v-if="isInventoryOpen" class="modal-overlay" @click.self="isInventoryOpen = false">
+    <div
+      v-if="isInventoryOpen"
+      class="modal-overlay"
+      @click.self="isInventoryOpen = false"
+    >
       <div class="modal-content modal-large">
         <h3>🎒 Túi Đồ</h3>
         <div class="shop-tabs">
@@ -975,9 +1131,16 @@ onUnmounted(() => {
         </div>
         <div>
           <div v-show="inventoryTab === 'inventory'">
-            <div v-if="!gameState?.inventory?.length" class="empty-state">
-              <div class="empty-state-icon">📦</div>
-              <div class="empty-state-text">Chưa có vật phẩm nào</div>
+            <div
+              v-if="!gameState?.inventory?.length"
+              class="empty-state"
+            >
+              <div class="empty-state-icon">
+                📦
+              </div>
+              <div class="empty-state-text">
+                Chưa có vật phẩm nào
+              </div>
             </div>
             <div
               v-for="id in gameState?.inventory"
@@ -1002,11 +1165,22 @@ onUnmounted(() => {
             </div>
           </div>
           <div v-show="inventoryTab === 'skills'">
-            <div v-if="!gameState?.activeSkills?.length" class="empty-state">
-              <div class="empty-state-icon">✨</div>
-              <div class="empty-state-text">Chưa có kỹ năng nào</div>
+            <div
+              v-if="!gameState?.activeSkills?.length"
+              class="empty-state"
+            >
+              <div class="empty-state-icon">
+                ✨
+              </div>
+              <div class="empty-state-text">
+                Chưa có kỹ năng nào
+              </div>
             </div>
-            <div v-for="id in gameState?.activeSkills" :key="id" class="inventory-item">
+            <div
+              v-for="id in gameState?.activeSkills"
+              :key="id"
+              class="inventory-item"
+            >
               <div class="shop-item-icon">
                 {{ gameData?.activeSkills.find((s) => s.id === id)?.name?.split(' ')[0] }}
               </div>
@@ -1041,41 +1215,83 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        <button class="modal-btn modal-close" @click="isInventoryOpen = false">✕ Đóng</button>
+        <button
+          class="modal-btn modal-close"
+          @click="isInventoryOpen = false"
+        >
+          ✕ Đóng
+        </button>
       </div>
     </div>
 
     <!-- MENU MODAL -->
-    <div v-if="isMenuOpen" class="modal-overlay" @click.self="isMenuOpen = false">
+    <div
+      v-if="isMenuOpen"
+      class="modal-overlay"
+      @click.self="isMenuOpen = false"
+    >
       <div class="modal-content">
         <h3>⚙️ Menu</h3>
-        <button class="modal-btn" @click="saveGame">💾 Lưu Game</button>
-        <button class="modal-btn" @click="restartGame">🔄 Chơi Lại</button>
-        <RouterLink to="/" class="modal-btn">🏠 Về Trang Chủ</RouterLink>
-        <button class="modal-btn modal-close" @click="isMenuOpen = false">✕ Đóng</button>
+        <button
+          class="modal-btn"
+          @click="saveGame"
+        >
+          💾 Lưu Game
+        </button>
+        <button
+          class="modal-btn"
+          @click="restartGame"
+        >
+          🔄 Chơi Lại
+        </button>
+        <RouterLink
+          to="/"
+          class="modal-btn"
+        >
+          🏠 Về Trang Chủ
+        </RouterLink>
+        <button
+          class="modal-btn modal-close"
+          @click="isMenuOpen = false"
+        >
+          ✕ Đóng
+        </button>
       </div>
     </div>
 
     <!-- TOASTS -->
     <div class="toast-container">
-      <div v-for="toast in toasts" :key="toast.id" class="toast" :class="toast.type">
+      <div
+        v-for="toast in toasts"
+        :key="toast.id"
+        class="toast"
+        :class="toast.type"
+      >
         {{ toast.message }}
       </div>
     </div>
 
     <!-- PREVIEW MODAL -->
-    <div v-if="previewModalEvent" class="modal-overlay" @click.self="previewModalEvent = null">
+    <div
+      v-if="previewModalEvent"
+      class="modal-overlay"
+      @click.self="previewModalEvent = null"
+    >
       <div class="modal-content modal-large">
         <h3>🔮 Nhìn Trước Tương Lai</h3>
         <div class="preview-timeline-info">
-          <span class="preview-age"
-            >📅 Năm {{ (gameState?.year ?? 0) + 1 }} | Tuổi {{ (gameState?.age ?? 0) + 1 }}</span
-          >
+          <span class="preview-age">📅 Năm {{ (gameState?.year ?? 0) + 1 }} | Tuổi {{ (gameState?.age ?? 0) + 1 }}</span>
         </div>
         <div class="preview-event-card">
-          <div class="event-type">{{ previewModalEvent.type }}</div>
-          <h4 class="event-title">{{ previewModalEvent.title }}</h4>
-          <p class="event-desc">{{ previewModalEvent.description }}</p>
+          <div class="event-type">
+            {{ previewModalEvent.type }}
+          </div>
+          <h4 class="event-title">
+            {{ previewModalEvent.title }}
+          </h4>
+          <p class="event-desc">
+            {{ previewModalEvent.description }}
+          </p>
           <div class="preview-choices">
             <div
               v-for="(choice, idx) in previewModalEvent.choices"
@@ -1086,18 +1302,31 @@ onUnmounted(() => {
                 <span class="choice-icon">{{ choice.icon || '📍' }}</span>
                 <span class="choice-text">{{ choice.text }}</span>
               </div>
-              <div class="preview-choice-hint">{{ choice.hint || '' }}</div>
+              <div class="preview-choice-hint">
+                {{ choice.hint || '' }}
+              </div>
             </div>
           </div>
         </div>
-        <button class="modal-btn modal-close" @click="previewModalEvent = null">✓ Đã hiểu</button>
+        <button
+          class="modal-btn modal-close"
+          @click="previewModalEvent = null"
+        >
+          ✓ Đã hiểu
+        </button>
       </div>
     </div>
 
     <!-- GALLERY MODAL -->
-    <div v-if="isGalleryOpen" class="modal-overlay" @click.self="isGalleryOpen = false">
+    <div
+      v-if="isGalleryOpen"
+      class="modal-overlay"
+      @click.self="isGalleryOpen = false"
+    >
       <div class="modal-content modal-large">
-        <h3 style="margin-bottom: 0.5rem">📚 Bộ Sưu Tập Chặng Cuối</h3>
+        <h3 style="margin-bottom: 0.5rem">
+          📚 Bộ Sưu Tập Chặng Cuối
+        </h3>
         <p
           style="
             text-align: center;
@@ -1122,14 +1351,16 @@ onUnmounted(() => {
               <h4 class="gallery-title">
                 {{ unlockedEndings.includes(ending.id) ? ending.title : '???' }}
               </h4>
-              <p class="gallery-condition">{{ ending.condition }}</p>
+              <p class="gallery-condition">
+                {{ ending.condition }}
+              </p>
             </div>
           </div>
         </div>
         <button
           class="modal-btn modal-close"
-          @click="isGalleryOpen = false"
           style="margin-top: 2rem"
+          @click="isGalleryOpen = false"
         >
           ✕ Đóng
         </button>
@@ -1137,7 +1368,10 @@ onUnmounted(() => {
     </div>
 
     <!-- STAT CHANGE POPUP -->
-    <div v-if="statChanges" class="stat-change-popup">
+    <div
+      v-if="statChanges"
+      class="stat-change-popup"
+    >
       <div
         v-for="(val, key) in statChanges"
         :key="String(key)"

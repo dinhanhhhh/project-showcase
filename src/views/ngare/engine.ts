@@ -5,7 +5,6 @@ import {
   ACHIEVEMENTS,
   getCareerLevel,
   loadGameData,
-  type Achievement,
   type ActiveSkill,
   type Choice,
   type GameDataJson,
