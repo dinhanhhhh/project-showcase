@@ -74,25 +74,7 @@ export class GameEngine {
     return this.state
   }
 
-  loadGame() {
-    try {
-      const saved = localStorage.getItem('ngare_save')
-      if (!saved) return null
-      const parsed = JSON.parse(saved)
-      this.state = parsed.state
-      this.usedEvents = new Set(parsed.used)
-      return this.state
-    } catch (e) {
-      console.error('Lỗi load game:', e)
-      return null
-    }
-  }
 
-  clearSave() {
-    localStorage.removeItem('ngare_save')
-    this.state = null
-    this.usedEvents = new Set()
-  }
 
   getNextEvent(): GameEvent | null {
     if (!this.state || !this._data || this.state.gameOver) return null
@@ -235,12 +217,7 @@ export class GameEngine {
     this._checkAchievements()
     this._checkGameOver(choice)
 
-    return { 
-      success: true, 
-      result: choice.result, 
-      effects: resolvedEffects,
-      gameOver: this.state.gameOver ? this.state.gameOverInfo : null
-    }
+    return JSON.parse(JSON.stringify(this.state))
   }
 
   _checkAchievements() {
@@ -308,7 +285,6 @@ export class GameEngine {
       const stats = this.state.stats
       const score = stats.money + stats.skill + stats.happiness + stats.health + stats.relationships - stats.stress
       this._addHistory(`🏁 Kết thúc cuộc đời ở tuổi ${this.state.age}. Tổng điểm: ${score}`)
-      localStorage.removeItem('ngare_save')
     }
   }
 
@@ -454,16 +430,7 @@ export class GameEngine {
   }
 
   hasSave() {
-    return !!localStorage.getItem('ngare_save')
-  }
-
-  saveGame() {
-    if (!this.state) return false
-    localStorage.setItem(
-      'ngare_save',
-      JSON.stringify({ state: this.state, used: [...this.usedEvents] }),
-    )
-    return true
+    return !!localStorage.getItem('ngare_game_state')
   }
 
   async buyItem(itemId: string) {

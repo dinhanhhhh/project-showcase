@@ -4,18 +4,17 @@ import { RouterLink } from 'vue-router'
 import {
   loadGameData,
   type GameDataJson,
-  type GameState,
   type GameEvent,
   type Choice,
   type PassiveItem,
   type ActiveSkill,
 } from './game-data'
-import { GameEngine } from './engine'
+import { useNgareStore } from '@/stores/ngare'
 
-const engine = new GameEngine()
+const ngareStore = useNgareStore()
 const currentScreen = ref('intro')
 const gameData = ref<GameDataJson | null>(null)
-const gameState = ref<GameState | null>(null)
+const gameState = computed(() => ngareStore.gameState)
 const currentEvent = ref<GameEvent | null>(null)
 const charNameInput = ref('')
 const selectedCareerId = ref('')
@@ -108,21 +107,17 @@ async function startNewGame() {
     showToast('Vui lòng chọn nghề!', 'toast-negative')
     return
   }
-  gameState.value = (await engine.newGame(charNameInput.value, selectedCareerId.value))
-    ? JSON.parse(JSON.stringify(engine.state))
-    : null
-  currentEvent.value = engine.getNextEvent()
+  await ngareStore.startNewGame(charNameInput.value, selectedCareerId.value)
+  currentEvent.value = ngareStore.engine.getNextEvent()
   currentScreen.value = 'game'
-  // Scroll về đầu trang để người dùng thấy chỉ số trước
   window.scrollTo({ top: 0, behavior: 'instant' })
 }
 
 async function loadGame() {
-  await engine.ensureData()
-  const state = engine.loadGame()
-  if (state) {
-    gameState.value = JSON.parse(JSON.stringify(engine.state))
-    currentEvent.value = engine.getNextEvent()
+  await ngareStore.engine.ensureData()
+  ngareStore.loadFromStorage()
+  if (ngareStore.gameState) {
+    currentEvent.value = ngareStore.engine.getNextEvent()
     currentScreen.value = 'game'
     showToast('Đã tải game!', 'toast-info')
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -166,8 +161,8 @@ function triggerStatWarning(stat: string, message: string) {
 async function handleChoice(choice: Choice) {
   const oldStats = gameState.value ? { ...gameState.value.stats } : null
 
-  const result = await engine.applyChoice(choice)
-  gameState.value = JSON.parse(JSON.stringify(engine.state))
+  const result = await ngareStore.makeChoice(choice)
+  if (!result) return
 
   // Kiểm tra mốc chỉ số
   if (oldStats && gameState.value) {
@@ -212,7 +207,7 @@ async function handleChoice(choice: Choice) {
   }
 
   if (result.gameOver) {
-    showToast((result.gameOver as { message: string }).message, 'toast-negative')
+    showToast(result.gameOverInfo?.message || 'Game Over', 'toast-negative')
     currentScreen.value = 'end'
     const endResult = calculateEnding()
     if (endResult && endResult.id && endResult.id !== 'unknown') {
@@ -229,21 +224,20 @@ async function handleChoice(choice: Choice) {
       }
     }
   } else {
-    currentEvent.value = engine.getNextEvent()
+    currentEvent.value = ngareStore.engine.getNextEvent()
   }
 }
 
 function saveGame() {
-  if (engine.saveGame()) {
-    showToast('Đã lưu game!', 'toast-info')
-    hasSavedGame.value = engine.hasSave()
-  }
+  // Pinia persistedstate tự động save, ta chỉ cần thông báo
+  showToast('Đã lưu game!', 'toast-info')
+  hasSavedGame.value = true
   isMenuOpen.value = false
 }
 
 function deleteSaveGame() {
   if (confirm('Bạn có chắc chắn muốn xóa dữ liệu game đã lưu? Hành động này không thể hoàn tác.')) {
-    engine.clearSave()
+    ngareStore.resetGame()
     hasSavedGame.value = false
     showToast('Đã xóa dữ liệu lưu!', 'toast-info')
   }
@@ -251,13 +245,8 @@ function deleteSaveGame() {
 
 function restartGame() {
   if (confirm('Bạn có chắc muốn chơi lại từ đầu?')) {
-    // Reset engine state để tránh data cũ ảnh hưởng game mới
-    engine.state = null
-    engine.usedEvents = new Set()
-    engine.previousSnapshot = null
-    engine.previewedEvent = null
+    ngareStore.resetGame()
     currentScreen.value = 'intro'
-    gameState.value = null
     currentEvent.value = null
     charNameInput.value = ''
     selectedCareerId.value = ''
@@ -266,29 +255,22 @@ function restartGame() {
 }
 
 async function buyItemFn(item: PassiveItem) {
-  const result = await engine.buyItem(item.id)
-  // Null safety: chỉ sync khi engine.state không null
-  if (engine.state) gameState.value = JSON.parse(JSON.stringify(engine.state))
+  const result = await ngareStore.engine.buyItem(item.id)
   showToast(result.message, result.success ? 'toast-info' : 'toast-negative')
 }
 
 async function buySkillFn(skill: ActiveSkill) {
-  const result = await engine.buySkill(skill.id)
-  if (engine.state) gameState.value = JSON.parse(JSON.stringify(engine.state))
+  const result = await ngareStore.engine.buySkill(skill.id)
   showToast(result.message, result.success ? 'toast-info' : 'toast-negative')
 }
 
 async function useSkillFn(skillId: string) {
-  const result = await engine.useSkill(skillId)
+  const result = await ngareStore.engine.useSkill(skillId)
   if (result.success) {
     showToast(`⚡ ${result.message}`, 'toast-info')
     const r = result as { isPreview?: boolean; previewEvent?: GameEvent }
     if (r.isPreview && r.previewEvent) {
-      // Preview skill: hiển thị modal, KHÔNG gọi getNextEvent (không tiêu lượt)
       previewModalEvent.value = r.previewEvent
-    } else {
-      // Các skill khác: chỉ refresh UI, KHÔNG gọi getNextEvent (không tiêu lượt)
-      if (engine.state) gameState.value = JSON.parse(JSON.stringify(engine.state))
     }
   } else {
     showToast(`❌ ${result.message}`, 'toast-negative')
@@ -540,7 +522,7 @@ function getMilestoneInfo(text: string) {
 onMounted(() => {
   loadGameData().then((d) => (gameData.value = d))
   initParticles()
-  hasSavedGame.value = engine.hasSave()
+  hasSavedGame.value = ngareStore.engine.hasSave()
   window.addEventListener('keydown', handleGlobalKeydown)
 })
 
