@@ -1,0 +1,41 @@
+{
+  "name": "vibe-platform",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "pnpm generate:pages && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "generate:pages": "node scripts/generate-pages-json.mjs",
+    "create:page": "node scripts/create-page.mjs"
+  },
+  "dependencies": {
+    "@vueuse/core": "^12.8.2",
+    "pinia": "^3.0.3",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.2",
+    "@tailwindcss/postcss": "^4.1.2",
+    "@types/node": "^22.13.11",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/compiler-sfc": "^3.5.13",
+    "@vue/eslint-config-typescript": "^14.5.0",
+    "@vue/tsconfig": "^0.7.0",
+    "@vue/test-utils": "^2.4.6",
+    "eslint": "^8.57.1",
+    "eslint-plugin-vue": "^9.33.0",
+    "jsdom": "^26.0.0",
+    "tailwindcss": "^4.1.2",
+    "typescript": "~5.7.3",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.9",
+    "vue-tsc": "^2.2.8"
+  }
+}

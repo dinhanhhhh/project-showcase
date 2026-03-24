@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "color-game",
+    "path": "/color-game",
+    "name": "Trò chơi Màu sắc",
+    "description": "Thử thách khả năng phân biệt màu sắc của bạn.",
+    "category": "game",
+    "author": "Vibe Team"
+  },
+  {
+    "slug": "mini-piano",
+    "path": "/mini-piano",
+    "name": "Đàn Piano Mini",
+    "description": "Sáng tạo âm nhạc ngay trên trình duyệt của bạn.",
+    "category": "creative",
+    "author": "Vibe Team"
+  },
+  {
+    "slug": "ngare",
+    "path": "/ngare",
+    "name": "Ngã Rẽ Cuộc Đời",
+    "description": "Game mô phỏng cuộc đời, nơi mỗi lựa chọn định hình tương lai của bạn.",
+    "category": "game",
+    "author": "Vibe Team"
+  }
+]
