@@ -2,16 +2,16 @@
   {
     "slug": "color-game",
     "path": "/color-game",
-    "name": "Trò chơi Màu sắc",
-    "description": "Thử thách khả năng phân biệt màu sắc của bạn.",
+    "name": "Color Game",
+    "description": "Tro choi doan mau sac don gian",
     "category": "game",
     "author": "Vibe Team"
   },
   {
     "slug": "mini-piano",
     "path": "/mini-piano",
-    "name": "Đàn Piano Mini",
-    "description": "Sáng tạo âm nhạc ngay trên trình duyệt của bạn.",
+    "name": "Mini Piano",
+    "description": "Choi piano tren trinh duyet",
     "category": "creative",
     "author": "Vibe Team"
   },

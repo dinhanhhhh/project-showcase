@@ -3,20 +3,7 @@ import { defineStore } from 'pinia'
 import type { PageEntry } from '@/types/page'
 import { loadPagesRegistry } from '@/data/pages-loader'
 
-const FAVORITES_KEY = 'vibe:favorites'
-const RECENT_KEY = 'vibe:recently-viewed'
 const RECENT_LIMIT = 8
-
-function readLocalStorageList(key: string): string[] {
-  try {
-    const raw = localStorage.getItem(key)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : []
-  } catch {
-    return []
-  }
-}
 
 export const usePagesStore = defineStore('pages', () => {
   const pages = ref<PageEntry[]>([])
@@ -25,8 +12,8 @@ export const usePagesStore = defineStore('pages', () => {
   const query = ref('')
   const category = ref('all')
 
-  const favoriteSlugs = ref<string[]>(readLocalStorageList(FAVORITES_KEY))
-  const recentlyViewedSlugs = ref<string[]>(readLocalStorageList(RECENT_KEY))
+  const favoriteSlugs = ref<string[]>([])
+  const recentlyViewedSlugs = ref<string[]>([])
 
   const categories = computed(() => {
     const set = new Set(pages.value.map((page) => page.category))
@@ -73,14 +60,6 @@ export const usePagesStore = defineStore('pages', () => {
     }
   }
 
-  function persistFavorites() {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favoriteSlugs.value))
-  }
-
-  function persistRecentlyViewed() {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recentlyViewedSlugs.value))
-  }
-
   function toggleFavorite(slug: string) {
     const set = new Set(favoriteSlugs.value)
     if (set.has(slug)) {
@@ -90,7 +69,6 @@ export const usePagesStore = defineStore('pages', () => {
     }
 
     favoriteSlugs.value = Array.from(set)
-    persistFavorites()
   }
 
   function isFavorite(slug: string) {
@@ -102,7 +80,11 @@ export const usePagesStore = defineStore('pages', () => {
       0,
       RECENT_LIMIT,
     )
-    persistRecentlyViewed()
+  }
+
+  function clearUserData() {
+    favoriteSlugs.value = []
+    recentlyViewedSlugs.value = []
   }
 
   return {
@@ -121,5 +103,11 @@ export const usePagesStore = defineStore('pages', () => {
     toggleFavorite,
     isFavorite,
     trackRecentlyViewed,
+    clearUserData,
+  }
+}, {
+  persist: {
+    key: 'vibe:pages-store',
+    pick: ['favoriteSlugs', 'recentlyViewedSlugs']
   }
 })

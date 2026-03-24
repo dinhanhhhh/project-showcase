@@ -36,11 +36,15 @@ await fs.mkdir(targetDir, { recursive: true })
 
 const title = titleFromSlug(slug)
 
-const metaContent = `import type { PageMeta } from '@/types/page'\n\nconst meta: PageMeta = {\n  name: '${title}',\n  description: 'Mo ta app',\n  author: 'Vibe Team',\n  category: 'tool',\n}\n\nexport default meta\n`
+const metaContent = `import type { PageMeta } from '@/types/page'\n\nconst meta: PageMeta = {\n  name: '${title}',\n  description: 'Mô tả ngắn gọn về app',\n  author: 'Vibe Team',\n  category: 'tool',\n}\n\nexport default meta\n`
 
-const pageContent = `<template>\n  <main class="mx-auto max-w-3xl p-6">\n    <h1 class="mb-2 text-2xl font-bold">${title}</h1>\n    <p class="mb-4 text-sm text-gray-600">Mini-app moi duoc scaffold tu create:page.</p>\n    <RouterLink class="text-blue-600" to="/">Ve launcher</RouterLink>\n  </main>\n</template>\n`
+const pageContent = `<template>\n  <main class="vibe-container">\n    <h1>${title}</h1>\n    <p>Mini-app mới được khởi tạo tự động.</p>\n    <RouterLink to="/">Về Launcher</RouterLink>\n  </main>\n</template>\n`
+
+const readmeContent = `# 🚀 ${title} Mini-App\n\n## 🎯 Mục tiêu & Nhiệm vụ\n- [ ] Ghi lại mục tiêu chính của app này.\n- [ ] Liệt kê các tính năng cần phát triển.\n\n## 💡 Ghi chú Logic\n- AI hãy đọc file này trước khi bắt đầu code tính năng cho ${slug}.\n`
 
 await fs.writeFile(path.join(targetDir, 'meta.ts'), metaContent, 'utf8')
 await fs.writeFile(path.join(targetDir, 'index.vue'), pageContent, 'utf8')
+await fs.writeFile(path.join(targetDir, 'README.md'), readmeContent, 'utf8')
 
-console.log(`Created page: src/views/${slug}`)
+console.log(`✅ Đã tạo Mini-App: src/views/${slug}`)
+console.log(`📝 Đừng quên cập nhật mục tiêu trong: src/views/${slug}/README.md`)

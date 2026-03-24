@@ -1,11 +1,12 @@
 import type { RouteRecordRaw } from 'vue-router'
+import type { MiniAppLoader } from '@/types/page'
 
 export function isValidSlug(slug: string): boolean {
   return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
 }
 
 export function buildAppRoutes(
-  modules: Record<string, () => Promise<unknown>>,
+  modules: Record<string, MiniAppLoader>,
 ): RouteRecordRaw[] {
   const routes: RouteRecordRaw[] = []
 
@@ -19,7 +20,7 @@ export function buildAppRoutes(
     routes.push({
       path: `/${slug}`,
       name: slug,
-      component: loader as RouteRecordRaw['component'],
+      component: loader,
       meta: { slug },
     })
   }
