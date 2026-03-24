@@ -8,13 +8,14 @@ Mỗi mini-app được tổ chức gọn gàng theo một thư mục (folder) r
 
 ## ✨ Tính Năng Nổi Bật
 
-- 🧩 **Kiến trúc linh hoạt (Modular):** Mỗi mini-app hoạt động độc lập, có `meta.ts` riêng chứa thông tin hiển thị.
+- 🧩 **Kiến trúc linh hoạt (Modular):** Mỗi mini-app hoạt động độc lập, có `meta.ts` riêng chứa thông tin hiển thị và được validate mạnh mẽ bằng **Zod**.
 - ⚡ **Tự động định tuyến (Auto-routing):** Sử dụng `import.meta.glob` kết hợp công cụ sinh tệp cấu hình tự động. Không cần cấu hình Router thủ công.
+- ⚙️ **Settings & Customization:** Tích hợp Modal cài đặt để tùy chỉnh Tên người dùng, Vai trò và cấu hình hiệu năng hệ thống (Particles Background).
 - 🎮 **Launcher tiện lợi:** 
-  - Giao diện Dashboard đẹp mắt quản lý toàn bộ hệ sinh thái.
+  - Giao diện Dashboard đẹp mắt (Digital Curator style) quản lý toàn bộ hệ sinh thái.
   - Tìm kiếm và Lọc (Filter) ứng dụng theo danh mục (Category).
-  - Ghim "Yêu thích" (Favorites) và lịch sử "Hoạt động gần đây" lưu trữ bằng LocalStorage.
-- 🛠️ **Scaffolding Tool:** 1 câu lệnh CLI `pnpm create:page` để tự sinh ra bộ khung tạo sẵn cho app mới.
+  - Ghim "Yêu thích" (Favorites) và lịch sử "Hoạt động gần đây" được lưu trữ an toàn bằng **Pinia Persistedstate**.
+- 🛠️ **Scaffolding Tool:** 1 câu lệnh CLI `pnpm create:page` sinh ra bộ khung tạo sẵn (`index.vue`, `meta.ts`, `README.md` logic).
 
 ---
 
@@ -23,9 +24,10 @@ Mỗi mini-app được tổ chức gọn gàng theo một thư mục (folder) r
 Dự án được xây dựng với những công nghệ FE hiện đại nhất:
 - **Core:** [Vue 3](https://vuejs.org/) (Composition API) + [TypeScript](https://www.typescriptlang.org/)
 - **Build Tool:** [Vite](https://vitejs.dev/) siêu tốc độ
-- **State Management:** [Pinia](https://pinia.vuejs.org/)
+- **State Management:** [Pinia](https://pinia.vuejs.org/) + [Persistedstate](https://prazdevs.github.io/pinia-plugin-persistedstate/)
+- **Validation:** [Zod](https://zod.dev/) (Schema validation cho Metadata)
 - **Mã nguồn tiện ích:** [VueUse](https://vueuse.org/)
-- **UI & Styling:** Không sử dụng Component Library bên thứ 3, code thuần CSS tối ưu hoá với biến đổi biến CSS hoặc kết hợp [Tailwind CSS](https://tailwindcss.com/)
+- **UI & Styling:** Không sử dụng Component Library bên thứ 3, code thuần CSS tối ưu hoá hoặc kết hợp [Tailwind CSS](https://tailwindcss.com/)
 - **Testing:** [Vitest](https://vitest.dev/) + Vue Test Utils
 
 ---
@@ -135,6 +137,12 @@ vibe-platform/
 
 ## 🎯 Lưu ý Phát Triển (Development Notes)
 - **Ranh giới dữ liệu (Boundaries):** Không bao giờ `import` chéo logic hoặc UI Component giữa các mini-app với nhau (để đảm bảo tính Modular 100%). Nếu có hàm dùng chung, hãy vứt ra thư mục `src/utils/`.
+- **Hệ thống Metadata:** Phải tuân thủ `PageMetaSchema` trong `src/types/page.ts`.
 - **Media & Tài nguyên nặng:** Để trong thư mục `public/<slug-app>/...` riêng của từng app.
+
+---
+
+## 🤖 AI Technical Notes (For AI Assistants)
+Dự án có tệp [OVERVIEW.md](./OVERVIEW.md) mô tả chuyên sâu về kiến trúc và các "bí kíp" làm việc dành cho AI Agent. Hãy yêu cầu AI đọc tệp này trước khi thực hiện các thay đổi lớn.
 
 *Được thiết kế hướng tới tốc độ, sự linh hoạt và mở rộng tối đa theo kiến trúc MVP (Minimum Viable Product).*
