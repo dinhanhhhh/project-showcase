@@ -41,5 +41,10 @@ Khi thêm hoặc sửa Event/Items:
 - **200 - 350**: Thành công / Bình dị.
 - **<200**: Gập ghềnh / Thử thách.
 
+## 🧪 6. Unit Testing & Bảo vệ Logic
+Logic lõi của Game Engine được bảo vệ nghiêm ngặt bởi bộ Unit Test tại `tests/ngare-engine.spec.ts`.
+- **Mục tiêu**: Đảm bảo các tính năng (Thăng tiến, Phá sản, Hiệu ứng vật phẩm, Lưu game) hoạt động chính xác sau mỗi lần refactor.
+- **Yêu cầu**: Trước khi sửa `engine.ts` hoặc dữ liệu trong `data/`, AI hoặc Developer **BẮT BUỘC** phải chạy `pnpm test` để kiểm tra độ tương thích.
+
 ---
-*Trước khi sửa `engine.ts` hoặc `game-data.ts`, AI phải đối chiếu với các nguyên tắc này.*
+*Trước khi sửa `engine.ts` hoặc `game-data.ts`, AI phải đối chiếu với các nguyên tắc này và đảm bảo 6/6 test cases đều Pass.*

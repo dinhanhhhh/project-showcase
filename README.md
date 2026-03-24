@@ -9,6 +9,13 @@ Mỗi mini-app được tổ chức gọn gàng theo một thư mục (folder) r
 ## ✨ Tính Năng Nổi Bật
 
 - 🧩 **Kiến trúc linh hoạt (Modular):** Mỗi mini-app hoạt động độc lập, có `meta.ts` riêng chứa thông tin hiển thị và được validate mạnh mẽ bằng **Zod**.
+## 🧪 6. Unit Testing & Bảo vệ Logic
+Logic lõi của Game Engine được bảo vệ nghiêm ngặt bởi bộ Unit Test tại `tests/ngare-engine.spec.ts`.
+- **Mục tiêu**: Đảm bảo các tính năng (Thăng tiến, Phá sản, Hiệu ứng vật phẩm, Lưu game) hoạt động chính xác sau mỗi lần refactor.
+- **Yêu cầu**: Trước khi sửa `engine.ts` hoặc dữ liệu trong `data/`, AI hoặc Developer **BẮT BUỘC** phải chạy `pnpm test` để kiểm tra độ tương thích.
+
+---
+*Trước khi sửa `engine.ts` hoặc `game-data.ts`, AI phải đối chiếu với các nguyên tắc này và đảm bảo 6/6 test cases đều Pass.*
 - ⚡ **Tự động định tuyến (Auto-routing):** Sử dụng `import.meta.glob` kết hợp công cụ sinh tệp cấu hình tự động. Không cần cấu hình Router thủ công.
 - ⚙️ **Settings & Customization:** Tích hợp Modal cài đặt để tùy chỉnh Tên người dùng, Vai trò và cấu hình hiệu năng hệ thống (Particles Background).
 - 🎮 **Launcher tiện lợi:** 
@@ -72,7 +79,17 @@ pnpm dev
 - `pnpm generate:pages`: Đọc thư mục `src/views/*/meta.ts` và quét thành một file JSON duy nhất để tối ưu load cho màn hình Home Launcher.
 - `pnpm create:page <slug>`: Lệnh tắt tạo bộ khung app mới.
 - `pnpm typecheck`: Kiểm tra tĩnh TypeScript trên toàn dự án.
-- `pnpm lint`: Chạy ESLint rà soát lỗi format code.
+- `pnpm lint`: Chạy ESLint rà soát lỗi (Cấm dùng `any`).
+- `pnpm test`: Chạy toàn bộ Unit Test (Vitest).
+
+---
+
+## 🧪 Đảm Bảo Chất Lượng (Quality Control)
+
+Dự án áp dụng quy trình kiểm soát chất lượng tự động:
+1. **ESLint (Strict Mode):** Cấm sử dụng kiểu dữ liệu `any` để đảm bảo Type-safety tuyệt đối.
+2. **Husky & lint-staged:** Tự động chạy `lint` và sửa lỗi mỗi khi thực hiện `git commit`. Nếu có lỗi, commit sẽ bị chặn.
+3. **Unit Testing:** Toàn bộ logic lõi của Game Engine được kiểm thử bằng **Vitest** tại thư mục `tests/`.
 
 ---
 
