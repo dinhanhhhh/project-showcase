@@ -10,6 +10,10 @@
   --primary: #6dddff;
   --primary-glow: rgba(109, 221, 255, 0.4);
   --accent: #d277ff;
+  --property-group-a: #8bc34a;
+  --property-group-b: #03a9f4;
+  --property-group-c: #dd2c00;
+  --property-group-d: #ffb300;
   --danger: #ff5555;
   --danger-bg: rgba(255, 60, 60, 0.1);
   --danger-border: rgba(255, 60, 60, 0.3);

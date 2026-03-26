@@ -21,8 +21,14 @@ Thumbs.db
 *.sln
 *.sw?
 
-# Diagnostic / AI
+# Diagnostic / AI / Temporary Logs
 .gemini
+*.txt
+!README.md
+!AGENTS.md
+!OVERVIEW.md
+.eslintcache
+.stylelintcache
 
 # Dependencies
 node_modules
@@ -32,10 +38,15 @@ node_modules
 dist
 dist-ssr
 .vite
+.vitest
 coverage
 *.tsbuildinfo
 
+# Husky / Git Hooks
+.husky/_
+
 # Environment Variables
 .env
-.env.*
+.env.local
+.env.*.local
 !.env.example

@@ -23,32 +23,33 @@ export function validateMeta(meta) {
 }
 
 function parseMetaFromTs(source) {
+  // Loại bỏ các dòng import/export type để tránh làm rối Regex
   const stripped = source
-    .replace(/^\s*import\s+type\s+.*$/gm, '')
-    .replace(/^\s*import\s+.*$/gm, '')
+    .replace(/^import.*$/gm, '')
     .trim()
 
-  const inlineDefaultMatch = stripped.match(/export\s+default\s+({[\s\S]*?})\s*;?\s*$/)
-  if (inlineDefaultMatch) {
+  // Tìm biến meta theo cấu trúc: const meta: PageMeta = { ... }
+  const metaMatch = stripped.match(/const\s+meta\s*(?::\s*[\w\s<>|]+)?\s*=\s*({[\s\S]*?})(?=;|\n|export)/)
+  if (metaMatch) {
     try {
-      return Function(`"use strict"; return (${inlineDefaultMatch[1]});`)()
-    } catch {
-      return null
+      // Dùng hàm Function để eval an toàn chuỗi JSON-like object
+      return new Function(`return ${metaMatch[1]}`)()
+    } catch (e) {
+      console.error('Lỗi khi parse meta object:', e)
     }
   }
 
-  const namedMetaMatch = stripped.match(/const\s+meta(?:\s*:\s*[^=]+)?\s*=\s*({[\s\S]*?})\s*;?/)
-  const hasExportMeta = /export\s+default\s+meta\s*;?/.test(stripped)
-
-  if (!namedMetaMatch || !hasExportMeta) {
-    return null
+  // Dự phòng cho trường hợp export default trực tiếp
+  const defaultExportMatch = stripped.match(/export\s+default\s+({[\s\S]*?})(?=;|\n|$)/)
+  if (defaultExportMatch) {
+    try {
+      return new Function(`return ${defaultExportMatch[1]}`)()
+    } catch (e) {
+       console.error('Lỗi khi parse default export:', e)
+    }
   }
 
-  try {
-    return Function(`"use strict"; return (${namedMetaMatch[1]});`)()
-  } catch {
-    return null
-  }
+  return null
 }
 
 async function loadMeta(metaPath) {

@@ -94,35 +94,22 @@ const handlePress = (n: { note: string, freq: number }) => {
 <style scoped>
 .piano-container {
   min-height: 100vh;
+  width: 100%;
   background: #091328;
   color: #dee5ff;
   font-family: 'Inter', sans-serif;
-  padding: 2rem;
+  padding: 1.5rem; /* Giảm padding cho mobile */
   display: flex;
   flex-direction: column;
+  overflow-x: hidden; /* Chặn cuộn ngang toàn trang */
 }
 
 .piano-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 5rem;
-}
-
-.back-link {
-  color: #6dddff;
-  text-decoration: none;
-  font-weight: 500;
-  transition: opacity 0.2s;
-}
-
-.back-link:hover { opacity: 0.8; }
-
-.piano-brand {
-  font-family: 'Manrope', sans-serif;
-  font-weight: 800;
-  letter-spacing: 2px;
-  color: rgba(109, 221, 255, 0.4);
+  margin-bottom: 2rem;
+  width: 100%;
 }
 
 .piano-body {
@@ -131,20 +118,22 @@ const handlePress = (n: { note: string, freq: number }) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
   max-width: 1000px;
   margin: 0 auto;
 }
 
 .piano-info {
   text-align: center;
-  margin-bottom: 4rem;
+  margin-bottom: 3rem;
+  width: 100%;
 }
 
 .title {
   font-family: 'Manrope', sans-serif;
   font-size: 3rem;
   font-weight: 800;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .desc {
@@ -154,16 +143,26 @@ const handlePress = (n: { note: string, freq: number }) => {
 
 .keyboard {
   display: flex;
+  justify-content: center;
   background: #141f38;
-  padding: 1.5rem;
-  padding-bottom: 1rem;
+  padding: 1rem;
+  padding-bottom: 0.8rem;
   border-radius: 20px;
   box-shadow: 0 40px 100px rgba(0,0,0,0.6);
   border: 1px solid rgba(109, 221, 255, 0.1);
+  width: 100%; /* Chiếm hết chiều ngang */
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow: hidden; /* Cấm cuộn ngang */
 }
 
+/* Ẩn thanh cuộn dự phòng */
+.keyboard::-webkit-scrollbar { display: none; }
+
 .white-key {
-  width: 70px;
+  flex: 1; /* CỰC QUAN TRỌNG: Các phím tự chia đều không gian */
+  min-width: 0; /* Cho phép co nhỏ hơn nội dung */
   height: 280px;
   background: white;
   border: 1px solid #ccc;
@@ -175,9 +174,37 @@ const handlePress = (n: { note: string, freq: number }) => {
   justify-content: flex-end;
   padding-bottom: 1.5rem;
   color: #333;
-  margin: 0 2px;
+  margin: 0 2px; /* Giảm margin để nhường chỗ */
   transition: all 0.1s;
   user-select: none;
+}
+
+/* RESPONSIVE TRÊN MOBILE */
+@media (max-width: 768px) {
+  .piano-container { padding: 0.5rem; } /* Giảm lề ngoài tối đa */
+  .title { font-size: 1.6rem; }
+  .desc { font-size: 0.85rem; margin-bottom: 2rem; }
+  
+  .piano-header { margin-bottom: 1.5rem; }
+  .piano-body { justify-content: flex-start; padding-top: 2rem; }
+
+  .keyboard {
+    padding: 0.3rem;
+    padding-bottom: 0.5rem;
+    border-radius: 12px;
+  }
+  
+  .white-key {
+    height: 160px;
+    padding-bottom: 0.8rem;
+    margin: 0 1px; /* Khoảng cách siêu nhỏ trên mobile */
+    border-radius: 0 0 5px 5px;
+  }
+
+  .key-label {
+    font-size: 0.5rem; /* Thu nhỏ chữ tối đa */
+    white-space: nowrap;
+  }
 }
 
 .white-key.active {

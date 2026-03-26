@@ -1,5 +1,13 @@
 [
   {
+    "slug": "oracle-tarot",
+    "path": "/oracle-tarot",
+    "name": "Bói Bài Oracle",
+    "description": "Lắng nghe thông điệp huyền bí từ vũ trụ thông qua những lá bài Tarot kỹ thuật số linh ứng.",
+    "category": "spiritual",
+    "author": "Truong Dinh Anh"
+  },
+  {
     "slug": "color-game",
     "path": "/color-game",
     "name": "Color Game",
@@ -14,6 +22,22 @@
     "description": "Choi piano tren trinh duyet",
     "category": "creative",
     "author": "Vibe Team"
+  },
+  {
+    "slug": "monopoly",
+    "path": "/monopoly",
+    "name": "Monopoly",
+    "description": "Game cờ tỉ phú (Neo-Monopoly) phiên bản web. Chơi với AI để tranh giành tài sản.",
+    "category": "game",
+    "author": "Cộng đồng AI"
+  },
+  {
+    "slug": "neon-typing",
+    "path": "/neon-typing",
+    "name": "Neon Typing",
+    "description": "Thử thách gõ phím tốc độ cao với hiệu ứng Neon và WPM thời gian thực.",
+    "category": "game",
+    "author": "Truong Dinh Anh"
   },
   {
     "slug": "ngare",

@@ -143,20 +143,22 @@ onMounted(() => {
           >
             <div class="card-glow" />
             <div class="card-content">
-              <div class="app-header">
-                <div class="app-icon">
-                  {{ page.name.charAt(0) }}
+              <div class="card-body">
+                <div class="app-header">
+                  <div class="app-icon">
+                    {{ page.name.charAt(0) }}
+                  </div>
+                  <div class="app-category">
+                    {{ page.category }}
+                  </div>
                 </div>
-                <div class="app-category">
-                  {{ page.category }}
-                </div>
+                <h3 class="app-name">
+                  {{ page.name }}
+                </h3>
+                <p class="app-desc">
+                  {{ page.description }}
+                </p>
               </div>
-              <h3 class="app-name">
-                {{ page.name }}
-              </h3>
-              <p class="app-desc">
-                {{ page.description }}
-              </p>
               <div class="card-footer">
                 <span class="launch-btn">Khởi chạy</span>
                 <button
@@ -253,11 +255,10 @@ onMounted(() => {
 .vibe-layout {
   display: flex;
   width: 100%;
-  height: 100vh;
+  min-height: 100vh; /* Thay đổi từ height: 100vh */
   background: var(--bg);
   color: var(--text);
   font-family: 'Inter', sans-serif;
-  overflow: hidden;
   position: relative;
 }
 
@@ -275,7 +276,6 @@ onMounted(() => {
 .content-hub {
   flex: 1;
   padding: 3rem 4rem;
-  overflow-y: auto;
   position: relative;
   z-index: 1;
 }
@@ -319,7 +319,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  width: 300px;
+  flex: 1; /* Thay đổi từ width cố định sang flex: 1 */
+  min-width: 200px;
 }
 
 .search-box input {
@@ -337,6 +338,7 @@ onMounted(() => {
   border-radius: 99px;
   color: var(--text-dim);
   outline: none;
+  width: 100%; /* Đảm bảo chiếm hết ngang trên mobile */
 }
 
 /* App Grid */
@@ -369,6 +371,8 @@ onMounted(() => {
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid var(--outline);
+  display: flex;
+  flex-direction: column;
 }
 
 .app-card:hover {
@@ -441,10 +445,23 @@ onMounted(() => {
   overflow: hidden;
 }
 
+.card-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+.card-body {
+  flex-grow: 1; /* Đẩy footer xuống dưới */
+}
+
 .card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-top: 1.5rem; /* Khoảng cách tối thiểu với mô tả */
 }
 
 .launch-btn {
@@ -539,7 +556,23 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .sidebar { display: none; }
-  .content-hub { padding: 2rem; }
+  .content-hub { padding: 1.5rem; }
   .secondary-grid { grid-template-columns: 1fr; }
+  
+  .display-title { font-size: 2.2rem; }
+  
+  .search-wrap {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  
+  .search-box {
+    width: 100%;
+  }
+
+  .hub-header {
+    margin-bottom: 2rem;
+  }
 }
 </style>
