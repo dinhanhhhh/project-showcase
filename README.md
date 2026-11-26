@@ -60,11 +60,9 @@ Dự án được xây dựng với những công nghệ FE hiện đại nhất
    - Lắng nghe thông điệp từ những lá bài Tarot kỹ thuật số.
 9. **⌨️ Neon Typing (`neon-typing`)**:
    - Thử thách gõ phím tốc độ cao với hiệu ứng Neon và WPM thời gian thực.
-10. **🏦 Monopoly (`monopoly`)**:
-    - Phiên bản cờ tỉ phú Neo-Monopoly chơi nhanh với AI.
-11. **🎹 Mini Piano (`mini-piano`)**: 
+10. **🎹 Mini Piano (`mini-piano`)**: 
     - Đàn Synthesizer Piano 13 phím (trắng & đen), hỗ trợ gõ phím máy tính, 4 âm sắc nhạc cụ và 3 bản nhạc mẫu tự động.
-12. **🎨 Color Game (`color-game`)**: 
+11. **🎨 Color Game (`color-game`)**: 
     - Trò chơi phản xạ thị giác nhận diện mã màu RGB & HEX với 3 cấp độ khó (4/6/9 ô), thanh phân tích kênh màu và chuỗi Streak.
 
 *(Các mini-app nằm tại thư mục `src/views/` và các app nhúng tĩnh nằm tại `public/apps/`)*

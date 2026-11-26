@@ -48,14 +48,6 @@
     "author": "Vibe Team"
   },
   {
-    "slug": "monopoly",
-    "path": "/monopoly",
-    "name": "Monopoly",
-    "description": "Game cờ tỉ phú (Neo-Monopoly) phiên bản web. Chơi với AI để tranh giành tài sản.",
-    "category": "game",
-    "author": "Cộng đồng AI"
-  },
-  {
     "slug": "neon-typing",
     "path": "/neon-typing",
     "name": "Neon Typing",

@@ -81,12 +81,6 @@ const APP_VISUALS: Record<string, AppVisualMeta> = {
     badge: 'RGB & HEX',
     tags: ['Phản xạ màu sắc', '3 Cấp độ 4/6/9 ô', 'Chuỗi Streak'],
   },
-  monopoly: {
-    icon: '🏦',
-    accent: '#f59e0b',
-    badge: 'Classic 20 Ô',
-    tags: ['Neo-Monopoly', 'Ván nhanh với AI'],
-  },
 }
 
 const CATEGORY_META: Record<string, { label: string; icon: string }> = {
