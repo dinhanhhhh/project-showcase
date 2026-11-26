@@ -1,3 +1,16 @@
+export type WordPackId = 'dev' | 'vietnamese' | 'syntax' | 'english'
+
+export type TypingMode = 'timed' | 'sudden_death'
+
+export type TypingRank = 'S+' | 'S' | 'A' | 'B' | 'C'
+
+export interface WordPackMeta {
+  id: WordPackId
+  label: string
+  icon: string
+  words: readonly string[]
+}
+
 export interface GameState {
   isActive: boolean
   isFinished: boolean

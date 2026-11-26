@@ -35,9 +35,19 @@ export interface MoveRecord {
   notation: string
 }
 
-export type GameMode = 'vs_bot' | 'pvp_local'
+export type GameMode = 'vs_bot' | 'pvp_local' | 'puzzle'
 export type GameStatus = 'ongoing' | 'check' | 'checkmate' | 'stalemate' | 'draw'
 export type BotDifficulty = 'easy' | 'medium' | 'hard'
+export type TimeControlMinutes = 0 | 5 | 10
+
+export interface XiangqiPuzzle {
+  id: string
+  title: string
+  difficulty: 'Cơ bản' | 'Trung bình' | 'Cao thủ'
+  description: string
+  hint: string
+  boardState: BoardState
+}
 
 export interface BotMove {
   piece: Piece

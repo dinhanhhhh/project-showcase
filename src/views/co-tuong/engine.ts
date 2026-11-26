@@ -3,6 +3,7 @@ import {
   BOARD_RANKS,
   PIECE_NAMES_VI,
   PIECE_VALUES,
+  cloneBoardState,
   createInitialBoardState,
 } from './constants'
 import type {
@@ -362,8 +363,11 @@ export function isRepetition(moveHistory: readonly MoveRecord[]): boolean {
   )
 }
 
-export function replayHistory(history: readonly MoveRecord[]): BoardState {
-  let board = createInitialBoardState()
+export function replayHistory(
+  history: readonly MoveRecord[],
+  initialBoard?: BoardState,
+): BoardState {
+  let board = initialBoard ? cloneBoardState(initialBoard) : createInitialBoardState()
   for (const move of history) {
     const piece = board.pieces.find((p) => p.id === move.piece.id)
     if (piece) {
@@ -426,6 +430,12 @@ export function evaluateBoard(boardState: BoardState, perspective: Side): number
   }
 
   return perspective === 'red' ? redScore : -redScore
+}
+
+export function calculateRedAdvantagePercent(boardState: BoardState): number {
+  const redScore = evaluateBoard(boardState, 'red')
+  const percent = Math.round(50 + Math.tanh(redScore / 850) * 45)
+  return Math.max(5, Math.min(95, percent))
 }
 
 function collectOrderedMoves(boardState: BoardState, side: Side): BotMove[] {

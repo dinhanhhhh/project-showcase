@@ -47,9 +47,9 @@ Dự án được xây dựng với những công nghệ FE hiện đại nhất
 1. **🏠 Home (Bộ định tuyến chính)**: 
    - Nơi hiển thị tất cả ứng dụng. Giao diện phi hành gia (Digital Curator) hiện đại với lưới thẻ ứng dụng, lọc theo danh mục (`Trò chơi`, `Sáng tạo`, `Công cụ`, `Học tập`, `Tâm linh`).
 2. **🕹️ Ngã Rẽ Cuộc Đời (`ngare`)**: 
-   - Game nhập vai mô phỏng cuộc đời với hệ thống Chỉ số (Stats), Nghề nghiệp (Careers), Sự kiện (Events), Cửa hàng (Shop), và Kỹ năng (Skills).
+   - Game nhập vai mô phỏng cuộc đời với hệ thống Chỉ số (Stats), Nghề nghiệp (Careers), Sự kiện hiện đại phong phú (AI & Tự động hóa, Remote Work, Marathon, Digital Detox, Góp vốn kinh doanh...), Cửa hàng (Shop), và Kỹ năng (Skills).
 3. **♟️ Cờ Tướng Master (`co-tuong`)** *(Native Vue 3)*:
-   - Game Cờ Tướng (Xiangqi) chuẩn luật quốc tế với AI Minimax Alpha-Beta 3 cấp độ, chơi 2 người tại chỗ, biên bản ký hiệu tiếng Việt, âm thanh Web Audio và lưu ván tự động bằng Pinia.
+   - Game Cờ Tướng (Xiangqi) chuẩn luật quốc tế với AI Minimax Alpha-Beta 3 cấp độ, **4 Cờ Thế tàn cuộc** (Song Xa Thác, Trọng Pháo, Mã Hậu Pháo, Ngọa Tào Mã 2 nước), **Đồng hồ bấm giờ** (5/10 phút), **Thanh đánh giá thế trận (Evaluation Bar)**, nút Đầu hàng, chơi 2 người tại chỗ và lưu ván tự động bằng Pinia.
 4. **🎴 OOP Flashcards (`oop-flashcards`)** *(Native Vue 3)*:
    - Ứng dụng ôn tập 21 câu hỏi phỏng vấn OOP & SOLID với thẻ lật 3D, syntax highlighting an toàn, phím tắt và lưu tiến trình qua Pinia.
 5. **🍜 Hôm Nay Ăn Gì (`hom-nay-an-gi`)** *(Native Vue 3)*:
@@ -61,11 +61,11 @@ Dự án được xây dựng với những công nghệ FE hiện đại nhất
 8. **🔮 Bói Bài Oracle (`oracle-tarot`)**:
    - Lắng nghe thông điệp từ những lá bài Tarot kỹ thuật số.
 9. **⌨️ Neon Typing (`neon-typing`)**:
-   - Thử thách gõ phím tốc độ cao với hiệu ứng Neon và WPM thời gian thực.
+   - Thử thách gõ phím tốc độ cao với **4 bộ từ vựng (146 từ)**, chế độ **Tính giờ (15s/30s/60s)** và **Sudden Death (3 mạng ❤️❤️❤️)**, **âm thanh bàn phím cơ Web Audio**, xếp hạng `S+` đến `C` và lưu kỷ lục qua Pinia.
 10. **🎹 Mini Piano (`mini-piano`)**: 
-    - Đàn Synthesizer Piano 13 phím (trắng & đen), hỗ trợ gõ phím máy tính, 4 âm sắc nhạc cụ và 3 bản nhạc mẫu tự động.
+    - Đàn Synthesizer Piano 13 phím hỗ trợ **chuyển 3 quãng tám (`C3`/`C4`/`C5`)**, 4 âm sắc nhạc cụ, chế độ **Thử thách Giai điệu chấm điểm & Combo** trên **5 bản nhạc** (có gợi ý phím đen) và **Bộ thu âm / phát lại giai điệu theo nhịp thực**.
 11. **🎨 Color Game (`color-game`)**: 
-    - Trò chơi phản xạ thị giác nhận diện mã màu RGB & HEX với 3 cấp độ khó (4/6/9 ô), thanh phân tích kênh màu và chuỗi Streak.
+    - Trò chơi phản xạ thị giác nhận diện mã màu **RGB, HEX & HSL** (kèm thanh phân tích H/S/L), chế độ **Tự do** và **Time Attack 45s (+2s/-3s, Combo x1–x3)**, quyền trợ giúp **50:50**, âm thanh cộng hưởng Web Audio và lưu kỷ lục qua Pinia.
 
 *(Các mini-app nằm tại thư mục `src/views/` và các app nhúng tĩnh nằm tại `public/apps/`)*
 

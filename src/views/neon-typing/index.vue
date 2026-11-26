@@ -1,17 +1,33 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { useIntervalFn, useLocalStorage } from '@vueuse/core'
-import { calculateAccuracy, calculateWPM, createInitialState, getRandomWords } from './engine'
-import type { GameState } from './types'
+import { useIntervalFn } from '@vueuse/core'
+import { useNeonTypingStore } from '@/stores/neonTyping'
+import { useTypingAudio } from './composables/useTypingAudio'
+import {
+  WORD_PACK_LIST,
+  calculateAccuracy,
+  calculateTypingRank,
+  calculateWPM,
+  createInitialState,
+  getRandomWords,
+} from './engine'
+import type { GameState, TypingMode, WordPackId } from './types'
 
 type DurationOption = 15 | 30 | 60
 
-const topScore = useLocalStorage('neon_typing_highscore', 0)
+const MAX_HEARTS = 3
+
+const store = useNeonTypingStore()
+const { playKeyClick, playWordComplete, playError, playGameOver } = useTypingAudio()
+
+const typingMode = ref<TypingMode>('timed')
 const selectedDuration = ref<DurationOption>(30)
-const state = ref<GameState>(createInitialState(40))
+const state = ref<GameState>(createInitialState(40, store.preferredPack, 30))
 const inputRef = ref<HTMLInputElement | null>(null)
 const timerRef = ref<number>(30)
+const elapsedSuddenDeathSec = ref<number>(0)
+const heartsLeft = ref<number>(MAX_HEARTS)
 const combo = ref(0)
 const maxCombo = ref(0)
 const recentResults = ref<Array<{ word: string; ok: boolean }>>([])
@@ -21,12 +37,16 @@ let shakeTimer: ReturnType<typeof setTimeout> | null = null
 
 const { pause, resume } = useIntervalFn(
   () => {
-    if (timerRef.value > 0) {
-      timerRef.value -= 1
-      state.value.timeLeft = timerRef.value
-    }
-    if (timerRef.value <= 0) {
-      finishGame()
+    if (typingMode.value === 'timed') {
+      if (timerRef.value > 0) {
+        timerRef.value -= 1
+        state.value.timeLeft = timerRef.value
+      }
+      if (timerRef.value <= 0) {
+        finishGame()
+      }
+    } else {
+      elapsedSuddenDeathSec.value += 1
     }
   },
   1000,
@@ -38,19 +58,30 @@ const upcomingWords = computed(() =>
   state.value.words.slice(state.value.currentIndex + 1, state.value.currentIndex + 6),
 )
 
-const elapsedSeconds = computed(() => Math.max(0, selectedDuration.value - timerRef.value))
+const activeElapsedSeconds = computed(() =>
+  typingMode.value === 'timed'
+    ? Math.max(0, selectedDuration.value - timerRef.value)
+    : elapsedSuddenDeathSec.value,
+)
 
 const wpmRealtime = computed(() =>
-  calculateWPM(state.value.score.correctCount, elapsedSeconds.value),
+  calculateWPM(state.value.score.correctCount, Math.max(1, activeElapsedSeconds.value)),
 )
 
 const liveAccuracy = computed(() =>
   calculateAccuracy(state.value.score.correctCount, state.value.score.totalTyped),
 )
 
-const timeProgressPercent = computed(() =>
-  Math.max(0, Math.min(100, (timerRef.value / selectedDuration.value) * 100)),
+const finalRank = computed(() =>
+  calculateTypingRank(state.value.score.wpm, state.value.score.accuracy),
 )
+
+const progressPercent = computed(() => {
+  if (typingMode.value === 'sudden_death') {
+    return (heartsLeft.value / MAX_HEARTS) * 100
+  }
+  return Math.max(0, Math.min(100, (timerRef.value / selectedDuration.value) * 100))
+})
 
 const inputProgressPercent = computed(() => {
   const len = currentWord.value.length
@@ -78,9 +109,10 @@ const extraTypedChars = computed(() => {
 
 function resetGame(autoFocus = true) {
   pause()
-  state.value = createInitialState(40)
+  state.value = createInitialState(40, store.preferredPack, selectedDuration.value)
   timerRef.value = selectedDuration.value
-  state.value.timeLeft = selectedDuration.value
+  elapsedSuddenDeathSec.value = 0
+  heartsLeft.value = MAX_HEARTS
   combo.value = 0
   maxCombo.value = 0
   recentResults.value = []
@@ -89,8 +121,20 @@ function resetGame(autoFocus = true) {
   }
 }
 
+function setMode(mode: TypingMode) {
+  if (typingMode.value === mode) return
+  typingMode.value = mode
+  resetGame(true)
+}
+
 function setDuration(seconds: DurationOption) {
+  typingMode.value = 'timed'
   selectedDuration.value = seconds
+  resetGame(true)
+}
+
+function selectPack(pack: WordPackId) {
+  store.setPack(pack)
   resetGame(true)
 }
 
@@ -116,37 +160,50 @@ function handleInput(e: Event) {
     resume()
   }
 
-  if (val.endsWith(' ')) {
-    const typed = val.trim()
-    if (typed.length === 0) {
-      state.value.inputValue = ''
-      return
-    }
+  if (!val.endsWith(' ')) {
+    playKeyClick(store.soundEnabled)
+    return
+  }
 
-    const isCorrect = typed === currentWord.value
-    if (isCorrect) {
-      state.value.score.correctCount += 1
-      combo.value += 1
-      if (combo.value > maxCombo.value) {
-        maxCombo.value = combo.value
-      }
-    } else {
-      combo.value = 0
-      triggerInputShake()
-    }
-
-    recentResults.value = [...recentResults.value.slice(-7), { word: currentWord.value, ok: isCorrect }]
-    state.value.score.totalTyped += 1
-    state.value.score.accuracy = calculateAccuracy(
-      state.value.score.correctCount,
-      state.value.score.totalTyped,
-    )
-    state.value.currentIndex += 1
+  const typed = val.trim()
+  if (typed.length === 0) {
     state.value.inputValue = ''
+    return
+  }
 
-    if (state.value.currentIndex + 10 >= state.value.words.length) {
-      state.value.words.push(...getRandomWords(20))
+  const isCorrect = typed === currentWord.value
+  if (isCorrect) {
+    state.value.score.correctCount += 1
+    combo.value += 1
+    if (combo.value > maxCombo.value) {
+      maxCombo.value = combo.value
     }
+    playWordComplete(store.soundEnabled, combo.value)
+  } else {
+    combo.value = 0
+    triggerInputShake()
+    playError(store.soundEnabled)
+    if (typingMode.value === 'sudden_death') {
+      heartsLeft.value = Math.max(0, heartsLeft.value - 1)
+    }
+  }
+
+  recentResults.value = [...recentResults.value.slice(-7), { word: currentWord.value, ok: isCorrect }]
+  state.value.score.totalTyped += 1
+  state.value.score.accuracy = calculateAccuracy(
+    state.value.score.correctCount,
+    state.value.score.totalTyped,
+  )
+  state.value.currentIndex += 1
+  state.value.inputValue = ''
+
+  if (typingMode.value === 'sudden_death' && heartsLeft.value <= 0) {
+    finishGame()
+    return
+  }
+
+  if (state.value.currentIndex + 10 >= state.value.words.length) {
+    state.value.words.push(...getRandomWords(20, store.preferredPack))
   }
 }
 
@@ -154,15 +211,23 @@ function finishGame() {
   pause()
   state.value.isActive = false
   state.value.isFinished = true
-  state.value.score.wpm = calculateWPM(state.value.score.correctCount, selectedDuration.value)
+  const spent =
+    typingMode.value === 'timed'
+      ? selectedDuration.value
+      : Math.max(1, elapsedSuddenDeathSec.value)
+  state.value.score.wpm = calculateWPM(state.value.score.correctCount, spent)
   state.value.score.accuracy = calculateAccuracy(
     state.value.score.correctCount,
     state.value.score.totalTyped,
   )
 
-  if (state.value.score.wpm > topScore.value) {
-    topScore.value = state.value.score.wpm
+  if (typingMode.value === 'timed') {
+    store.recordTimedResult(state.value.score.wpm)
+  } else {
+    store.recordSuddenDeathResult(state.value.score.correctCount, state.value.score.wpm)
   }
+
+  playGameOver(store.soundEnabled)
 }
 
 onMounted(() => {
@@ -188,11 +253,45 @@ onUnmounted(() => {
 
         <div class="title-block">
           <h1>⌨️ Neon Speed Typist</h1>
-          <p>Gõ ngay ký tự đầu tiên để tự động kích hoạt đồng hồ</p>
+          <p>4 bộ từ vựng · Âm thanh bàn phím cơ · Chế độ Tính giờ &amp; Sudden Death</p>
+        </div>
+
+        <button
+          type="button"
+          class="sound-btn"
+          :class="{ muted: !store.soundEnabled }"
+          @click="store.toggleSound()"
+        >
+          {{ store.soundEnabled ? '🔊 Phím cơ' : '🔇 Tắt âm' }}
+        </button>
+      </header>
+
+      <!-- Thanh chọn Chế độ & Bộ từ vựng -->
+      <section class="config-strip">
+        <div
+          class="segmented"
+          role="group"
+          aria-label="Chọn chế độ chơi"
+        >
+          <button
+            type="button"
+            :class="{ active: typingMode === 'timed' }"
+            @click="setMode('timed')"
+          >
+            ⏱️ Tính giờ
+          </button>
+          <button
+            type="button"
+            :class="{ active: typingMode === 'sudden_death' }"
+            @click="setMode('sudden_death')"
+          >
+            💀 Sudden Death
+          </button>
         </div>
 
         <div
-          class="duration-pills"
+          v-if="typingMode === 'timed'"
+          class="segmented"
           role="group"
           aria-label="Chọn thời lượng"
         >
@@ -206,20 +305,48 @@ onUnmounted(() => {
             {{ sec }}s
           </button>
         </div>
-      </header>
 
-      <!-- Thanh Telemetry 4 chỉ số + Combo -->
+        <div
+          class="pack-pills"
+          role="group"
+          aria-label="Chọn bộ từ vựng"
+        >
+          <button
+            v-for="pack in WORD_PACK_LIST"
+            :key="pack.id"
+            type="button"
+            :class="{ active: store.preferredPack === pack.id }"
+            @click="selectPack(pack.id)"
+          >
+            {{ pack.icon }} {{ pack.label }}
+          </button>
+        </div>
+      </section>
+
+      <!-- Thanh Telemetry 5 chỉ số -->
       <section class="stats-bar glass-card">
         <div class="stat-cell">
-          <span class="label">THỜI GIAN</span>
+          <span class="label">{{ typingMode === 'timed' ? 'THỜI GIAN' : 'SINH MẠNG' }}</span>
           <strong
+            v-if="typingMode === 'timed'"
             class="val"
             :class="{ danger: timerRef <= 10 && state.isActive }"
-          >{{ timerRef }}s</strong>
+          >
+            {{ timerRef }}s
+          </strong>
+          <strong
+            v-else
+            class="val hearts"
+            :class="{ danger: heartsLeft === 1 }"
+          >
+            {{ '❤️'.repeat(heartsLeft) }}{{ '🖤'.repeat(MAX_HEARTS - heartsLeft) }}
+          </strong>
         </div>
         <div class="stat-cell featured">
           <span class="label">TỐC ĐỘ (WPM)</span>
-          <strong class="val neon">{{ state.isFinished ? state.score.wpm : wpmRealtime }}</strong>
+          <strong class="val neon">
+            {{ state.isFinished ? state.score.wpm : state.isActive ? wpmRealtime : 0 }}
+          </strong>
         </div>
         <div class="stat-cell">
           <span class="label">CHÍNH XÁC</span>
@@ -230,17 +357,25 @@ onUnmounted(() => {
           <strong class="val combo">{{ combo }} 🔥</strong>
         </div>
         <div class="stat-cell">
-          <span class="label">KỶ LỤC</span>
-          <strong class="val accent">{{ topScore }}</strong>
+          <span class="label">
+            {{ typingMode === 'timed' ? 'KỶ LỤC WPM' : 'KỶ LỤC TỪ' }}
+          </span>
+          <strong class="val accent">
+            {{ typingMode === 'timed' ? store.bestWpm : store.bestSuddenDeathWords }}
+          </strong>
         </div>
       </section>
 
-      <!-- Thanh tiến trình thời gian -->
+      <!-- Thanh tiến trình thời gian / sinh mạng -->
       <div class="time-track">
         <div
           class="time-fill"
-          :class="{ danger: timerRef <= 10 && state.isActive }"
-          :style="{ width: `${timeProgressPercent}%` }"
+          :class="{
+            danger:
+              (typingMode === 'timed' && timerRef <= 10 && state.isActive) ||
+              (typingMode === 'sudden_death' && heartsLeft <= 1),
+          }"
+          :style="{ width: `${progressPercent}%` }"
         />
       </div>
 
@@ -311,8 +446,9 @@ onUnmounted(() => {
 
         <div class="arena-footer">
           <span class="hint-text">
-            Mẹo: Nhấn <kbd>Space</kbd> để chốt từng từ · Trạng thái:
-            <strong>{{ state.isActive ? 'Đang chạy ⚡' : 'Chờ gõ phím đầu tiên' }}</strong>
+            Mẹo: Nhấn <kbd>Space</kbd> để chốt từng từ ·
+            <strong v-if="typingMode === 'sudden_death'">Sai 3 từ sẽ kết thúc · Đã sống sót {{ elapsedSuddenDeathSec }}s</strong>
+            <strong v-else>{{ state.isActive ? 'Đang chạy ⚡' : 'Chờ gõ phím đầu tiên' }}</strong>
           </span>
           <button
             type="button"
@@ -324,17 +460,31 @@ onUnmounted(() => {
         </div>
       </main>
 
-      <!-- Kết quả cuối ván -->
+      <!-- Kết quả cuối ván với Hạng S+ đến C -->
       <section
         v-else
         class="result-card glass-card"
       >
         <div class="result-badge">
-          ⚡ HOÀN THÀNH THỬ THÁCH {{ selectedDuration }}S
+          {{
+            typingMode === 'timed'
+              ? `⚡ HOÀN THÀNH THỬ THÁCH ${selectedDuration}S`
+              : `💀 SUDDEN DEATH · SỐNG SÓT ${elapsedSuddenDeathSec}S`
+          }}
         </div>
-        <h2 class="result-wpm">
-          {{ state.score.wpm }} <span>WPM</span>
-        </h2>
+
+        <div class="result-headline">
+          <div
+            class="rank-emblem"
+            :class="`rank-${finalRank.replace('+', 'plus').toLowerCase()}`"
+          >
+            <span>RANK</span>
+            <strong>{{ finalRank }}</strong>
+          </div>
+          <h2 class="result-wpm">
+            {{ state.score.wpm }} <span>WPM</span>
+          </h2>
+        </div>
 
         <div class="result-grid">
           <div class="res-box">
@@ -350,8 +500,10 @@ onUnmounted(() => {
             <strong class="combo">{{ maxCombo }} 🔥</strong>
           </div>
           <div class="res-box">
-            <span>Kỷ lục cá nhân</span>
-            <strong class="accent">{{ topScore }} WPM</strong>
+            <span>Kỷ lục cá nhân (Tổng {{ store.totalGamesPlayed }} ván)</span>
+            <strong class="accent">
+              {{ store.bestWpm }} WPM · {{ store.bestSuddenDeathWords }} từ SD
+            </strong>
           </div>
         </div>
 
@@ -381,10 +533,10 @@ onUnmounted(() => {
 
 .typing-shell {
   width: 100%;
-  max-width: 860px;
+  max-width: 900px;
   display: flex;
   flex-direction: column;
-  gap: 1.15rem;
+  gap: 1rem;
 }
 
 .top-nav {
@@ -395,7 +547,8 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.back-btn {
+.back-btn,
+.sound-btn {
   padding: 0.5rem 0.95rem;
   border-radius: 12px;
   background: var(--bg-card);
@@ -403,7 +556,12 @@ onUnmounted(() => {
   color: var(--primary);
   text-decoration: none;
   font-weight: 600;
-  font-size: 0.86rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.sound-btn.muted {
+  color: var(--text-dim);
 }
 
 .title-block {
@@ -422,27 +580,40 @@ onUnmounted(() => {
   color: var(--text-dim);
 }
 
-.duration-pills {
+.config-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.segmented,
+.pack-pills {
   display: flex;
   gap: 0.25rem;
   padding: 0.25rem;
   border-radius: 12px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
+  flex-wrap: wrap;
 }
 
-.duration-pills button {
-  padding: 0.42rem 0.8rem;
+.segmented button,
+.pack-pills button {
+  padding: 0.4rem 0.72rem;
   border-radius: 9px;
   border: none;
   background: transparent;
   color: var(--text-dim);
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   cursor: pointer;
+  transition: var(--transition-fast);
 }
 
-.duration-pills button.active {
+.segmented button.active,
+.pack-pills button.active {
   background: var(--primary);
   color: var(--text-inverse);
 }
@@ -451,7 +622,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 0.75rem;
-  padding: 1.1rem 1.25rem;
+  padding: 1rem 1.2rem;
 }
 
 .stat-cell {
@@ -462,16 +633,21 @@ onUnmounted(() => {
 }
 
 .stat-cell .label {
-  font-size: 0.68rem;
-  letter-spacing: 1.3px;
+  font-size: 0.66rem;
+  letter-spacing: 1.2px;
   color: var(--text-dim);
   font-weight: 700;
 }
 
 .stat-cell .val {
   font-family: 'Manrope', sans-serif;
-  font-size: 1.55rem;
+  font-size: 1.45rem;
   font-weight: 800;
+}
+
+.val.hearts {
+  font-size: 1.15rem;
+  letter-spacing: 2px;
 }
 
 .val.neon {
@@ -510,7 +686,7 @@ onUnmounted(() => {
 .time-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--primary), var(--accent));
-  transition: width 0.35s linear;
+  transition: width 0.3s linear;
 }
 
 .time-fill.danger {
@@ -521,7 +697,7 @@ onUnmounted(() => {
   padding: 2rem 1.75rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.4rem;
 }
 
 .recent-strip {
@@ -694,6 +870,58 @@ onUnmounted(() => {
   letter-spacing: 1px;
 }
 
+.result-headline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+}
+
+.rank-emblem {
+  width: 78px;
+  height: 78px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-sidebar);
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 24px var(--primary-glow);
+}
+
+.rank-emblem span {
+  font-size: 0.62rem;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.rank-emblem strong {
+  font-family: 'Manrope', sans-serif;
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--primary);
+}
+
+.rank-emblem.rank-splus {
+  border-color: var(--warning);
+  box-shadow: 0 0 28px rgba(251, 191, 36, 0.45);
+}
+
+.rank-emblem.rank-splus strong {
+  color: var(--warning);
+}
+
+.rank-emblem.rank-s {
+  border-color: var(--accent);
+}
+
+.rank-emblem.rank-s strong {
+  color: var(--accent);
+}
+
 .result-wpm {
   font-family: 'Manrope', sans-serif;
   font-size: clamp(2.8rem, 7vw, 4.2rem);
@@ -731,7 +959,7 @@ onUnmounted(() => {
 
 .res-box strong {
   font-family: 'Manrope', sans-serif;
-  font-size: 1.3rem;
+  font-size: 1.15rem;
 }
 
 .cta-retry {

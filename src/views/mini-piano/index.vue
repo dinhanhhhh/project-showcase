@@ -1,65 +1,28 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import {
+  SONG_PRESETS,
+  calculateChallengeAccuracy,
+  formatPitchForOctave,
+  getKeysForOctave,
+  scoreChallengeHit,
+} from './engine'
+import type {
+  ChallengeStats,
+  OctaveNumber,
+  PianoKey,
+  PianoPlayMode,
+  RecordedNoteEvent,
+  SongPreset,
+} from './types'
 
 interface ExtendedWindow extends Window {
   webkitAudioContext?: typeof AudioContext
 }
 
-interface PianoKey {
-  note: string
-  freq: number
-  label: string
-  kbd: string
-  isSharp: boolean
-  leftPercent?: number
-}
-
-interface SongPreset {
-  id: string
-  title: string
-  notes: string[]
-}
-
-const WHITE_KEYS: PianoKey[] = [
-  { note: 'C4', freq: 261.63, label: 'Đô', kbd: 'A', isSharp: false },
-  { note: 'D4', freq: 293.66, label: 'Rê', kbd: 'S', isSharp: false },
-  { note: 'E4', freq: 329.63, label: 'Mi', kbd: 'D', isSharp: false },
-  { note: 'F4', freq: 349.23, label: 'Pha', kbd: 'F', isSharp: false },
-  { note: 'G4', freq: 392.0, label: 'Son', kbd: 'G', isSharp: false },
-  { note: 'A4', freq: 440.0, label: 'La', kbd: 'H', isSharp: false },
-  { note: 'B4', freq: 493.88, label: 'Si', kbd: 'J', isSharp: false },
-  { note: 'C5', freq: 523.25, label: 'Đô 2', kbd: 'K', isSharp: false },
-]
-
-const BLACK_KEYS: PianoKey[] = [
-  { note: 'C#4', freq: 277.18, label: 'C♯', kbd: 'W', isSharp: true, leftPercent: 12.5 },
-  { note: 'D#4', freq: 311.13, label: 'D♯', kbd: 'E', isSharp: true, leftPercent: 25 },
-  { note: 'F#4', freq: 369.99, label: 'F♯', kbd: 'T', isSharp: true, leftPercent: 50 },
-  { note: 'G#4', freq: 415.3, label: 'G♯', kbd: 'Y', isSharp: true, leftPercent: 62.5 },
-  { note: 'A#4', freq: 466.16, label: 'A♯', kbd: 'U', isSharp: true, leftPercent: 75 },
-]
-
-const ALL_KEYS: PianoKey[] = [...WHITE_KEYS, ...BLACK_KEYS]
-
-const SONG_PRESETS: SongPreset[] = [
-  {
-    id: 'twinkle',
-    title: '⭐ Twinkle Little Star',
-    notes: ['C4', 'C4', 'G4', 'G4', 'A4', 'A4', 'G4', 'F4', 'F4', 'E4', 'E4', 'D4', 'D4', 'C4'],
-  },
-  {
-    id: 'ode',
-    title: '🎼 Ode to Joy (Beethoven)',
-    notes: ['E4', 'E4', 'F4', 'G4', 'G4', 'F4', 'E4', 'D4', 'C4', 'C4', 'D4', 'E4', 'E4', 'D4', 'D4'],
-  },
-  {
-    id: 'birthday',
-    title: '🎂 Happy Birthday',
-    notes: ['C4', 'C4', 'D4', 'C4', 'F4', 'E4', 'C4', 'C4', 'D4', 'C4', 'G4', 'F4'],
-  },
-]
-
+const playMode = ref<PianoPlayMode>('free')
+const octave = ref<OctaveNumber>(4)
 const waveform = ref<OscillatorType>('triangle')
 const activeNote = ref<string | null>(null)
 const lastPlayedKey = ref<PianoKey | null>(null)
@@ -67,10 +30,40 @@ const selectedSong = ref<SongPreset>(SONG_PRESETS[0])
 const songStepIndex = ref(0)
 const isAutoPlaying = ref(false)
 const recentNotes = ref<string[]>([])
+const wrongFlashNote = ref<string | null>(null)
+
+// Challenge mode stats
+const challenge = ref<ChallengeStats>({
+  hits: 0,
+  misses: 0,
+  combo: 0,
+  maxCombo: 0,
+  score: 0,
+  completed: false,
+})
+
+// Melody Recorder
+const isRecording = ref(false)
+const isPlayingRecording = ref(false)
+const recordedNotes = ref<RecordedNoteEvent[]>([])
+let recordStartMs = 0
 
 let audioCtx: AudioContext | null = null
 let activeTimer: ReturnType<typeof setTimeout> | null = null
+let wrongTimer: ReturnType<typeof setTimeout> | null = null
 let autoPlayTimer: ReturnType<typeof setInterval> | null = null
+let playbackTimers: Array<ReturnType<typeof setTimeout>> = []
+
+const octaveKeys = computed(() => getKeysForOctave(octave.value))
+const whiteKeys = computed(() => octaveKeys.value.whiteKeys)
+const blackKeys = computed(() => octaveKeys.value.blackKeys)
+const allKeys = computed(() => octaveKeys.value.allKeys)
+
+const expectedPitchClass = computed(() => selectedSong.value.notes[songStepIndex.value] ?? null)
+
+const challengeAccuracy = computed(() =>
+  calculateChallengeAccuracy(challenge.value.hits, challenge.value.misses),
+)
 
 function ensureAudio(): AudioContext | null {
   if (typeof window === 'undefined') return null
@@ -85,33 +78,87 @@ function ensureAudio(): AudioContext | null {
   return audioCtx
 }
 
-function triggerKey(key: PianoKey) {
+function playSynthTone(freq: number) {
+  const ctx = ensureAudio()
+  if (!ctx) return
+
+  const now = ctx.currentTime
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+
+  osc.type = waveform.value
+  osc.frequency.setValueAtTime(freq, now)
+
+  gain.gain.setValueAtTime(0.001, now)
+  gain.gain.linearRampToValueAtTime(0.36, now + 0.015)
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.92)
+
+  osc.connect(gain)
+  gain.connect(ctx.destination)
+
+  osc.start(now)
+  osc.stop(now + 0.95)
+}
+
+function resetChallengeStats() {
+  songStepIndex.value = 0
+  challenge.value = {
+    hits: 0,
+    misses: 0,
+    combo: 0,
+    maxCombo: 0,
+    score: 0,
+    completed: false,
+  }
+}
+
+function triggerKey(key: PianoKey, isAutomated = false) {
   activeNote.value = key.note
   lastPlayedKey.value = key
   recentNotes.value = [...recentNotes.value.slice(-11), key.note]
+  playSynthTone(key.freq)
 
-  if (selectedSong.value.notes[songStepIndex.value] === key.note) {
-    songStepIndex.value = (songStepIndex.value + 1) % selectedSong.value.notes.length
+  if (isRecording.value && !isAutomated) {
+    const now = performance.now()
+    if (recordedNotes.value.length === 0) {
+      recordStartMs = now
+    }
+    recordedNotes.value = [
+      ...recordedNotes.value,
+      {
+        pitchClass: key.pitchClass,
+        octave: octave.value,
+        offsetMs: Math.round(now - recordStartMs),
+      },
+    ]
   }
 
-  const ctx = ensureAudio()
-  if (ctx) {
-    const now = ctx.currentTime
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
+  if (!isAutomated && playMode.value === 'challenge' && !challenge.value.completed) {
+    if (expectedPitchClass.value === key.pitchClass) {
+      const nextCombo = challenge.value.combo + 1
+      challenge.value.hits += 1
+      challenge.value.combo = nextCombo
+      if (nextCombo > challenge.value.maxCombo) {
+        challenge.value.maxCombo = nextCombo
+      }
+      challenge.value.score += scoreChallengeHit(nextCombo)
 
-    osc.type = waveform.value
-    osc.frequency.setValueAtTime(key.freq, now)
-
-    gain.gain.setValueAtTime(0.001, now)
-    gain.gain.linearRampToValueAtTime(0.38, now + 0.015)
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.95)
-
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-
-    osc.start(now)
-    osc.stop(now + 0.95)
+      if (songStepIndex.value + 1 >= selectedSong.value.notes.length) {
+        challenge.value.completed = true
+      } else {
+        songStepIndex.value += 1
+      }
+    } else {
+      challenge.value.misses += 1
+      challenge.value.combo = 0
+      wrongFlashNote.value = key.note
+      if (wrongTimer) clearTimeout(wrongTimer)
+      wrongTimer = setTimeout(() => {
+        wrongFlashNote.value = null
+      }, 260)
+    }
+  } else if (expectedPitchClass.value === key.pitchClass) {
+    songStepIndex.value = (songStepIndex.value + 1) % selectedSong.value.notes.length
   }
 
   if (activeTimer) clearTimeout(activeTimer)
@@ -122,10 +169,26 @@ function triggerKey(key: PianoKey) {
   }, 220)
 }
 
+function setMode(mode: PianoPlayMode) {
+  stopAutoPlay()
+  playMode.value = mode
+  resetChallengeStats()
+}
+
+function setOctave(next: OctaveNumber) {
+  octave.value = next
+}
+
 function selectSong(song: SongPreset) {
   stopAutoPlay()
   selectedSong.value = song
-  songStepIndex.value = 0
+  resetChallengeStats()
+}
+
+function selectNextSong() {
+  const idx = SONG_PRESETS.findIndex((s) => s.id === selectedSong.value.id)
+  const next = SONG_PRESETS[(idx + 1) % SONG_PRESETS.length]
+  selectSong(next)
 }
 
 function stopAutoPlay() {
@@ -142,24 +205,94 @@ function toggleAutoPlay() {
     return
   }
 
+  stopPlayback()
   isAutoPlaying.value = true
   songStepIndex.value = 0
   autoPlayTimer = setInterval(() => {
-    const noteName = selectedSong.value.notes[songStepIndex.value]
-    const key = ALL_KEYS.find((k) => k.note === noteName)
+    const pitch = selectedSong.value.notes[songStepIndex.value]
+    const key = allKeys.value.find((k) => k.pitchClass === pitch)
     if (key) {
-      triggerKey(key)
+      triggerKey(key, true)
     }
     if (songStepIndex.value === 0) {
       stopAutoPlay()
     }
-  }, 360)
+  }, 340)
+}
+
+function stopPlayback() {
+  for (const timer of playbackTimers) {
+    clearTimeout(timer)
+  }
+  playbackTimers = []
+  isPlayingRecording.value = false
+}
+
+function toggleRecording() {
+  if (isRecording.value) {
+    isRecording.value = false
+    return
+  }
+  stopAutoPlay()
+  stopPlayback()
+  recordedNotes.value = []
+  recordStartMs = performance.now()
+  isRecording.value = true
+}
+
+function clearRecording() {
+  stopPlayback()
+  isRecording.value = false
+  recordedNotes.value = []
+}
+
+function playRecording() {
+  if (recordedNotes.value.length === 0) return
+  if (isPlayingRecording.value) {
+    stopPlayback()
+    return
+  }
+  stopAutoPlay()
+  isRecording.value = false
+  isPlayingRecording.value = true
+
+  const events = [...recordedNotes.value]
+  let maxDelay = 0
+
+  events.forEach((ev) => {
+    if (ev.offsetMs > maxDelay) maxDelay = ev.offsetMs
+    const timer = setTimeout(() => {
+      const targetKeys = getKeysForOctave(ev.octave).allKeys
+      const matched = targetKeys.find((k) => k.pitchClass === ev.pitchClass)
+      if (matched) {
+        octave.value = ev.octave
+        triggerKey(matched, true)
+      }
+    }, ev.offsetMs)
+    playbackTimers.push(timer)
+  })
+
+  const endTimer = setTimeout(() => {
+    isPlayingRecording.value = false
+    playbackTimers = []
+  }, maxDelay + 450)
+  playbackTimers.push(endTimer)
 }
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.repeat || e.target instanceof HTMLInputElement) return
+
+  if (e.key === '[') {
+    if (octave.value > 3) octave.value = (octave.value - 1) as OctaveNumber
+    return
+  }
+  if (e.key === ']') {
+    if (octave.value < 5) octave.value = (octave.value + 1) as OctaveNumber
+    return
+  }
+
   const upper = e.key.toUpperCase()
-  const matched = ALL_KEYS.find((k) => k.kbd === upper)
+  const matched = allKeys.value.find((k) => k.kbd === upper)
   if (matched) {
     e.preventDefault()
     triggerKey(matched)
@@ -173,7 +306,9 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   stopAutoPlay()
+  stopPlayback()
   if (activeTimer) clearTimeout(activeTimer)
+  if (wrongTimer) clearTimeout(wrongTimer)
   if (audioCtx) {
     void audioCtx.close()
     audioCtx = null
@@ -194,7 +329,9 @@ onUnmounted(() => {
 
         <div class="title-block">
           <h1>🎹 Vibe Synth Piano</h1>
-          <p>Bấm chuột, chạm màn hình hoặc gõ phím <kbd>A</kbd>–<kbd>K</kbd> &amp; <kbd>W E T Y U</kbd></p>
+          <p>
+            Phím <kbd>A</kbd>–<kbd>K</kbd> &amp; <kbd>W E T Y U</kbd> · Đổi quãng tám bằng <kbd>[</kbd> <kbd>]</kbd>
+          </p>
         </div>
 
         <div class="wave-selector">
@@ -229,13 +366,136 @@ onUnmounted(() => {
         </div>
       </header>
 
+      <!-- Thanh điều khiển Chế độ, Quãng tám & Thu âm -->
+      <section class="studio-controls">
+        <div class="segmented">
+          <button
+            type="button"
+            :class="{ active: playMode === 'free' }"
+            @click="setMode('free')"
+          >
+            🎹 Chơi tự do
+          </button>
+          <button
+            type="button"
+            :class="{ active: playMode === 'challenge' }"
+            @click="setMode('challenge')"
+          >
+            🎯 Thử thách giai điệu
+          </button>
+        </div>
+
+        <div class="segmented">
+          <button
+            v-for="oct in ([3, 4, 5] as const)"
+            :key="oct"
+            type="button"
+            :class="{ active: octave === oct }"
+            @click="setOctave(oct)"
+          >
+            Quãng {{ oct }} (C{{ oct }})
+          </button>
+        </div>
+
+        <div class="recorder-bar">
+          <button
+            type="button"
+            class="rec-btn"
+            :class="{ recording: isRecording }"
+            @click="toggleRecording"
+          >
+            {{ isRecording ? '⏹ Dừng thu' : '⏺ Thu âm' }}
+          </button>
+          <button
+            type="button"
+            class="play-rec-btn"
+            :disabled="recordedNotes.length === 0"
+            @click="playRecording"
+          >
+            {{ isPlayingRecording ? '⏹ Dừng phát' : `▶ Phát lại (${recordedNotes.length})` }}
+          </button>
+          <button
+            v-if="recordedNotes.length > 0"
+            type="button"
+            class="clear-rec-btn"
+            title="Xóa bản thu"
+            @click="clearRecording"
+          >
+            🗑️
+          </button>
+        </div>
+      </section>
+
+      <!-- HUD Thử thách Giai điệu (khi ở chế độ Challenge) -->
+      <section
+        v-if="playMode === 'challenge'"
+        class="challenge-hud"
+      >
+        <div class="ch-stat">
+          <span>ĐIỂM</span>
+          <strong class="neon">{{ challenge.score }}</strong>
+        </div>
+        <div class="ch-stat">
+          <span>COMBO</span>
+          <strong class="warn">{{ challenge.combo }} 🔥</strong>
+        </div>
+        <div class="ch-stat">
+          <span>CHÍNH XÁC</span>
+          <strong>{{ challengeAccuracy }}%</strong>
+        </div>
+        <div class="ch-stat">
+          <span>TIẾN ĐỘ</span>
+          <strong>
+            {{ challenge.completed ? selectedSong.notes.length : songStepIndex }} / {{ selectedSong.notes.length }}
+          </strong>
+        </div>
+        <button
+          type="button"
+          class="ch-reset"
+          @click="resetChallengeStats"
+        >
+          🔄 Chơi lại
+        </button>
+      </section>
+
+      <!-- Banner chúc mừng hoàn thành thử thách -->
+      <section
+        v-if="playMode === 'challenge' && challenge.completed"
+        class="challenge-win"
+      >
+        <div>
+          <strong>🎉 Xuất sắc! Bạn đã hoàn thành "{{ selectedSong.title }}"</strong>
+          <p>
+            Điểm: <strong>{{ challenge.score }}</strong> · Độ chính xác: <strong>{{ challengeAccuracy }}%</strong> · Max Combo: <strong>{{ challenge.maxCombo }} 🔥</strong>
+          </p>
+        </div>
+        <div class="win-actions">
+          <button
+            type="button"
+            class="autoplay-btn"
+            @click="selectNextSong"
+          >
+            Bài tiếp theo →
+          </button>
+          <button
+            type="button"
+            class="ch-reset"
+            @click="resetChallengeStats"
+          >
+            Đánh lại
+          </button>
+        </div>
+      </section>
+
       <!-- Khu vực Hiển thị Nốt đang vang & Bản nhạc mẫu -->
       <section class="synth-hud">
         <div class="now-playing">
-          <span class="hud-label">NỐT ĐANG VANG</span>
+          <span class="hud-label">
+            {{ isRecording ? '🔴 ĐANG THU ÂM GIAI ĐIỆU...' : 'NỐT ĐANG VANG' }}
+          </span>
           <div class="note-readout">
-            <strong>{{ lastPlayedKey ? `${lastPlayedKey.note} (${lastPlayedKey.label})` : 'Sẵn sàng' }}</strong>
-            <small>{{ lastPlayedKey ? `${lastPlayedKey.freq} Hz · Phím [${lastPlayedKey.kbd}]` : 'Hãy gõ phím đầu tiên!' }}</small>
+            <strong>{{ lastPlayedKey ? `${lastPlayedKey.note} (${lastPlayedKey.label})` : `Sẵn sàng · Quãng ${octave}` }}</strong>
+            <small>{{ lastPlayedKey ? `${lastPlayedKey.freq} Hz · Phím [${lastPlayedKey.kbd}]` : 'Hãy gõ phím hoặc bấm nốt đầu tiên!' }}</small>
           </div>
           <div class="note-trail">
             <span
@@ -271,15 +531,15 @@ onUnmounted(() => {
 
           <div class="sheet-notes">
             <span
-              v-for="(note, idx) in selectedSong.notes"
+              v-for="(pitch, idx) in selectedSong.notes"
               :key="`${selectedSong.id}-${idx}`"
               class="sheet-pill"
               :class="{
-                current: idx === songStepIndex,
-                passed: idx < songStepIndex,
+                current: !challenge.completed && idx === songStepIndex,
+                passed: challenge.completed || idx < songStepIndex,
               }"
             >
-              {{ note }}
+              {{ formatPitchForOctave(pitch, octave) }}
             </span>
           </div>
         </div>
@@ -291,13 +551,14 @@ onUnmounted(() => {
           <!-- 8 Phím Trắng -->
           <div class="white-keys-row">
             <button
-              v-for="wk in WHITE_KEYS"
+              v-for="wk in whiteKeys"
               :key="wk.note"
               type="button"
               class="white-key"
               :class="{
                 active: activeNote === wk.note,
-                hint: selectedSong.notes[songStepIndex] === wk.note,
+                hint: !challenge.completed && expectedPitchClass === wk.pitchClass,
+                wrong: wrongFlashNote === wk.note,
               }"
               @mousedown="triggerKey(wk)"
               @touchstart.prevent="triggerKey(wk)"
@@ -310,11 +571,15 @@ onUnmounted(() => {
 
           <!-- 5 Phím Đen (♯) -->
           <button
-            v-for="bk in BLACK_KEYS"
+            v-for="bk in blackKeys"
             :key="bk.note"
             type="button"
             class="black-key"
-            :class="{ active: activeNote === bk.note }"
+            :class="{
+              active: activeNote === bk.note,
+              hint: !challenge.completed && expectedPitchClass === bk.pitchClass,
+              wrong: wrongFlashNote === bk.note,
+            }"
             :style="{ left: `${bk.leftPercent}%` }"
             @mousedown.stop="triggerKey(bk)"
             @touchstart.stop.prevent="triggerKey(bk)"
@@ -338,11 +603,11 @@ onUnmounted(() => {
 }
 
 .piano-shell {
-  max-width: 980px;
+  max-width: 1020px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
 .piano-header {
@@ -390,17 +655,19 @@ kbd {
   color: var(--primary);
 }
 
-.wave-selector {
+.wave-selector,
+.segmented {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.3rem;
   padding: 0.25rem;
   border-radius: 12px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
 }
 
-.wave-selector button {
-  padding: 0.42rem 0.75rem;
+.wave-selector button,
+.segmented button {
+  padding: 0.42rem 0.72rem;
   border-radius: 9px;
   border: none;
   background: transparent;
@@ -411,14 +678,127 @@ kbd {
   transition: var(--transition-fast);
 }
 
-.wave-selector button.active {
+.wave-selector button.active,
+.segmented button.active {
   background: var(--primary);
   color: var(--text-inverse);
 }
 
+.studio-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.recorder-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.rec-btn,
+.play-rec-btn,
+.clear-rec-btn,
+.ch-reset {
+  padding: 0.46rem 0.85rem;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rec-btn.recording {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger);
+  animation: recPulse 1s infinite;
+}
+
+@keyframes recPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.play-rec-btn {
+  border-color: var(--outline-strong);
+  color: var(--primary);
+}
+
+.play-rec-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.challenge-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 1.2rem;
+  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline-strong);
+}
+
+.ch-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 72px;
+}
+
+.ch-stat span {
+  font-size: 0.66rem;
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.ch-stat strong {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.25rem;
+}
+
+.ch-stat strong.neon {
+  color: var(--primary);
+}
+
+.ch-stat strong.warn {
+  color: var(--warning);
+}
+
+.challenge-win {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary);
+}
+
+.challenge-win p {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-top: 0.2rem;
+}
+
+.win-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .synth-hud {
   display: grid;
-  grid-template-columns: 0.85fr 1.15fr;
+  grid-template-columns: 0.82fr 1.18fr;
   gap: 1rem;
 }
 
@@ -427,7 +807,7 @@ kbd {
   background: var(--bg-card);
   border: 1px solid var(--outline);
   border-radius: 20px;
-  padding: 1.15rem;
+  padding: 1.1rem;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -443,7 +823,7 @@ kbd {
 .note-readout strong {
   display: block;
   font-family: 'Manrope', sans-serif;
-  font-size: 1.45rem;
+  font-size: 1.4rem;
   color: var(--primary);
 }
 
@@ -483,12 +863,12 @@ kbd {
 }
 
 .song-tab {
-  padding: 0.35rem 0.7rem;
+  padding: 0.34rem 0.68rem;
   border-radius: 99px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
   color: var(--text-dim);
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -513,15 +893,15 @@ kbd {
 .sheet-notes {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.38rem;
+  gap: 0.36rem;
 }
 
 .sheet-pill {
-  padding: 0.25rem 0.55rem;
+  padding: 0.22rem 0.52rem;
   border-radius: 8px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 700;
   color: var(--text-dim);
 }
@@ -558,7 +938,7 @@ kbd {
 }
 
 .white-key {
-  height: 270px;
+  height: 265px;
   background: linear-gradient(180deg, #ffffff 0%, #eef2ff 90%, #dbe4ff 100%);
   border: 1px solid #cbd5e1;
   border-radius: 6px 6px 14px 14px;
@@ -582,6 +962,10 @@ kbd {
   background: linear-gradient(180deg, #e0f9ff 0%, var(--primary) 100%);
   transform: translateY(6px);
   box-shadow: 0 2px 0 #38bdf8, 0 6px 14px rgba(109, 221, 255, 0.45);
+}
+
+.white-key.wrong {
+  background: linear-gradient(180deg, #fee2e2 0%, #f87171 100%);
 }
 
 .wk-kbd {
@@ -610,12 +994,12 @@ kbd {
   position: absolute;
   top: 0;
   width: 7.8%;
-  height: 165px;
+  height: 162px;
   transform: translateX(-50%);
   background: linear-gradient(180deg, #27324b 0%, #0f172a 85%, #020617 100%);
   border: 1px solid #334155;
   border-radius: 0 0 10px 10px;
-  color: var(--text);
+  color: #f8fafc;
   cursor: pointer;
   z-index: 4;
   display: flex;
@@ -628,9 +1012,18 @@ kbd {
   transition: transform 0.08s ease, background 0.1s ease;
 }
 
+.black-key.hint {
+  border-color: var(--primary);
+  box-shadow: 0 6px 0 var(--primary), 0 0 18px var(--primary-glow);
+}
+
 .black-key.active {
   background: linear-gradient(180deg, var(--accent) 0%, #7e22ce 100%);
   transform: translateX(-50%) translateY(5px);
+}
+
+.black-key.wrong {
+  background: linear-gradient(180deg, #ef4444 0%, #991b1b 100%);
 }
 
 .bk-kbd {
@@ -642,7 +1035,7 @@ kbd {
 .bk-label {
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--text-dim);
+  color: #cbd5e1;
 }
 
 @media (max-width: 768px) {

@@ -8,6 +8,7 @@ import type {
   GameStatus,
   MoveRecord,
   Side,
+  TimeControlMinutes,
 } from '@/views/co-tuong/types'
 
 interface CoTuongState {
@@ -17,6 +18,8 @@ interface CoTuongState {
   gameMode: GameMode
   humanSide: Side
   botDifficulty: BotDifficulty
+  timeControl: TimeControlMinutes
+  solvedPuzzleIds: string[]
   gameStatus: GameStatus
   soundEnabled: boolean
   stats: CoTuongStats
@@ -30,6 +33,8 @@ export const useCoTuongStore = defineStore('co-tuong', {
     gameMode: 'vs_bot',
     humanSide: 'red',
     botDifficulty: 'medium',
+    timeControl: 0,
+    solvedPuzzleIds: [],
     gameStatus: 'ongoing',
     soundEnabled: true,
     stats: {
@@ -45,6 +50,12 @@ export const useCoTuongStore = defineStore('co-tuong', {
       this.currentPlayer = 'red'
       this.moveHistory = []
       this.gameStatus = 'ongoing'
+    },
+
+    markPuzzleSolved(puzzleId: string) {
+      if (!this.solvedPuzzleIds.includes(puzzleId)) {
+        this.solvedPuzzleIds = [...this.solvedPuzzleIds, puzzleId]
+      }
     },
 
     recordResult(outcome: 'win' | 'loss' | 'draw') {

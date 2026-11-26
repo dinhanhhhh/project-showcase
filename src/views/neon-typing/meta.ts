@@ -2,7 +2,7 @@ import type { PageMeta } from '@/types/page'
 
 const meta: PageMeta = {
   name: 'Neon Typing',
-  description: 'Thử thách gõ phím tốc độ cao với highlight từng ký tự thời gian thực, chọn 15s/30s/60s, đếm WPM & Combo Streak.',
+  description: 'Thử thách gõ phím tốc độ cao với 4 bộ từ vựng (145+ từ), âm thanh phím cơ Web Audio, chế độ Tính giờ & Sudden Death 3 mạng, xếp hạng S+ đến C.',
   author: 'Truong Dinh Anh',
   category: 'game',
 }

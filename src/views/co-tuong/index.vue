@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useCoTuongStore } from '@/stores/coTuong'
 import XiangqiBoard from './components/XiangqiBoard.vue'
 import { useCoTuongAudio } from './composables/useCoTuongAudio'
-import { PIECE_CHARS } from './constants'
+import { PIECE_CHARS, XIANGQI_PUZZLES, cloneBoardState } from './constants'
 import {
   applyMove,
+  calculateRedAdvantagePercent,
+  evaluateBoard,
   findBestMove,
   formatNotation,
   getGameStatus,
@@ -17,7 +19,15 @@ import {
   isSamePosition,
   replayHistory,
 } from './engine'
-import type { BotDifficulty, GameMode, MoveRecord, Piece, Position, Side } from './types'
+import type {
+  BotDifficulty,
+  GameMode,
+  MoveRecord,
+  Piece,
+  Position,
+  Side,
+  TimeControlMinutes,
+} from './types'
 
 const store = useCoTuongStore()
 const { playSound } = useCoTuongAudio()
@@ -29,17 +39,33 @@ const isBotThinking = ref(false)
 const manualFlipped = ref(false)
 const isVictoryModalOpen = ref(false)
 
+// Cờ Thế (Endgame Puzzles)
+const activePuzzleIndex = ref(0)
+const showPuzzleHint = ref(false)
+
+// Đồng hồ cờ & Đầu hàng
+const redTimeSec = ref(0)
+const blackTimeSec = ref(0)
+const timedOutSide = ref<Side | null>(null)
+const resignedSide = ref<Side | null>(null)
+
 let botTimer: ReturnType<typeof setTimeout> | null = null
 let gameOverSoundTimer: ReturnType<typeof setTimeout> | null = null
+let clockInterval: ReturnType<typeof setInterval> | null = null
+
+const activePuzzle = computed(() => XIANGQI_PUZZLES[activePuzzleIndex.value] ?? XIANGQI_PUZZLES[0])
 
 const isGameOver = computed(
   () =>
     store.gameStatus === 'checkmate' ||
     store.gameStatus === 'stalemate' ||
-    store.gameStatus === 'draw',
+    store.gameStatus === 'draw' ||
+    timedOutSide.value !== null ||
+    resignedSide.value !== null,
 )
 
 const isBoardFlipped = computed(() => {
+  if (store.gameMode === 'puzzle') return manualFlipped.value
   const autoFlip = store.gameMode === 'vs_bot' && store.humanSide === 'black'
   return manualFlipped.value ? !autoFlip : autoFlip
 })
@@ -61,10 +87,37 @@ const capturedByBlack = computed(() =>
     .map((m) => m.capturedPiece as Piece),
 )
 
+const redEvalScore = computed(() => evaluateBoard(store.boardState, 'red'))
+const redAdvantagePercent = computed(() => calculateRedAdvantagePercent(store.boardState))
+const evalScoreLabel = computed(() => {
+  if (Math.abs(redEvalScore.value) < 30) return 'Cân bằng (0.0)'
+  const pawns = (Math.abs(redEvalScore.value) / 100).toFixed(1)
+  return redEvalScore.value > 0 ? `Đỏ ưu +${pawns}` : `Đen ưu +${pawns}`
+})
+
+const hasClock = computed(() => store.gameMode !== 'puzzle' && store.timeControl > 0)
+
 const statusBanner = computed(() => {
+  if (timedOutSide.value) {
+    return timedOutSide.value === 'red'
+      ? '⏱️ Bên Đỏ hết giờ — Bên Đen chiến thắng!'
+      : '⏱️ Bên Đen hết giờ — Bên Đỏ chiến thắng!'
+  }
+  if (resignedSide.value) {
+    return resignedSide.value === 'red'
+      ? '🏳️ Bên Đỏ đã đầu hàng — Bên Đen chiến thắng!'
+      : '🏳️ Bên Đen đã đầu hàng — Bên Đỏ chiến thắng!'
+  }
   if (store.gameStatus === 'checkmate') {
     const winner = getOppositeSide(store.currentPlayer)
-    return winner === 'red' ? '🏆 Bên Đỏ chiếu bí giành chiến thắng!' : '🏆 Bên Đen chiếu bí giành chiến thắng!'
+    if (store.gameMode === 'puzzle') {
+      return winner === 'red'
+        ? `🎉 Phá giải thành công ${activePuzzle.value.title}!`
+        : '💥 Phá thế thất bại! Hãy thử đi lại hoặc chơi lại thế này.'
+    }
+    return winner === 'red'
+      ? '🏆 Bên Đỏ chiếu bí giành chiến thắng!'
+      : '🏆 Bên Đen chiếu bí giành chiến thắng!'
   }
   if (store.gameStatus === 'stalemate') {
     return '🤝 Hòa cờ do hết nước đi hợp lệ (Stalemate)!'
@@ -73,13 +126,76 @@ const statusBanner = computed(() => {
     return '🤝 Hòa cờ do lặp nước liên tiếp!'
   }
   if (store.gameStatus === 'check') {
-    return store.currentPlayer === 'red' ? '⚠️ Bên Đỏ đang bị CHIẾU TƯỚNG!' : '⚠️ Bên Đen đang bị CHIẾU TƯỚNG!'
+    return store.currentPlayer === 'red'
+      ? '⚠️ Bên Đỏ đang bị CHIẾU TƯỚNG!'
+      : '⚠️ Bên Đen đang bị CHIẾU TƯỚNG!'
   }
   if (isBotThinking.value) {
     return '🤖 Máy đang tính toán nước đi...'
   }
+  if (store.gameMode === 'puzzle') {
+    return `🧩 ${activePuzzle.value.title} — Lượt Bên Đỏ chiếu bí!`
+  }
   return store.currentPlayer === 'red' ? '🔴 Lượt đi của Bên Đỏ' : '⚫ Lượt đi của Bên Đen'
 })
+
+function formatClock(totalSeconds: number): string {
+  const safe = Math.max(0, totalSeconds)
+  const mins = Math.floor(safe / 60)
+  const secs = safe % 60
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
+function stopClock() {
+  if (clockInterval) {
+    clearInterval(clockInterval)
+    clockInterval = null
+  }
+}
+
+function resetClocks() {
+  stopClock()
+  const initialSec = store.timeControl * 60
+  redTimeSec.value = initialSec
+  blackTimeSec.value = initialSec
+  timedOutSide.value = null
+  resignedSide.value = null
+}
+
+function startClockIfNeeded() {
+  if (!hasClock.value || isGameOver.value || store.moveHistory.length === 0) {
+    stopClock()
+    return
+  }
+  if (clockInterval) return
+  clockInterval = setInterval(() => {
+    if (isGameOver.value || !hasClock.value) {
+      stopClock()
+      return
+    }
+    if (store.currentPlayer === 'red') {
+      redTimeSec.value = Math.max(0, redTimeSec.value - 1)
+      if (redTimeSec.value <= 0) {
+        handleTimeout('red')
+      }
+    } else {
+      blackTimeSec.value = Math.max(0, blackTimeSec.value - 1)
+      if (blackTimeSec.value <= 0) {
+        handleTimeout('black')
+      }
+    }
+  }, 1000)
+}
+
+function handleTimeout(loser: Side) {
+  clearTimers()
+  timedOutSide.value = loser
+  isVictoryModalOpen.value = true
+  if (store.gameMode === 'vs_bot') {
+    store.recordResult(loser === store.humanSide ? 'loss' : 'win')
+  }
+  playSound('gameover', store.soundEnabled)
+}
 
 function clearTimers() {
   if (botTimer) {
@@ -90,7 +206,14 @@ function clearTimers() {
     clearTimeout(gameOverSoundTimer)
     gameOverSoundTimer = null
   }
+  stopClock()
   isBotThinking.value = false
+}
+
+function isHumanTurn(): boolean {
+  if (store.gameMode === 'puzzle') return store.currentPlayer === 'red'
+  if (store.gameMode === 'vs_bot') return store.currentPlayer === store.humanSide
+  return true
 }
 
 function executeMove(piece: Piece, to: Position) {
@@ -133,6 +256,7 @@ function executeMove(piece: Piece, to: Position) {
   }
 
   if (nextStatus === 'checkmate' || nextStatus === 'stalemate' || nextStatus === 'draw') {
+    stopClock()
     isVictoryModalOpen.value = true
     if (store.gameMode === 'vs_bot') {
       if (nextStatus === 'checkmate') {
@@ -141,17 +265,24 @@ function executeMove(piece: Piece, to: Position) {
       } else {
         store.recordResult('draw')
       }
+    } else if (store.gameMode === 'puzzle' && nextStatus === 'checkmate') {
+      const winner = getOppositeSide(nextPlayer)
+      if (winner === 'red') {
+        store.markPuzzleSolved(activePuzzle.value.id)
+      }
     }
     gameOverSoundTimer = setTimeout(() => {
       playSound('gameover', store.soundEnabled)
     }, 350)
+  } else {
+    startClockIfNeeded()
   }
 }
 
 function requestHint() {
-  if (isGameOver.value || isBotThinking.value) return
-  if (store.gameMode === 'vs_bot' && store.currentPlayer !== store.humanSide) return
-  const suggested = findBestMove(store.boardState, store.currentPlayer, 'medium')
+  if (isGameOver.value || isBotThinking.value || !isHumanTurn()) return
+  const searchLevel: BotDifficulty = store.gameMode === 'puzzle' ? 'hard' : 'medium'
+  const suggested = findBestMove(store.boardState, store.currentPlayer, searchLevel)
   if (!suggested) return
 
   hintMove.value = {
@@ -164,8 +295,7 @@ function requestHint() {
 }
 
 function handleSquareClick(pos: Position) {
-  if (isGameOver.value || isBotThinking.value) return
-  if (store.gameMode === 'vs_bot' && store.currentPlayer !== store.humanSide) return
+  if (isGameOver.value || isBotThinking.value || !isHumanTurn()) return
 
   if (selectedPiece.value) {
     const canMoveTo = legalMoves.value.some((m) => isSamePosition(m, pos))
@@ -185,26 +315,68 @@ function handleSquareClick(pos: Position) {
   }
 }
 
+function loadPuzzle(index: number) {
+  clearTimers()
+  const safeIndex = Math.max(0, Math.min(XIANGQI_PUZZLES.length - 1, index))
+  activePuzzleIndex.value = safeIndex
+  const puzzle = XIANGQI_PUZZLES[safeIndex]
+  store.boardState = cloneBoardState(puzzle.boardState)
+  store.currentPlayer = 'red'
+  store.moveHistory = []
+  store.gameStatus = 'ongoing'
+  selectedPiece.value = null
+  legalMoves.value = []
+  hintMove.value = null
+  showPuzzleHint.value = false
+  manualFlipped.value = false
+  isVictoryModalOpen.value = false
+  timedOutSide.value = null
+  resignedSide.value = null
+}
+
+function handleNextPuzzle() {
+  const nextIndex = (activePuzzleIndex.value + 1) % XIANGQI_PUZZLES.length
+  loadPuzzle(nextIndex)
+}
+
 function handleNewGame() {
   clearTimers()
   selectedPiece.value = null
   legalMoves.value = []
   hintMove.value = null
   isVictoryModalOpen.value = false
+  if (store.gameMode === 'puzzle') {
+    loadPuzzle(activePuzzleIndex.value)
+    return
+  }
   store.resetMatch()
+  resetClocks()
+}
+
+function handleResign() {
+  if (isGameOver.value || store.gameMode === 'puzzle') return
+  clearTimers()
+  const loser: Side = store.gameMode === 'vs_bot' ? store.humanSide : store.currentPlayer
+  resignedSide.value = loser
+  isVictoryModalOpen.value = true
+  if (store.gameMode === 'vs_bot') {
+    store.recordResult('loss')
+  }
+  playSound('gameover', store.soundEnabled)
 }
 
 function handleUndo() {
   if (store.moveHistory.length === 0) return
   clearTimers()
 
+  const isBotGame = store.gameMode === 'vs_bot' || store.gameMode === 'puzzle'
+  const playerSide: Side = store.gameMode === 'puzzle' ? 'red' : store.humanSide
   const stepsBack =
-    store.gameMode === 'vs_bot' && store.currentPlayer === store.humanSide && store.moveHistory.length >= 2
-      ? 2
-      : 1
+    isBotGame && store.currentPlayer === playerSide && store.moveHistory.length >= 2 ? 2 : 1
 
   const nextHistory = store.moveHistory.slice(0, Math.max(0, store.moveHistory.length - stepsBack))
-  const nextBoard = replayHistory(nextHistory)
+  const baseBoard = store.gameMode === 'puzzle' ? activePuzzle.value.boardState : undefined
+  const nextBoard = replayHistory(nextHistory, baseBoard)
   const lastRecord = nextHistory[nextHistory.length - 1]
   const nextPlayer: Side = lastRecord ? getOppositeSide(lastRecord.side) : 'red'
 
@@ -216,12 +388,19 @@ function handleUndo() {
   legalMoves.value = []
   hintMove.value = null
   isVictoryModalOpen.value = false
+  timedOutSide.value = null
+  resignedSide.value = null
+  startClockIfNeeded()
 }
 
 function setMode(mode: GameMode) {
   if (store.gameMode === mode) return
   store.gameMode = mode
-  handleNewGame()
+  if (mode === 'puzzle') {
+    loadPuzzle(activePuzzleIndex.value)
+  } else {
+    handleNewGame()
+  }
 }
 
 function setHumanSide(side: Side) {
@@ -235,35 +414,64 @@ function setDifficulty(level: BotDifficulty) {
   store.botDifficulty = level
 }
 
-// Tự động cho Bot suy nghĩ khi tới lượt máy
+function setTimeControl(minutes: TimeControlMinutes) {
+  if (store.timeControl === minutes) return
+  store.timeControl = minutes
+  handleNewGame()
+}
+
+// Tự động cho Bot suy nghĩ khi tới lượt máy (vs_bot hoặc puzzle)
 watch(
-  () => [store.currentPlayer, store.gameMode, store.humanSide, store.gameStatus] as const,
-  ([currentPlayer, mode, humanSide, status]) => {
+  () =>
+    [
+      store.currentPlayer,
+      store.gameMode,
+      store.humanSide,
+      store.gameStatus,
+      timedOutSide.value,
+      resignedSide.value,
+    ] as const,
+  ([currentPlayer, mode, humanSide, status, timedOut, resigned]) => {
     if (botTimer) {
       clearTimeout(botTimer)
       botTimer = null
     }
+    if (timedOut !== null || resigned !== null) {
+      isBotThinking.value = false
+      return
+    }
+
+    const activeStatus = status === 'ongoing' || status === 'check'
     const shouldBotPlay =
-      mode === 'vs_bot' &&
-      currentPlayer !== humanSide &&
-      (status === 'ongoing' || status === 'check')
+      activeStatus &&
+      ((mode === 'vs_bot' && currentPlayer !== humanSide) ||
+        (mode === 'puzzle' && currentPlayer === 'black'))
 
     if (!shouldBotPlay) {
       isBotThinking.value = false
       return
     }
 
+    const aiDifficulty: BotDifficulty = mode === 'puzzle' ? 'hard' : store.botDifficulty
     isBotThinking.value = true
     botTimer = setTimeout(() => {
-      const best = findBestMove(store.boardState, currentPlayer, store.botDifficulty)
+      const best = findBestMove(store.boardState, currentPlayer, aiDifficulty)
       isBotThinking.value = false
       if (best) {
         executeMove(best.piece, best.to)
       }
-    }, 380)
+    }, 360)
   },
   { immediate: true },
 )
+
+onMounted(() => {
+  if (store.gameMode === 'puzzle') {
+    loadPuzzle(activePuzzleIndex.value)
+  } else {
+    resetClocks()
+  }
+})
 
 onUnmounted(() => {
   clearTimers()
@@ -283,7 +491,7 @@ onUnmounted(() => {
 
         <div class="title-block">
           <h1>♟️ Cờ Tướng Master</h1>
-          <p>Xiangqi chuẩn luật · AI Minimax Alpha-Beta</p>
+          <p>Xiangqi chuẩn luật · AI Minimax Alpha-Beta · Cờ Thế Tàn Cuộc</p>
         </div>
 
         <div class="header-tools">
@@ -309,7 +517,7 @@ onUnmounted(() => {
       <div
         class="status-banner"
         :class="{
-          'is-check': store.gameStatus === 'check',
+          'is-check': store.gameStatus === 'check' && !isGameOver,
           'is-over': isGameOver,
         }"
       >
@@ -317,8 +525,51 @@ onUnmounted(() => {
         <span class="turn-counter">Nước: {{ store.moveHistory.length }}</span>
       </div>
 
+      <!-- Đồng hồ bấm giờ (khi bật giới hạn thời gian) -->
+      <div
+        v-if="hasClock"
+        class="clock-bar"
+      >
+        <div
+          class="clock-chip red"
+          :class="{
+            active: !isGameOver && store.currentPlayer === 'red',
+            low: redTimeSec <= 30 && redTimeSec > 0,
+          }"
+        >
+          <span class="clock-label">🔴 Đỏ</span>
+          <strong class="clock-time">{{ formatClock(redTimeSec) }}</strong>
+        </div>
+        <span class="clock-vs">⏱️ {{ store.timeControl }} PHÚT</span>
+        <div
+          class="clock-chip black"
+          :class="{
+            active: !isGameOver && store.currentPlayer === 'black',
+            low: blackTimeSec <= 30 && blackTimeSec > 0,
+          }"
+        >
+          <span class="clock-label">⚫ Đen</span>
+          <strong class="clock-time">{{ formatClock(blackTimeSec) }}</strong>
+        </div>
+      </div>
+
       <div class="chess-grid">
         <section class="board-column">
+          <!-- Thanh Đánh Giá Thế Trận (Evaluation Bar) -->
+          <div class="eval-widget">
+            <div class="eval-meta">
+              <span>🔴 Đỏ {{ redAdvantagePercent }}%</span>
+              <strong class="eval-score">{{ evalScoreLabel }}</strong>
+              <span>{{ 100 - redAdvantagePercent }}% Đen ⚫</span>
+            </div>
+            <div class="eval-track">
+              <div
+                class="eval-red-fill"
+                :style="{ width: `${redAdvantagePercent}%` }"
+              />
+            </div>
+          </div>
+
           <div class="captured-strip">
             <span class="cap-label">Quân Đen ăn:</span>
             <div class="cap-pieces">
@@ -393,7 +644,65 @@ onUnmounted(() => {
                 >
                   👥 2 Người
                 </button>
+                <button
+                  type="button"
+                  :class="{ active: store.gameMode === 'puzzle' }"
+                  @click="setMode('puzzle')"
+                >
+                  🧩 Cờ Thế
+                </button>
               </div>
+            </div>
+
+            <!-- Danh sách Cờ Thế Tàn Cuộc -->
+            <div
+              v-if="store.gameMode === 'puzzle'"
+              class="puzzle-panel"
+            >
+              <div class="puzzle-header-row">
+                <span class="setting-label">Chọn thế cờ kinh điển</span>
+                <span class="puzzle-progress">
+                  Đã giải {{ store.solvedPuzzleIds.length }}/{{ XIANGQI_PUZZLES.length }}
+                </span>
+              </div>
+
+              <div class="puzzle-list">
+                <button
+                  v-for="(pz, idx) in XIANGQI_PUZZLES"
+                  :key="pz.id"
+                  type="button"
+                  class="puzzle-btn"
+                  :class="{
+                    active: activePuzzleIndex === idx,
+                    solved: store.solvedPuzzleIds.includes(pz.id),
+                  }"
+                  @click="loadPuzzle(idx)"
+                >
+                  <span class="pz-name">
+                    {{ store.solvedPuzzleIds.includes(pz.id) ? '✅ ' : '♟️ ' }}{{ pz.title }}
+                  </span>
+                  <span class="pz-diff">{{ pz.difficulty }}</span>
+                </button>
+              </div>
+
+              <p class="puzzle-desc">
+                {{ activePuzzle.description }}
+              </p>
+
+              <button
+                type="button"
+                class="puzzle-clue-btn"
+                @click="showPuzzleHint = !showPuzzleHint"
+              >
+                {{ showPuzzleHint ? '🙈 Ẩn manh mối' : '🔍 Xem manh mối thế cờ' }}
+              </button>
+
+              <p
+                v-if="showPuzzleHint"
+                class="puzzle-clue-box"
+              >
+                {{ activePuzzle.hint }}
+              </p>
             </div>
 
             <div
@@ -449,11 +758,41 @@ onUnmounted(() => {
               </div>
             </div>
 
+            <div
+              v-if="store.gameMode !== 'puzzle'"
+              class="setting-group"
+            >
+              <span class="setting-label">Đồng hồ bấm giờ</span>
+              <div class="segmented">
+                <button
+                  type="button"
+                  :class="{ active: store.timeControl === 0 }"
+                  @click="setTimeControl(0)"
+                >
+                  ∞ Tự do
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: store.timeControl === 5 }"
+                  @click="setTimeControl(5)"
+                >
+                  5 phút
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: store.timeControl === 10 }"
+                  @click="setTimeControl(10)"
+                >
+                  10 phút
+                </button>
+              </div>
+            </div>
+
             <div class="action-buttons three-cols">
               <button
                 type="button"
                 class="btn-secondary"
-                :disabled="isGameOver || isBotThinking || (store.gameMode === 'vs_bot' && store.currentPlayer !== store.humanSide)"
+                :disabled="isGameOver || isBotThinking || !isHumanTurn()"
                 title="AI gợi ý nước đi tối ưu"
                 @click="requestHint"
               >
@@ -472,9 +811,18 @@ onUnmounted(() => {
                 class="btn-primary"
                 @click="handleNewGame"
               >
-                🔄 Ván mới
+                {{ store.gameMode === 'puzzle' ? '🔄 Thử lại' : '🔄 Ván mới' }}
               </button>
             </div>
+
+            <button
+              v-if="store.gameMode !== 'puzzle' && !isGameOver && store.moveHistory.length > 0"
+              type="button"
+              class="btn-resign"
+              @click="handleResign"
+            >
+              🏳️ Xin thua / Đầu hàng
+            </button>
           </div>
 
           <div
@@ -545,7 +893,7 @@ onUnmounted(() => {
         aria-modal="true"
       >
         <div class="victory-trophy">
-          {{ store.gameStatus === 'checkmate' ? '🏆' : '🤝' }}
+          {{ store.gameStatus === 'checkmate' || timedOutSide || resignedSide ? '🏆' : '🤝' }}
         </div>
         <h2>{{ statusBanner }}</h2>
         <p class="victory-meta">
@@ -553,6 +901,15 @@ onUnmounted(() => {
         </p>
         <div class="victory-actions">
           <button
+            v-if="store.gameMode === 'puzzle'"
+            type="button"
+            class="btn-primary"
+            @click="handleNextPuzzle"
+          >
+            🧩 Thế tiếp theo →
+          </button>
+          <button
+            v-else
             type="button"
             class="btn-primary"
             @click="handleNewGame"
@@ -586,7 +943,7 @@ onUnmounted(() => {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.9rem;
 }
 
 .chess-header {
@@ -633,7 +990,7 @@ onUnmounted(() => {
 
 .title-block p {
   color: var(--text-dim);
-  font-size: 0.85rem;
+  font-size: 0.84rem;
 }
 
 .header-tools {
@@ -646,7 +1003,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.75rem 1.15rem;
+  padding: 0.72rem 1.15rem;
   border-radius: 14px;
   background: var(--bg-card);
   border: 1px solid var(--outline);
@@ -672,9 +1029,65 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+.clock-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.clock-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--outline);
+  min-width: 140px;
+  justify-content: space-between;
+  transition: var(--transition-fast);
+}
+
+.clock-chip.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 14px var(--primary-glow);
+}
+
+.clock-chip.low {
+  border-color: var(--danger);
+  color: var(--danger);
+  animation: clockPulse 0.9s infinite;
+}
+
+@keyframes clockPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.clock-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.clock-time {
+  font-family: 'JetBrains Mono', 'Manrope', monospace;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.clock-vs {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+
 .chess-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(290px, 0.75fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
   gap: 1.25rem;
   align-items: start;
 }
@@ -682,7 +1095,43 @@ onUnmounted(() => {
 .board-column {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.65rem;
+}
+
+.eval-widget {
+  max-width: 540px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.eval-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.eval-score {
+  color: var(--primary);
+  font-family: 'Manrope', sans-serif;
+}
+
+.eval-track {
+  height: 8px;
+  border-radius: 99px;
+  background: #1e293b;
+  border: 1px solid var(--outline);
+  overflow: hidden;
+}
+
+.eval-red-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #dc2626, #f97316);
+  transition: width 0.35s ease;
 }
 
 .captured-strip {
@@ -768,7 +1217,7 @@ onUnmounted(() => {
 
 .segmented {
   display: flex;
-  gap: 0.4rem;
+  gap: 0.35rem;
   background: var(--bg-sidebar);
   padding: 0.25rem;
   border-radius: 12px;
@@ -777,12 +1226,12 @@ onUnmounted(() => {
 
 .segmented button {
   flex: 1;
-  padding: 0.48rem 0.5rem;
+  padding: 0.46rem 0.4rem;
   border-radius: 9px;
   border: none;
   background: transparent;
   color: var(--text-dim);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
   transition: var(--transition-fast);
@@ -791,6 +1240,91 @@ onUnmounted(() => {
 .segmented button.active {
   background: var(--primary);
   color: var(--text-inverse);
+}
+
+.puzzle-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.puzzle-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.puzzle-progress {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--success);
+}
+
+.puzzle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+
+.puzzle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.52rem 0.7rem;
+  border-radius: 10px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition-fast);
+}
+
+.puzzle-btn.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.puzzle-btn.solved .pz-diff {
+  color: var(--success);
+}
+
+.pz-diff {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.puzzle-desc {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.puzzle-clue-btn {
+  align-self: flex-start;
+  padding: 0.36rem 0.7rem;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-glow);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.puzzle-clue-box {
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: var(--bg-sidebar);
+  border: 1px dashed var(--accent);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text);
 }
 
 .action-buttons {
@@ -802,6 +1336,18 @@ onUnmounted(() => {
 
 .action-buttons.three-cols {
   grid-template-columns: repeat(3, 1fr);
+}
+
+.btn-resign {
+  width: 100%;
+  padding: 0.55rem;
+  border-radius: 10px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .hint-banner {
@@ -863,11 +1409,11 @@ onUnmounted(() => {
 
 .btn-primary,
 .btn-secondary {
-  padding: 0.7rem;
+  padding: 0.7rem 0.5rem;
   border-radius: 12px;
   font-family: 'Manrope', sans-serif;
   font-weight: 800;
-  font-size: 0.9rem;
+  font-size: 0.86rem;
   cursor: pointer;
   border: 1px solid var(--outline);
 }

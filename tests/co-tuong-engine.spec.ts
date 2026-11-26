@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createInitialBoardState } from '@/views/co-tuong/constants'
+import { XIANGQI_PUZZLES, cloneBoardState, createInitialBoardState } from '@/views/co-tuong/constants'
 import {
   applyMove,
+  calculateRedAdvantagePercent,
   findBestMove,
   formatNotation,
   getGameStatus,
@@ -9,6 +10,7 @@ import {
   getPieceAt,
   isKingInCheck,
   isRepetition,
+  replayHistory,
 } from '@/views/co-tuong/engine'
 import type { BoardState, MoveRecord, Piece } from '@/views/co-tuong/types'
 
@@ -128,5 +130,59 @@ describe('Co Tuong Engine', () => {
     ]
 
     expect(isRepetition(history)).toBe(true)
+  })
+
+  it('validates all 4 endgame puzzles have legal start states and forced checkmates', () => {
+    expect(XIANGQI_PUZZLES).toHaveLength(4)
+
+    for (const puzzle of XIANGQI_PUZZLES) {
+      expect(isKingInCheck('red', puzzle.boardState)).toBe(false)
+      expect(isKingInCheck('black', puzzle.boardState)).toBe(false)
+      expect(getGameStatus('red', puzzle.boardState)).toBe('ongoing')
+    }
+
+    // Thế 1: Song Xa Thác — Xe (7,2) -> (7,0) chiếu bí 1 nước
+    const p1 = cloneBoardState(XIANGQI_PUZZLES[0].boardState)
+    const p1Chariot = getPieceAt(p1, { file: 7, rank: 2 })!
+    const p1After = applyMove(p1, p1Chariot, { file: 7, rank: 0 })
+    expect(getGameStatus('black', p1After)).toBe('checkmate')
+
+    // Thế 2: Trọng Pháo Sát Cục — Pháo (2,4) -> (4,4) chiếu bí 1 nước
+    const p2 = cloneBoardState(XIANGQI_PUZZLES[1].boardState)
+    const p2Cannon = getPieceAt(p2, { file: 2, rank: 4 })!
+    const p2After = applyMove(p2, p2Cannon, { file: 4, rank: 4 })
+    expect(getGameStatus('black', p2After)).toBe('checkmate')
+
+    // Thế 3: Mã Hậu Pháo — Mã (4,4) -> (5,2) chiếu bí 1 nước
+    const p3 = cloneBoardState(XIANGQI_PUZZLES[2].boardState)
+    const p3Horse = getPieceAt(p3, { file: 4, rank: 4 })!
+    const p3After = applyMove(p3, p3Horse, { file: 5, rank: 2 })
+    expect(getGameStatus('black', p3After)).toBe('checkmate')
+
+    // Thế 4: Ngọa Tào Mã — chiếu bí 2 nước (Mã (7,3)->(6,1), Tướng Đen buộc (4,0)->(5,0), Xe (8,4)->(8,0))
+    const p4 = cloneBoardState(XIANGQI_PUZZLES[3].boardState)
+    const p4Horse = getPieceAt(p4, { file: 7, rank: 3 })!
+    const p4Step1 = applyMove(p4, p4Horse, { file: 6, rank: 1 })
+    expect(getGameStatus('black', p4Step1)).toBe('check')
+
+    const blackGen = getPieceAt(p4Step1, { file: 4, rank: 0 })!
+    const blackGenMoves = getLegalMovesForPiece(blackGen, p4Step1)
+    expect(blackGenMoves).toEqual([{ file: 5, rank: 0 }])
+
+    const p4Step2 = applyMove(p4Step1, blackGen, { file: 5, rank: 0 })
+    const p4Chariot = getPieceAt(p4Step2, { file: 8, rank: 4 })!
+    const p4Mate = applyMove(p4Step2, p4Chariot, { file: 8, rank: 0 })
+    expect(getGameStatus('black', p4Mate)).toBe('checkmate')
+  })
+
+  it('supports replayHistory from custom puzzle board and evaluates advantage percentage', () => {
+    const startBoard = createInitialBoardState()
+    expect(calculateRedAdvantagePercent(startBoard)).toBe(50)
+
+    const p1 = XIANGQI_PUZZLES[0].boardState
+    expect(calculateRedAdvantagePercent(p1)).toBeGreaterThan(75)
+
+    const replayedEmpty = replayHistory([], p1)
+    expect(replayedEmpty.pieces).toHaveLength(p1.pieces.length)
   })
 })

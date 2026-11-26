@@ -1,55 +1,112 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useColorGameStore } from '@/stores/colorGame'
+import { useColorAudio } from './composables/useColorAudio'
+import {
+  MAX_LIFELINES,
+  TIME_ATTACK_BONUS_SECONDS,
+  TIME_ATTACK_PENALTY_SECONDS,
+  TIME_ATTACK_START_SECONDS,
+  applyFiftyFifty,
+  buildColorRound,
+  createSwatch,
+  formatColorSwatch,
+  getComboMultiplier,
+  getRoundPoints,
+} from './engine'
+import type { ColorFormat, ColorGameMode, ColorSwatch, GridSize } from './types'
 
-interface RgbColor {
-  r: number
-  g: number
-  b: number
-  rgb: string
-  hex: string
-}
+const store = useColorGameStore()
+const { playCorrect, playWrong, playLifeline, playTimeUp } = useColorAudio()
 
-type ColorFormat = 'rgb' | 'hex'
-type GridSize = 4 | 6 | 9
-
+const gameMode = ref<ColorGameMode>('classic')
 const colorFormat = ref<ColorFormat>('rgb')
 const gridSize = ref<GridSize>(6)
-const target = ref<RgbColor>({ r: 109, g: 221, b: 255, rgb: 'rgb(109, 221, 255)', hex: '#6DDDFF' })
-const options = ref<RgbColor[]>([])
+
+const target = ref<ColorSwatch>(createSwatch(109, 221, 255))
+const options = ref<ColorSwatch[]>([])
 const eliminatedHexes = ref<Record<string, boolean>>({})
 const score = ref(0)
 const streak = ref(0)
-const bestScore = ref(0)
-const statusText = ref('Quan sát tỷ lệ Đỏ (R) · Lục (G) · Lam (B) và chọn ô màu khớp nhất!')
+const sessionMaxStreak = ref(0)
+const roundsCleared = ref(0)
+const lifelinesLeft = ref(MAX_LIFELINES)
+const usedLifelineThisRound = ref(false)
+
+const timeLeft = ref(TIME_ATTACK_START_SECONDS)
+const isTimeAttackRunning = ref(false)
+const isTimeAttackOver = ref(false)
+const timeDeltaHint = ref<string | null>(null)
+
+const statusText = ref('Quan sát thông số màu và chọn ô màu khớp nhất!')
 const statusType = ref<'neutral' | 'win' | 'miss'>('neutral')
 const isRoundWon = ref(false)
 
 let nextRoundTimer: ReturnType<typeof setTimeout> | null = null
+let timeAttackInterval: ReturnType<typeof setInterval> | null = null
+let deltaHintTimer: ReturnType<typeof setTimeout> | null = null
 
-function toHexChannel(n: number): string {
-  return n.toString(16).padStart(2, '0').toUpperCase()
-}
+const displayCode = computed(() => formatColorSwatch(target.value, colorFormat.value))
 
-function randomColor(): RgbColor {
-  const r = Math.floor(Math.random() * 256)
-  const g = Math.floor(Math.random() * 256)
-  const b = Math.floor(Math.random() * 256)
-  return {
-    r,
-    g,
-    b,
-    rgb: `rgb(${r}, ${g}, ${b})`,
-    hex: `#${toHexChannel(r)}${toHexChannel(g)}${toHexChannel(b)}`,
+const currentBestScore = computed(() =>
+  gameMode.value === 'classic' ? store.bestClassicScore : store.bestTimeAttackScore,
+)
+
+const activeMultiplier = computed(() => getComboMultiplier(streak.value))
+
+const timeProgressPercent = computed(() =>
+  Math.max(0, Math.min(100, (timeLeft.value / TIME_ATTACK_START_SECONDS) * 100)),
+)
+
+const canUseLifeline = computed(
+  () =>
+    !isRoundWon.value &&
+    !isTimeAttackOver.value &&
+    lifelinesLeft.value > 0 &&
+    !usedLifelineThisRound.value,
+)
+
+function clearTimers() {
+  if (nextRoundTimer) {
+    clearTimeout(nextRoundTimer)
+    nextRoundTimer = null
+  }
+  if (timeAttackInterval) {
+    clearInterval(timeAttackInterval)
+    timeAttackInterval = null
+  }
+  if (deltaHintTimer) {
+    clearTimeout(deltaHintTimer)
+    deltaHintTimer = null
   }
 }
 
-const displayCode = computed(() =>
-  colorFormat.value === 'rgb' ? target.value.rgb : target.value.hex,
-)
+function flashTimeDelta(label: string) {
+  timeDeltaHint.value = label
+  if (deltaHintTimer) clearTimeout(deltaHintTimer)
+  deltaHintTimer = setTimeout(() => {
+    timeDeltaHint.value = null
+  }, 900)
+}
 
-function formatTileLabel(c: RgbColor): string {
-  return colorFormat.value === 'rgb' ? c.rgb : c.hex
+function startTimeAttackTicker() {
+  if (timeAttackInterval) return
+  isTimeAttackRunning.value = true
+  timeAttackInterval = setInterval(() => {
+    timeLeft.value = Math.max(0, timeLeft.value - 1)
+    if (timeLeft.value <= 0) {
+      finishTimeAttack()
+    }
+  }, 1000)
+}
+
+function finishTimeAttack() {
+  clearTimers()
+  isTimeAttackRunning.value = false
+  isTimeAttackOver.value = true
+  store.recordTimeAttack(score.value, sessionMaxStreak.value)
+  playTimeUp(store.soundEnabled)
 }
 
 function startNewRound() {
@@ -57,24 +114,34 @@ function startNewRound() {
     clearTimeout(nextRoundTimer)
     nextRoundTimer = null
   }
-  const answer = randomColor()
-  const list: RgbColor[] = [answer]
-  const seen = new Set<string>([answer.hex])
-
-  while (list.length < gridSize.value) {
-    const candidate = randomColor()
-    if (!seen.has(candidate.hex)) {
-      seen.add(candidate.hex)
-      list.push(candidate)
-    }
-  }
-
-  target.value = answer
-  options.value = list.sort(() => Math.random() - 0.5)
+  const round = buildColorRound(gridSize.value)
+  target.value = round.target
+  options.value = round.options
   eliminatedHexes.value = {}
+  usedLifelineThisRound.value = false
   isRoundWon.value = false
   statusType.value = 'neutral'
   statusText.value = 'Chọn ô màu khớp với mã bên trên!'
+}
+
+function resetSession() {
+  clearTimers()
+  score.value = 0
+  streak.value = 0
+  sessionMaxStreak.value = 0
+  roundsCleared.value = 0
+  lifelinesLeft.value = MAX_LIFELINES
+  timeLeft.value = TIME_ATTACK_START_SECONDS
+  isTimeAttackRunning.value = false
+  isTimeAttackOver.value = false
+  timeDeltaHint.value = null
+  startNewRound()
+}
+
+function setMode(mode: ColorGameMode) {
+  if (gameMode.value === mode) return
+  gameMode.value = mode
+  resetSession()
 }
 
 function setGridSize(size: GridSize) {
@@ -82,26 +149,73 @@ function setGridSize(size: GridSize) {
   startNewRound()
 }
 
-function handlePick(choice: RgbColor) {
-  if (isRoundWon.value || eliminatedHexes.value[choice.hex]) return
+function useLifeline() {
+  if (!canUseLifeline.value) return
+  eliminatedHexes.value = applyFiftyFifty(
+    options.value,
+    target.value.hex,
+    eliminatedHexes.value,
+  )
+  lifelinesLeft.value -= 1
+  usedLifelineThisRound.value = true
+  statusType.value = 'neutral'
+  statusText.value = '🪄 Đã loại bỏ 50% ô màu sai!'
+  playLifeline(store.soundEnabled)
+}
+
+function handlePick(choice: ColorSwatch) {
+  if (isRoundWon.value || isTimeAttackOver.value || eliminatedHexes.value[choice.hex]) return
+
+  if (gameMode.value === 'time_attack' && !isTimeAttackRunning.value) {
+    startTimeAttackTicker()
+  }
 
   if (choice.hex === target.value.hex) {
     isRoundWon.value = true
-    const bonus = gridSize.value === 9 ? 3 : gridSize.value === 6 ? 2 : 1
-    score.value += bonus
     streak.value += 1
-    if (score.value > bestScore.value) {
-      bestScore.value = score.value
+    roundsCleared.value += 1
+    if (streak.value > sessionMaxStreak.value) {
+      sessionMaxStreak.value = streak.value
     }
+
+    const earned = getRoundPoints(gridSize.value, streak.value)
+    score.value += earned
+    playCorrect(store.soundEnabled, streak.value)
+
+    if (gameMode.value === 'time_attack') {
+      timeLeft.value = Math.min(60, timeLeft.value + TIME_ATTACK_BONUS_SECONDS)
+      flashTimeDelta(`+${TIME_ATTACK_BONUS_SECONDS}s`)
+      store.recordTimeAttack(score.value, sessionMaxStreak.value)
+    } else {
+      store.recordClassic(score.value, sessionMaxStreak.value)
+    }
+
+    const mult = getComboMultiplier(streak.value)
     statusType.value = 'win'
-    statusText.value = `Chính xác! +${bonus} điểm (Chuỗi thắng ${streak.value} 🔥)`
-    nextRoundTimer = setTimeout(startNewRound, 1300)
+    statusText.value =
+      mult > 1
+        ? `Chính xác! +${earned} điểm (Combo x${mult} · Chuỗi ${streak.value} 🔥)`
+        : `Chính xác! +${earned} điểm (Chuỗi thắng ${streak.value} 🔥)`
+
+    const delayMs = gameMode.value === 'time_attack' ? 650 : 1200
+    nextRoundTimer = setTimeout(startNewRound, delayMs)
   } else {
     eliminatedHexes.value = { ...eliminatedHexes.value, [choice.hex]: true }
     streak.value = 0
     score.value = Math.max(0, score.value - 1)
+    playWrong(store.soundEnabled)
+
+    if (gameMode.value === 'time_attack') {
+      timeLeft.value = Math.max(0, timeLeft.value - TIME_ATTACK_PENALTY_SECONDS)
+      flashTimeDelta(`-${TIME_ATTACK_PENALTY_SECONDS}s`)
+      if (timeLeft.value <= 0) {
+        finishTimeAttack()
+        return
+      }
+    }
+
     statusType.value = 'miss'
-    statusText.value = `Chưa đúng! Ô đó là ${formatTileLabel(choice)} — thử ô khác nhé.`
+    statusText.value = `Chưa đúng! Ô đó là ${formatColorSwatch(choice, colorFormat.value)} — thử ô khác nhé.`
   }
 }
 
@@ -110,7 +224,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (nextRoundTimer) clearTimeout(nextRoundTimer)
+  clearTimers()
 })
 </script>
 
@@ -127,40 +241,101 @@ onUnmounted(() => {
 
         <div class="title-wrap">
           <h1>🎨 Color Studio Reflex</h1>
-          <p>Luyện cảm nhận mã màu RGB &amp; HEX dành cho Designer &amp; Developer</p>
+          <p>Luyện cảm nhận RGB · HEX · HSL · Time Attack 45s &amp; Trợ giúp 50:50</p>
         </div>
 
-        <div class="metrics-bar">
-          <div class="metric-pill">
-            <span>Điểm</span>
-            <strong>{{ score }}</strong>
-          </div>
-          <div class="metric-pill streak">
-            <span>Streak</span>
-            <strong>{{ streak }} 🔥</strong>
-          </div>
-          <div class="metric-pill best">
-            <span>Kỷ lục</span>
-            <strong>{{ bestScore }} 🏆</strong>
-          </div>
-        </div>
+        <button
+          type="button"
+          class="sound-btn"
+          :class="{ muted: !store.soundEnabled }"
+          @click="store.toggleSound()"
+        >
+          {{ store.soundEnabled ? '🔊' : '🔇' }}
+        </button>
       </header>
 
+      <!-- Thanh chỉ số -->
+      <section class="metrics-strip">
+        <div class="metric-pill">
+          <span>Điểm</span>
+          <strong>{{ score }}</strong>
+        </div>
+        <div
+          v-if="gameMode === 'time_attack'"
+          class="metric-pill timer"
+          :class="{ danger: timeLeft <= 10 && isTimeAttackRunning }"
+        >
+          <span>Thời gian</span>
+          <strong>
+            {{ timeLeft }}s
+            <em
+              v-if="timeDeltaHint"
+              class="delta-badge"
+            >{{ timeDeltaHint }}</em>
+          </strong>
+        </div>
+        <div class="metric-pill streak">
+          <span>Streak</span>
+          <strong>{{ streak }} 🔥 <em v-if="activeMultiplier > 1">x{{ activeMultiplier }}</em></strong>
+        </div>
+        <div class="metric-pill best">
+          <span>Kỷ lục</span>
+          <strong>{{ currentBestScore }} 🏆</strong>
+        </div>
+      </section>
+
+      <!-- Thanh thời gian cho Time Attack -->
+      <div
+        v-if="gameMode === 'time_attack'"
+        class="timer-track"
+      >
+        <div
+          class="timer-fill"
+          :class="{ danger: timeLeft <= 10 }"
+          :style="{ width: `${timeProgressPercent}%` }"
+        />
+      </div>
+
+      <!-- Thanh công cụ chế độ, định dạng màu, độ khó -->
       <section class="toolbar-row">
+        <div class="segmented">
+          <button
+            type="button"
+            :class="{ active: gameMode === 'classic' }"
+            @click="setMode('classic')"
+          >
+            🎨 Tự do
+          </button>
+          <button
+            type="button"
+            :class="{ active: gameMode === 'time_attack' }"
+            @click="setMode('time_attack')"
+          >
+            ⏱️ Time Attack 45s
+          </button>
+        </div>
+
         <div class="segmented">
           <button
             type="button"
             :class="{ active: colorFormat === 'rgb' }"
             @click="colorFormat = 'rgb'"
           >
-            Mã RGB
+            RGB
           </button>
           <button
             type="button"
             :class="{ active: colorFormat === 'hex' }"
             @click="colorFormat = 'hex'"
           >
-            Mã HEX
+            HEX
+          </button>
+          <button
+            type="button"
+            :class="{ active: colorFormat === 'hsl' }"
+            @click="colorFormat = 'hsl'"
+          >
+            HSL
           </button>
         </div>
 
@@ -170,33 +345,122 @@ onUnmounted(() => {
             :class="{ active: gridSize === 4 }"
             @click="setGridSize(4)"
           >
-            Dễ (4 ô)
+            4 ô
           </button>
           <button
             type="button"
             :class="{ active: gridSize === 6 }"
             @click="setGridSize(6)"
           >
-            Khó (6 ô)
+            6 ô
           </button>
           <button
             type="button"
             :class="{ active: gridSize === 9 }"
             @click="setGridSize(9)"
           >
-            Cao thủ (9 ô)
+            9 ô
           </button>
         </div>
       </section>
 
-      <main class="studio-card">
+      <!-- Màn hình tổng kết Time Attack -->
+      <section
+        v-if="isTimeAttackOver"
+        class="studio-card summary-card"
+      >
+        <div class="summary-badge">
+          ⏱️ HẾT GIỜ TIME ATTACK!
+        </div>
+        <h2 class="summary-score">
+          {{ score }} <span>điểm</span>
+        </h2>
+        <div class="summary-grid">
+          <div class="sum-box">
+            <span>Số màu đoán đúng</span>
+            <strong>{{ roundsCleared }} vòng</strong>
+          </div>
+          <div class="sum-box">
+            <span>Chuỗi cao nhất</span>
+            <strong>{{ sessionMaxStreak }} 🔥</strong>
+          </div>
+          <div class="sum-box">
+            <span>Kỷ lục Time Attack</span>
+            <strong>{{ store.bestTimeAttackScore }} 🏆</strong>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="replay-btn"
+          @click="resetSession"
+        >
+          ⚡ Chơi lại Time Attack
+        </button>
+      </section>
+
+      <!-- Khu vực chơi chính -->
+      <main
+        v-else
+        class="studio-card"
+      >
         <div class="code-display">
-          <span class="code-eyebrow">MÃ MÀU MỤC TIÊU</span>
+          <span class="code-eyebrow">
+            MÃ MÀU MỤC TIÊU ({{ colorFormat.toUpperCase() }})
+          </span>
           <div class="target-code">
             {{ displayCode }}
           </div>
 
-          <div class="channel-bars">
+          <!-- Phân tích kênh HSL khi chọn hệ màu HSL -->
+          <div
+            v-if="colorFormat === 'hsl'"
+            class="channel-bars"
+          >
+            <div class="channel-item">
+              <div class="ch-label">
+                <span>H (Tông màu)</span>
+                <strong>{{ target.hslValue.h }}°</strong>
+              </div>
+              <div class="ch-track">
+                <div
+                  class="ch-fill hue"
+                  :style="{ width: `${(target.hslValue.h / 360) * 100}%` }"
+                />
+              </div>
+            </div>
+
+            <div class="channel-item">
+              <div class="ch-label">
+                <span>S (Độ bão hòa)</span>
+                <strong>{{ target.hslValue.s }}%</strong>
+              </div>
+              <div class="ch-track">
+                <div
+                  class="ch-fill sat"
+                  :style="{ width: `${target.hslValue.s}%` }"
+                />
+              </div>
+            </div>
+
+            <div class="channel-item">
+              <div class="ch-label">
+                <span>L (Độ sáng)</span>
+                <strong>{{ target.hslValue.l }}%</strong>
+              </div>
+              <div class="ch-track">
+                <div
+                  class="ch-fill light"
+                  :style="{ width: `${target.hslValue.l}%` }"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Phân tích kênh RGB -->
+          <div
+            v-else
+            class="channel-bars"
+          >
             <div class="channel-item">
               <div class="ch-label">
                 <span>R (Đỏ)</span>
@@ -258,7 +522,7 @@ onUnmounted(() => {
               v-if="eliminatedHexes[item.hex] || isRoundWon"
               class="tile-code"
             >
-              {{ isRoundWon && item.hex === target.hex ? '✓ ' : '✕ ' }}{{ formatTileLabel(item) }}
+              {{ isRoundWon && item.hex === target.hex ? '✓ ' : '✕ ' }}{{ formatColorSwatch(item, colorFormat) }}
             </span>
           </button>
         </div>
@@ -270,13 +534,23 @@ onUnmounted(() => {
           >
             {{ statusText }}
           </p>
-          <button
-            type="button"
-            class="skip-btn"
-            @click="startNewRound"
-          >
-            🔄 Đổi mã màu khác
-          </button>
+          <div class="footer-actions">
+            <button
+              type="button"
+              class="lifeline-btn"
+              :disabled="!canUseLifeline"
+              @click="useLifeline"
+            >
+              🪄 50:50 ({{ lifelinesLeft }})
+            </button>
+            <button
+              type="button"
+              class="skip-btn"
+              @click="gameMode === 'time_attack' ? resetSession() : startNewRound()"
+            >
+              {{ gameMode === 'time_attack' ? '🔄 Làm mới' : '🔄 Đổi màu' }}
+            </button>
+          </div>
         </div>
       </main>
     </div>
@@ -293,11 +567,11 @@ onUnmounted(() => {
 }
 
 .color-shell {
-  max-width: 820px;
+  max-width: 860px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.15rem;
+  gap: 1rem;
 }
 
 .top-bar {
@@ -308,7 +582,8 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.back-btn {
+.back-btn,
+.sound-btn {
   padding: 0.5rem 0.95rem;
   border-radius: 12px;
   background: var(--bg-card);
@@ -317,6 +592,11 @@ onUnmounted(() => {
   text-decoration: none;
   font-weight: 600;
   font-size: 0.86rem;
+  cursor: pointer;
+}
+
+.sound-btn.muted {
+  color: var(--text-dim);
 }
 
 .title-wrap {
@@ -335,52 +615,96 @@ onUnmounted(() => {
   color: var(--text-dim);
 }
 
-.metrics-bar {
-  display: flex;
-  gap: 0.5rem;
+.metrics-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.65rem;
 }
 
 .metric-pill {
-  padding: 0.4rem 0.75rem;
-  border-radius: 12px;
+  padding: 0.55rem 0.85rem;
+  border-radius: 14px;
   background: var(--bg-card);
   border: 1px solid var(--outline);
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-width: 68px;
 }
 
 .metric-pill span {
   font-size: 0.68rem;
   color: var(--text-dim);
   text-transform: uppercase;
+  font-weight: 700;
 }
 
 .metric-pill strong {
   font-family: 'Manrope', sans-serif;
-  font-size: 1rem;
+  font-size: 1.15rem;
   color: var(--primary);
+}
+
+.metric-pill.timer strong {
+  color: var(--text);
+}
+
+.metric-pill.timer.danger {
+  border-color: var(--danger);
+}
+
+.metric-pill.timer.danger strong {
+  color: var(--danger);
+}
+
+.delta-badge {
+  font-style: normal;
+  font-size: 0.78rem;
+  margin-left: 0.3rem;
+  color: var(--accent);
 }
 
 .metric-pill.streak strong {
   color: var(--warning);
 }
 
+.metric-pill.streak em {
+  font-style: normal;
+  font-size: 0.82rem;
+  color: var(--primary);
+}
+
 .metric-pill.best strong {
   color: var(--accent);
+}
+
+.timer-track {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  overflow: hidden;
+}
+
+.timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  transition: width 0.3s linear;
+}
+
+.timer-fill.danger {
+  background: var(--danger);
 }
 
 .toolbar-row {
   display: flex;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.65rem;
   flex-wrap: wrap;
 }
 
 .segmented {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.3rem;
   padding: 0.25rem;
   border-radius: 12px;
   background: var(--bg-sidebar);
@@ -388,12 +712,12 @@ onUnmounted(() => {
 }
 
 .segmented button {
-  padding: 0.45rem 0.85rem;
+  padding: 0.44rem 0.78rem;
   border-radius: 9px;
   border: none;
   background: transparent;
   color: var(--text-dim);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
   transition: var(--transition-fast);
@@ -411,15 +735,82 @@ onUnmounted(() => {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1.35rem;
+  gap: 1.3rem;
   box-shadow: var(--shadow-card);
+}
+
+.summary-card {
+  text-align: center;
+  align-items: center;
+  padding: 2.2rem 1.5rem;
+}
+
+.summary-badge {
+  padding: 0.32rem 0.9rem;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  border: 1px solid var(--outline-strong);
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.summary-score {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(2.8rem, 6vw, 4rem);
+  color: var(--primary);
+  line-height: 1;
+}
+
+.summary-score span {
+  font-size: 1.2rem;
+  color: var(--text-dim);
+}
+
+.summary-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.sum-box {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  border-radius: 14px;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sum-box span {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.sum-box strong {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.2rem;
+}
+
+.replay-btn {
+  padding: 0.85rem 1.9rem;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: var(--text-inverse);
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .code-display {
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
   border-radius: 18px;
-  padding: 1.25rem;
+  padding: 1.2rem;
   text-align: center;
 }
 
@@ -432,7 +823,7 @@ onUnmounted(() => {
 
 .target-code {
   font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: clamp(1.45rem, 3.5vw, 2.2rem);
+  font-size: clamp(1.35rem, 3.5vw, 2.1rem);
   font-weight: 800;
   color: var(--primary);
   margin: 0.35rem 0 1rem;
@@ -460,7 +851,7 @@ onUnmounted(() => {
 .ch-track {
   height: 7px;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
@@ -473,6 +864,9 @@ onUnmounted(() => {
 .ch-fill.red { background: #ff5555; }
 .ch-fill.green { background: #34d399; }
 .ch-fill.blue { background: #38bdf8; }
+.ch-fill.hue { background: linear-gradient(90deg, #ff5555, #fbbf24, #34d399, #38bdf8, #a855f7, #ff5555); }
+.ch-fill.sat { background: var(--accent); }
+.ch-fill.light { background: var(--primary); }
 
 .color-grid {
   display: grid;
@@ -506,7 +900,7 @@ onUnmounted(() => {
 }
 
 .color-tile.eliminated {
-  opacity: 0.28;
+  opacity: 0.26;
   transform: scale(0.96);
   cursor: not-allowed;
 }
@@ -520,10 +914,10 @@ onUnmounted(() => {
 .tile-code {
   padding: 0.22rem 0.6rem;
   border-radius: 8px;
-  background: rgba(6, 14, 32, 0.82);
-  color: var(--text);
+  background: rgba(6, 14, 32, 0.84);
+  color: #f8fafc;
   font-family: monospace;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 700;
 }
 
@@ -531,12 +925,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.85rem;
   flex-wrap: wrap;
 }
 
 .status-msg {
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-dim);
 }
@@ -549,16 +943,37 @@ onUnmounted(() => {
   color: var(--danger);
 }
 
+.footer-actions {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.lifeline-btn,
 .skip-btn {
-  padding: 0.6rem 1.15rem;
+  padding: 0.58rem 1rem;
   border-radius: 12px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline-strong);
   color: var(--primary);
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   cursor: pointer;
   transition: var(--transition-fast);
+}
+
+.lifeline-btn {
+  border-color: var(--accent-glow);
+  color: var(--accent);
+}
+
+.lifeline-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lifeline-btn:not(:disabled):hover {
+  background: var(--accent);
+  color: var(--text-inverse);
 }
 
 .skip-btn:hover {
@@ -567,7 +982,8 @@ onUnmounted(() => {
 }
 
 @media (max-width: 600px) {
-  .channel-bars {
+  .channel-bars,
+  .summary-grid {
     grid-template-columns: 1fr;
   }
 
