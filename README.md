@@ -55,7 +55,7 @@ Dự án được xây dựng với những công nghệ FE hiện đại nhất
 5. **🍜 Hôm Nay Ăn Gì (`hom-nay-an-gi`)** *(Native Vue 3)*:
    - Công cụ quay gợi ý món ăn Việt Nam ngẫu nhiên, lọc theo nhóm món, lưu món yêu thích & tự thêm thực đơn cá nhân qua Pinia.
 6. **🌾 Nông Trại Anime 2.5D (`anime-farm`)** *(Static Embed)*:
-   - Game mô phỏng nông trại Isometric 2.5D phong cách Anime (gieo hạt kéo thả, tưới nước, nhà kho, đơn hàng) nhúng qua `AppEmbedFrame`.
+   - Game mô phỏng nông trại Isometric 2.5D phong cách **Studio Ghibli & Gỗ cổ tích**: luống đất nổi 2.5D phủ texture đất khô/đất ướt/cỏ hoa dại vẽ tay, trọn bộ 8 sprite PNG tách nền màu gouache nét mực nâu ấm (`assets/crops/*.png`) cho 6 loại cây trồng + 2 giai đoạn lớn, HUD gỗ & modal giấy da kem, ánh nắng ấm & cánh hoa bay; hỗ trợ **tưới nước 1 chạm & vuốt hàng loạt**, **Năng lượng Bón Phân (`⚡Bón`)**, **Thời tiết động (Nắng / Mưa tự tưới / Cầu Vồng x2 Thu Hoạch Vàng)**, **Combo thu hoạch**, nhà kho & đơn hàng thị trấn nhúng qua `AppEmbedFrame`.
 7. **🎲 Cờ Tỷ Phú Sài Gòn (`saigon-tycoon`)** *(Static Embed)*:
    - Saigon Tycoon 40 ô phố Sài Gòn hoài cổ chuẩn luật quốc tế (đấu giá, thế chấp, giao dịch, xây nhà), Bot AI & Đài Radio Lo-Fi nhúng qua `AppEmbedFrame`.
 8. **🔮 Bói Bài Oracle (`oracle-tarot`)**:

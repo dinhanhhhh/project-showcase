@@ -17,6 +17,19 @@
   <div class="farm-scenery-bg">
     <img src="assets/farm_bg.jpg" alt="Anime Farm Background" class="bg-panoramic" />
     <div class="bg-vignette-overlay"></div>
+    <!-- Lớp ánh nắng ấm & cánh hoa/hạt phấn bay nhẹ kiểu Studio Ghibli -->
+    <div class="atmosphere-layer" aria-hidden="true">
+      <div class="sunbeam sunbeam-1"></div>
+      <div class="sunbeam sunbeam-2"></div>
+      <span class="ambient-petal p1"></span>
+      <span class="ambient-petal p2"></span>
+      <span class="ambient-petal p3"></span>
+      <span class="ambient-petal p4"></span>
+      <span class="ambient-petal p5"></span>
+      <span class="ambient-petal p6"></span>
+      <span class="ambient-petal p7"></span>
+      <span class="ambient-petal p8"></span>
+    </div>
   </div>
 
   <div id="app-container">
@@ -24,9 +37,8 @@
     <!-- 1. GIAO DIỆN TRÊN CÙNG (CHUẨN 1:1 THEO ẢNH MẪU)   -->
     <!-- ================================================= -->
     <header class="game-hud-top">
-      <!-- Góc trên-trái: Back btn + Avatar tóc bạc + "Trang trại" + Badge 12 -->
-      <div class="hud-profile-card" id="hud-profile-card" role="button" tabindex="0" title="Nhấp để xem thông tin & kinh nghiệm lên cấp">
-        <button class="btn-back-nav" title="Trở về">‹</button>
+      <!-- Góc trên-trái: Avatar nông dân + "Trang trại" + Cấp & Thanh EXP -->
+      <div class="hud-profile-card" id="hud-profile-card" role="button" tabindex="0" title="Nhấp để xem hồ sơ nông trại, thống kê & cấp độ">
         <div class="avatar-frame">
           <img src="assets/farmer_avatar.jpg" alt="Avatar Nông Dân" class="avatar-photo" />
         </div>
@@ -41,73 +53,74 @@
         </div>
       </div>
 
-      <!-- Góc trên-phải: Năng lượng lá xanh (315 / 315) + Vàng + Âm thanh -->
+      <!-- Góc trên-phải: Thời tiết động + Năng lượng Bón phân + Vàng + Kho + Âm thanh -->
       <div class="hud-top-right">
-        <!-- Năng lượng lá xanh chuẩn ảnh mẫu -->
-        <div class="leaf-energy-pill" title="Năng lượng canh tác">
-          <span class="leaf-icon">🍃</span>
-          <span class="leaf-value">100 / 100</span>
-          <button class="leaf-add-btn" id="btn-quick-energy">+</button>
+        <!-- Thời tiết nông trại động -->
+        <div class="weather-pill" id="hud-weather-pill" title="Thời tiết thay đổi tự nhiên giúp tự tưới cây hoặc tăng thưởng!">
+          <span class="weather-icon" id="hud-weather-icon">☀️</span>
+          <span class="weather-label" id="hud-weather-label">Nắng Đẹp</span>
         </div>
 
-        <!-- Tiền Vàng Khởi Nghiệp -->
-        <div class="currency-pill gold-pill" id="btn-quick-shop" title="Tiền vàng">
+        <!-- Năng lượng lá xanh: Bấm để kích hoạt Bón Phân Tăng Tốc (-20 🍃) -->
+        <button type="button" class="leaf-energy-pill" id="btn-energy-boost" title="Dùng 20 Năng lượng bón phân tăng tốc toàn bộ cây đang lớn (+40% tiến độ)!">
+          <span class="leaf-icon">🍃</span>
+          <span class="leaf-value" id="hud-energy-val">100/100</span>
+          <span class="leaf-boost-tag" id="hud-energy-tag">⚡Bón</span>
+        </button>
+
+        <!-- Tiền Vàng -->
+        <div class="currency-pill gold-pill" id="btn-quick-shop" title="Tiền vàng (Chạm để mở Túi hạt giống)">
           <span class="currency-icon">💰</span>
           <span id="hud-coins" class="currency-val">100</span>
         </div>
 
         <!-- Sức chứa kho -->
-        <div class="currency-pill barn-pill" id="btn-header-barn" title="Nhà kho">
+        <div class="currency-pill barn-pill" id="btn-header-barn" title="Nhà kho nông sản">
           <span class="currency-icon">🧺</span>
           <span id="hud-barn-count" class="currency-val">0/60</span>
         </div>
 
         <!-- Âm thanh -->
-        <button id="btn-audio-toggle" class="audio-btn-compact" title="Bật/Tắt âm thanh">
+        <button type="button" id="btn-audio-toggle" class="audio-btn-compact" title="Bật/Tắt âm thanh">
           🔊
         </button>
       </div>
     </header>
 
-    <!-- Định nghĩa Gradient cho các luống đất Isometric 2.5D chuẩn 1:1 ảnh mẫu Liên Quân -->
+    <!-- Định nghĩa Texture vẽ tay & Gradient cho luống đất Isometric 2.5D -->
     <svg id="iso-defs" style="position:absolute;width:0;height:0;overflow:hidden;" aria-hidden="true">
       <defs>
+        <!-- Texture đất cày khô vẽ tay (tile_soil_dry.jpg) -->
+        <pattern id="patternSoilDry" patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox" width="1" height="1">
+          <image href="assets/tile_soil_dry.jpg" x="0" y="0" width="1" height="1" preserveAspectRatio="xMidYMid slice" />
+        </pattern>
+        <!-- Texture đất tưới ẩm ánh nước vẽ tay (tile_soil_wet.jpg) -->
+        <pattern id="patternSoilWet" patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox" width="1" height="1">
+          <image href="assets/tile_soil_wet.jpg" x="0" y="0" width="1" height="1" preserveAspectRatio="xMidYMid slice" />
+        </pattern>
+        <!-- Texture thảm cỏ hoa dại vẽ tay (tile_grass.jpg) -->
+        <pattern id="patternGrassWild" patternUnits="objectBoundingBox" patternContentUnits="objectBoundingBox" width="1" height="1">
+          <image href="assets/tile_grass.jpg" x="0" y="0" width="1" height="1" preserveAspectRatio="xMidYMid slice" />
+        </pattern>
+
         <!-- Bờ luống đất cày xới khô (Ridge Tilled) -->
         <linearGradient id="soilRidgeTilled" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#9d6135" />
-          <stop offset="50%" stop-color="#844d24" />
-          <stop offset="100%" stop-color="#693714" />
+          <stop offset="0%" stop-color="#9e6338" />
+          <stop offset="50%" stop-color="#7c4720" />
+          <stop offset="100%" stop-color="#5c3112" />
         </linearGradient>
-        <!-- Lòng luống đất cày khô trũng sâu (Trough Tilled) -->
-        <radialGradient id="soilTroughTilled" cx="50%" cy="45%" r="65%">
-          <stop offset="0%" stop-color="#6e3e1c" />
-          <stop offset="70%" stop-color="#552c0e" />
-          <stop offset="100%" stop-color="#3f1e07" />
-        </radialGradient>
         <!-- Bờ luống đất tưới nước ẩm mượt (Ridge Watered) -->
         <linearGradient id="soilRidgeWatered" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#5e3415" />
-          <stop offset="50%" stop-color="#49240c" />
-          <stop offset="100%" stop-color="#351704" />
+          <stop offset="0%" stop-color="#613617" />
+          <stop offset="50%" stop-color="#48230c" />
+          <stop offset="100%" stop-color="#2f1404" />
         </linearGradient>
-        <!-- Lòng luống đất tưới nước ẩm ướt (Trough Watered) -->
-        <radialGradient id="soilTroughWatered" cx="50%" cy="45%" r="65%">
-          <stop offset="0%" stop-color="#3f1e09" />
-          <stop offset="70%" stop-color="#2c1203" />
-          <stop offset="100%" stop-color="#1c0901" />
-        </radialGradient>
-        <!-- Bờ gò cỏ non chưa mở khóa (Locked Ridge Grass - chuẩn xanh cốm ảnh 1) -->
+        <!-- Bờ gò cỏ non chưa mở khóa (màu cỏ đồng tự nhiên dịu mắt) -->
         <linearGradient id="lockedRidgeGrass" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#a6e338" />
-          <stop offset="50%" stop-color="#8dcb24" />
-          <stop offset="100%" stop-color="#70a915" />
+          <stop offset="0%" stop-color="#9bcc46" />
+          <stop offset="50%" stop-color="#7eb32d" />
+          <stop offset="100%" stop-color="#608f1d" />
         </linearGradient>
-        <!-- Mặt gò cỏ non chưa mở khóa (Locked Trough Grass) -->
-        <radialGradient id="lockedTroughGrass" cx="50%" cy="45%" r="65%">
-          <stop offset="0%" stop-color="#b6f046" />
-          <stop offset="70%" stop-color="#94d627" />
-          <stop offset="100%" stop-color="#74b316" />
-        </radialGradient>
       </defs>
     </svg>
 
@@ -194,6 +207,7 @@
           <button id="btn-open-orders" class="hud-pill-action-btn btn-orders" title="Đơn Hàng Thị Trấn">
             <span class="pill-btn-icon">📜</span>
             <span class="pill-btn-label">Đơn</span>
+            <span class="pill-order-dot hidden" id="badge-orders-ready">0</span>
           </button>
 
           <!-- 4. Sổ Bách Khoa Cây Trồng -->

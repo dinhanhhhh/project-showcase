@@ -62,14 +62,13 @@
   }
 }
 
-/* TỪNG Ô ĐẤT ISOMETRIC: KHÍT CẠNH 100%, RÃNH CỎ TỰ NHIÊN 4-5PX CHUẨN ẢNH 1 */
+/* TỪNG Ô ĐẤT ISOMETRIC: KHÍT CẠNH 100%, HITBOX ĐÚNG HÌNH THOI KHÔNG CHỒNG GÓC TRONG SUỐT */
 .farm-plot {
   position: absolute;
   width: 116px;
   height: 58px;
-  cursor: pointer;
   touch-action: none;
-  pointer-events: auto !important;
+  pointer-events: none !important;
   transition: transform 0.1s ease;
 }
 
@@ -84,11 +83,18 @@
 }
 
 .plot-diamond-svg {
-  width: 100%;
-  height: 100%;
+  width: 116px;
+  height: 64px;
   display: block;
   overflow: visible;
+  pointer-events: none;
   transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.plot-ridge,
+.plot-trough {
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .farm-plot:hover .plot-diamond-svg {
@@ -97,135 +103,226 @@
 }
 
 /* ========================================================= */
-/* 2. LUỐNG ĐẤT NỔI 2.5D (RAISED BED) BO TRÒN 4 GÓC CHUẨN ẢNH 1 */
+/* 2. LUỐNG ĐẤT NỔI 2.5D PHỦ TEXTURE VẼ TAY GHIBLI/ANIME     */
 /* ========================================================= */
 
-/* BỜ LUỐNG NỔI (RIDGE) - Màu nâu đất xới, bo góc tròn, bóng đổ 3D xuống cỏ */
-.plot-ridge {
-  fill: url(#soilRidgeTilled);
-  stroke: url(#soilRidgeTilled);
+/* Thành đất 2.5D bên dưới viền trước để ô đất có độ dày bám chặt vào thảm cỏ */
+.plot-side-left {
+  fill: #6a3e1f;
+  stroke: #3d2412;
+  stroke-width: 1.2;
   stroke-linejoin: round;
-  stroke-width: 6;
-  filter: drop-shadow(0 3.5px 3.5px rgba(35, 18, 6, 0.35));
-  transition: fill 0.2s ease, stroke 0.2s ease;
+  pointer-events: none;
+  transition: fill 0.22s ease, opacity 0.22s ease;
 }
 
-/* LÒNG LUỐNG ĐẤT TRŨNG (TROUGH) - Thụt sâu vào 6px, lòng chảo đất sẫm mịn */
-.plot-trough {
-  fill: url(#soilTroughTilled);
-  stroke: #542c0f;
+.plot-side-right {
+  fill: #4b2810;
+  stroke: #3d2412;
+  stroke-width: 1.2;
   stroke-linejoin: round;
-  stroke-width: 3.5;
-  transition: fill 0.2s ease, stroke 0.2s ease;
+  pointer-events: none;
+  transition: fill 0.22s ease, opacity 0.22s ease;
+}
+
+/* BỜ LUỐNG NỔI (RIDGE) - Đất cày vẽ tay + viền mực nâu trầm ấm kiểu farm_bg.jpg */
+.plot-ridge {
+  fill: url(#soilRidgeTilled);
+  stroke: #4c2a12;
+  stroke-linejoin: round;
+  stroke-width: 2.2;
+  filter: drop-shadow(0 4px 4px rgba(38, 22, 8, 0.34));
+  transition: fill 0.22s ease, stroke 0.22s ease, opacity 0.22s ease;
+}
+
+/* LÒNG LUỐNG ĐẤT PHỦ TEXTURE VẼ TAY THẬT (tile_soil_dry.jpg) */
+.plot-trough {
+  fill: url(#patternSoilDry);
+  stroke: rgba(62, 36, 18, 0.65);
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+  transition: fill 0.22s ease, stroke 0.22s ease, opacity 0.22s ease;
+}
+
+/* Đường viền nắng ấm phía sau lưng luống tạo cảm giác ánh sáng chéo từ góc trên-trái */
+.plot-sun-rim {
+  stroke: rgba(255, 240, 198, 0.5);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  fill: none;
+  pointer-events: none;
 }
 
 /* Đường rãnh chìm viền lòng luống */
 .plot-trough-groove {
-  stroke: rgba(35, 15, 4, 0.35);
+  stroke: rgba(45, 21, 7, 0.35);
   stroke-linejoin: round;
-  stroke-width: 1.5;
+  stroke-width: 1.2;
+  pointer-events: none;
 }
 
-/* KHI ĐƯỢC TƯỚI NƯỚC (WATERED / GROWING / MATURE) - Đất ẩm mượt sẫm màu */
+/* KHI ĐƯỢC TƯỚI NƯỚC (WATERED / GROWING / MATURE) - Phủ texture đất ướt lấp lánh nước (tile_soil_wet.jpg) */
+.farm-plot.is-watered .plot-side-left,
+.farm-plot.status-planted_watered .plot-side-left,
+.farm-plot.status-mature .plot-side-left {
+  fill: #45230d;
+}
+
+.farm-plot.is-watered .plot-side-right,
+.farm-plot.status-planted_watered .plot-side-right,
+.farm-plot.status-mature .plot-side-right {
+  fill: #2d1406;
+}
+
 .farm-plot.is-watered .plot-ridge,
 .farm-plot.status-planted_watered .plot-ridge,
 .farm-plot.status-mature .plot-ridge {
   fill: url(#soilRidgeWatered);
-  stroke: url(#soilRidgeWatered);
-  filter: drop-shadow(0 3.5px 3.5px rgba(20, 10, 3, 0.45));
+  stroke: #341807;
+  filter: drop-shadow(0 4px 5px rgba(20, 10, 3, 0.44));
 }
 
 .farm-plot.is-watered .plot-trough,
 .farm-plot.status-planted_watered .plot-trough,
 .farm-plot.status-mature .plot-trough {
-  fill: url(#soilTroughWatered);
-  stroke: #2c1203;
+  fill: url(#patternSoilWet);
+  stroke: rgba(40, 18, 6, 0.8);
 }
 
 .farm-plot.is-watered .plot-trough-groove,
 .farm-plot.status-planted_watered .plot-trough-groove,
 .farm-plot.status-mature .plot-trough-groove {
-  stroke: rgba(15, 6, 2, 0.45);
+  stroke: rgba(147, 197, 253, 0.22);
 }
 
 /* ========================================================= */
-/* 3. Ô CỎ CHƯA MỞ KHÓA (LOCKED) - GÒ CỎ XANH NON BO GÓC CHUẨN ẢNH 1 */
+/* 3. Ô CỎ CHƯA MỞ KHÓA (LOCKED) - CỎ HOA DẠI VẼ TAY HÒA NỀN */
 /* ========================================================= */
+.farm-plot.status-locked .plot-side-left,
+.farm-plot.status-raw .plot-side-left {
+  fill: #668d23;
+  stroke: rgba(58, 42, 18, 0.45);
+  opacity: 0.78;
+}
+
+.farm-plot.status-locked .plot-side-right,
+.farm-plot.status-raw .plot-side-right {
+  fill: #4d7017;
+  stroke: rgba(58, 42, 18, 0.45);
+  opacity: 0.78;
+}
+
 .farm-plot.status-locked .plot-ridge {
   fill: url(#lockedRidgeGrass);
-  stroke: #7fbe19;
+  stroke: rgba(72, 98, 26, 0.55);
   stroke-linejoin: round;
-  stroke-width: 6;
-  filter: drop-shadow(0 3px 3.5px rgba(35, 65, 12, 0.25));
+  stroke-width: 1.8;
+  opacity: 0.82;
+  filter: drop-shadow(0 2.5px 3px rgba(35, 58, 12, 0.22));
 }
 
 .farm-plot.status-locked .plot-trough {
-  fill: url(#lockedTroughGrass);
-  stroke: #8ece22;
+  fill: url(#patternGrassWild);
+  stroke: rgba(255, 250, 210, 0.32);
   stroke-linejoin: round;
-  stroke-width: 3.5;
+  stroke-width: 1.2;
+  opacity: 0.86;
+}
+
+.farm-plot.status-locked .plot-sun-rim {
+  stroke: rgba(255, 252, 220, 0.45);
 }
 
 .farm-plot.status-locked .plot-trough-groove {
-  stroke: rgba(255, 255, 255, 0.35);
+  stroke: rgba(255, 255, 255, 0.18);
   stroke-linejoin: round;
-  stroke-width: 1.5;
+  stroke-width: 1;
 }
 
 /* Ô CỎ HOANG (RAW) */
 .farm-plot.status-raw .plot-ridge {
   fill: url(#lockedRidgeGrass);
-  stroke: #77b515;
+  stroke: #56791b;
   stroke-linejoin: round;
-  stroke-width: 6;
+  stroke-width: 2;
   filter: drop-shadow(0 3px 3.5px rgba(35, 65, 12, 0.25));
 }
 
 .farm-plot.status-raw .plot-trough {
-  fill: url(#lockedTroughGrass);
-  stroke: #86c41e;
+  fill: url(#patternGrassWild);
+  stroke: rgba(65, 95, 20, 0.5);
   stroke-linejoin: round;
-  stroke-width: 3.5;
+  stroke-width: 1.4;
 }
 
 .farm-plot.status-raw .plot-trough-groove {
   stroke: rgba(255, 255, 255, 0.22);
 }
 
-/* BIỂN CẮM TRÊN Ô CHƯA MỞ KHÓA (CHUẨN ẢNH 1) */
+/* BIỂN GỖ CẮM ĐẤT CỔ TÍCH TRÊN Ô CHƯA MỞ KHÓA (THAY VIÊN THUỐC TRẮNG NHỰA) */
 .plot-lock-sign {
   position: absolute;
   left: 50%;
-  bottom: 0px;
+  bottom: 3px;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  padding: 3px 8px;
-  background: linear-gradient(135deg, #fff3e0 0%, #fed7aa 100%);
-  border: 1.5px solid #d97706;
-  border-radius: 12px;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.22);
-  font-size: 0.68rem;
+  padding: 2px 8px;
+  background: linear-gradient(180deg, #9b6434 0%, #7a4921 55%, #613716 100%);
+  border: 1.6px solid #3e220e;
+  border-radius: 7px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 185, 0.42),
+    0 3px 5px rgba(34, 18, 6, 0.38);
+  font-size: 0.65rem;
   font-weight: 800;
-  color: #92400e;
+  color: #fef3c7;
+  text-shadow: 0 1px 1px rgba(35, 16, 4, 0.85);
   white-space: nowrap;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   user-select: none;
-  animation: signFloat 2.5s infinite ease-in-out;
+  animation: signFloat 2.8s infinite ease-in-out;
+}
+
+.plot-lock-sign.unlockable {
+  background: linear-gradient(180deg, #e5a93c 0%, #c27b19 100%);
+  border-color: #4d290c;
+  color: #fffbeb;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 210, 0.65),
+    0 4px 10px rgba(180, 105, 12, 0.5);
+  animation: unlockPulse 1.6s infinite ease-in-out;
+}
+
+.plot-lock-sign.unlockable-ready {
+  background: linear-gradient(180deg, #5da83e 0%, #3d7a24 100%);
+  border-color: #264d14;
+  color: #fefce8;
+  box-shadow:
+    inset 0 1px 0 rgba(220, 252, 200, 0.55),
+    0 4px 12px rgba(45, 118, 28, 0.55);
+}
+
+@keyframes unlockPulse {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.07); }
 }
 
 .plot-lock-sign::after {
   content: '';
   position: absolute;
-  bottom: -6px;
+  bottom: -7px;
   left: 50%;
   transform: translateX(-50%);
-  width: 3.5px;
-  height: 6px;
-  background: #b45309;
-  border-radius: 1px;
+  width: 4px;
+  height: 7px;
+  background: linear-gradient(90deg, #6e3f1a, #47250d);
+  border-left: 1px solid #3e220e;
+  border-right: 1px solid #3e220e;
+  border-radius: 0 0 2px 2px;
 }
 
 @keyframes signFloat {
@@ -301,60 +398,66 @@
   pointer-events: none !important;
 }
 
-/* KÍCH THƯỚC CÂY TRỒNG VỪA VẶN, NẰM GỌN TRONG Ô ĐẤT */
-.plant-svg {
+/* KÍCH THƯỚC CÂY TRỒNG VỪA VẶN, NẰM GỌN TRONG Ô ĐẤT (HỖ TRỢ CẢ PNG SPRITE & GOUACHE SVG) */
+.plant-svg,
+.plant-sprite-img {
   position: relative;
   z-index: 1;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(0 4px 6px rgba(36, 18, 6, 0.34));
   overflow: visible;
   display: block;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 
 .plant-eggplant,
 .plant-cucumber,
-.plant-pepper {
-  width: 68px !important;
-  height: 92px !important;
+.plant-pepper,
+.plant-wheat,
+.plant-carrot,
+.plant-corn {
+  width: 82px !important;
+  height: 102px !important;
 }
 
 .stage-growing {
-  width: 58px !important;
-  height: 74px !important;
+  width: 64px !important;
+  height: 80px !important;
 }
 
 .stage-sprout {
-  width: 44px !important;
-  height: 52px !important;
+  width: 50px !important;
+  height: 62px !important;
 }
 
-/* Cây chín lắc lư nhẹ */
-/* CÂY ĐANG LỚN: HÀO QUANG VÀNG NHẠT NHẤP NHÁY NHẸ NHÀNG */
-.plant-growing-glow .plant-svg {
-  animation: pulse-glow 2s infinite ease-in-out;
+/* CÂY ĐANG LỚN: HÀO QUANG NẮNG ẤM NHẸ NHÀNG */
+.plant-growing-glow .plant-svg,
+.plant-growing-glow .plant-sprite-img {
+  animation: pulse-glow 2.4s infinite ease-in-out;
 }
 
 @keyframes pulse-glow {
   0%, 100% {
-    filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.45));
-    opacity: 0.88;
+    filter: drop-shadow(0 3px 5px rgba(36, 18, 6, 0.32));
   }
   50% {
-    filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.95)) drop-shadow(0 0 20px rgba(253, 224, 71, 0.6));
-    opacity: 1;
+    filter: drop-shadow(0 0 9px rgba(254, 240, 138, 0.72)) drop-shadow(0 4px 6px rgba(36, 18, 6, 0.3));
   }
 }
 
-/* CÂY CHÍN: LẮC LƯ NHẸ + PARTICLE ÁNH SÁNG & HOA BAY LƠ LỬNG */
-.crop-ready-bounce .plant-svg {
-  animation: plantDance 2s infinite ease-in-out;
+/* CÂY CHÍN: LẮC LƯ NHẸ THEO GIÓ + PARTICLE ÁNH SÁNG */
+.crop-ready-bounce .plant-svg,
+.crop-ready-bounce .plant-sprite-img {
+  animation: plantDance 2.3s infinite ease-in-out;
   transform-origin: 50% 92%;
-  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.7));
+  filter: drop-shadow(0 0 8px rgba(254, 240, 138, 0.65)) drop-shadow(0 4px 6px rgba(36, 18, 6, 0.34));
 }
 
 @keyframes plantDance {
   0%, 100% { transform: rotate(0deg) scale(1); }
-  25% { transform: rotate(-2.5deg) scale(1.03); }
-  75% { transform: rotate(2.5deg) scale(1.03); }
+  25% { transform: rotate(-2.2deg) scale(1.025); }
+  75% { transform: rotate(2.2deg) scale(1.025); }
 }
 
 /* Particle ánh sáng & hoa lơ lửng cho cây chín */
@@ -386,40 +489,49 @@
   100% { transform: translateY(-28px) scale(1.1); opacity: 0; }
 }
 
-/* Huy hiệu Thu Hoạch */
+/* Huy hiệu Thu Hoạch: Màu lá rêu nắng ấm viền kem giấy da thay xanh neon */
 .iso-harvest-badge {
   position: absolute;
   top: -22px;
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: #fff;
-  font-size: 0.75rem;
+  background: linear-gradient(180deg, #5ca33b 0%, #3d7524 100%);
+  color: #fffef0;
+  font-size: 0.72rem;
   font-weight: 800;
   padding: 3px 10px;
-  border-radius: 14px;
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.5);
-  border: 1.8px solid #ffffff;
+  border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(235, 255, 210, 0.45),
+    0 3px 8px rgba(34, 58, 16, 0.45),
+    0 0 0 1.4px #31591a;
+  border: 1.5px solid #fef3c7;
+  text-shadow: 0 1px 1.5px rgba(20, 42, 8, 0.8);
   white-space: nowrap;
-  animation: floatBubble 2s infinite ease-in-out;
+  animation: floatBubble 2.2s infinite ease-in-out;
   z-index: 15;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
-/* Cảnh báo Cần tưới - Bong bóng tròn màu cam phong cách Anime đặt ở góc trên-phải của cây */
+/* Cảnh báo Cần tưới - Huy hiệu giọt nước màu mật ong ấm áp */
 .iso-water-alert {
   position: absolute;
   top: -24px;
-  right: -30px; /* Đặt chếch hẳn về góc trên-phải để hoàn toàn tách biệt với thanh giây đếm ngược ở giữa */
+  right: -30px;
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  border: 2px solid #ffffff;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.55), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+  background: linear-gradient(180deg, #e5a330 0%, #b87014 100%);
+  border: 1.8px solid #fef3c7;
+  box-shadow:
+    0 3px 9px rgba(138, 76, 10, 0.5),
+    0 0 0 1.3px #5c3309,
+    inset 0 1.5px 3px rgba(255, 245, 210, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   animation: floatBubbleRight 2s infinite ease-in-out;
   cursor: pointer;
+  pointer-events: auto;
   z-index: 22;
 }
 
@@ -633,4 +745,101 @@
 
 .timer-progress {
   display: none; /* Giữ badge dạng viên thuốc siêu gọn gàng, chỉ hiện số giây rõ ràng */
+}
+
+/* ========================================================= */
+/* HIỆU ỨNG BAY CHỮ, BỤI ĐẤT, GIỌT NƯỚC & MƯA RÀO            */
+/* ========================================================= */
+.floating-text {
+  position: absolute;
+  left: 50%;
+  top: -12px;
+  transform: translateX(-50%);
+  font-size: 0.86rem;
+  font-weight: 900;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 60;
+  color: #ffffff;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.85), 0 0 8px rgba(0, 0, 0, 0.4);
+  animation: floatTextRise 1.15s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.float-type-crop {
+  color: #fef08a;
+  font-size: 0.96rem;
+}
+
+.float-type-golden {
+  color: #fde047;
+  font-size: 1.05rem;
+  text-shadow: 0 2px 6px rgba(146, 64, 14, 0.9), 0 0 12px rgba(250, 204, 21, 0.9);
+}
+
+.float-type-exp {
+  color: #7dd3fc;
+  font-size: 0.8rem;
+}
+
+.float-type-water {
+  color: #38bdf8;
+}
+
+.float-type-seed {
+  color: #86efac;
+}
+
+.float-type-cost {
+  color: #fca5a5;
+}
+
+@keyframes floatTextRise {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.8); }
+  20% { opacity: 1; transform: translate(-50%, -10px) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -44px) scale(0.95); }
+}
+
+.dirt-particle,
+.water-splash-particle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 55;
+  animation: particleBurst 0.48s ease-out forwards;
+}
+
+.dirt-particle {
+  background: #a16207;
+  border: 1px solid #fef08a;
+}
+
+.water-splash-particle {
+  background: #38bdf8;
+  box-shadow: 0 0 6px #7dd3fc;
+}
+
+@keyframes particleBurst {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2); }
+}
+
+/* Hiệu ứng mưa nhẹ khi thời tiết Mưa Rào */
+body.weather-rain .bg-vignette-overlay {
+  background:
+    repeating-linear-gradient(
+      108deg,
+      transparent 0px,
+      transparent 28px,
+      rgba(125, 211, 252, 0.16) 29px,
+      rgba(125, 211, 252, 0.16) 30px
+    ),
+    radial-gradient(circle at 50% 50%, rgba(14, 116, 144, 0.12) 0%, rgba(15, 23, 42, 0.32) 100%);
+}
+
+body.weather-rainbow .bg-vignette-overlay {
+  background: radial-gradient(circle at 50% 35%, rgba(254, 240, 138, 0.22) 0%, rgba(168, 85, 247, 0.12) 60%, rgba(15, 23, 42, 0.2) 100%);
 }

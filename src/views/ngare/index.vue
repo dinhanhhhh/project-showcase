@@ -689,16 +689,18 @@ onUnmounted(() => {
             <div class="form-group">
               <label>Chọn ngành nghề khởi điểm</label>
               <div class="career-grid">
-                <div
+                <button
                   v-for="(career, id) in gameData?.careers ?? {}"
                   :key="String(id)"
+                  type="button"
                   class="career-card"
                   :class="{ selected: selectedCareerId === String(id) }"
+                  :aria-pressed="selectedCareerId === String(id)"
                   @click="selectedCareerId = String(id)"
                 >
                   <span class="career-emoji">{{ career.emoji }}</span>
                   <span class="career-label">{{ career.name }}</span>
-                </div>
+                </button>
               </div>
             </div>
           </div>
@@ -795,23 +797,29 @@ onUnmounted(() => {
           </div>
           <div class="header-right">
             <button
+              type="button"
               class="btn-icon"
               title="Cửa hàng"
+              aria-label="Mở cửa hàng"
               @click="isShopOpen = true"
             >
               🛒
             </button>
             <button
+              type="button"
               class="btn-icon"
               title="Túi đồ"
+              aria-label="Mở túi đồ"
               @click="isInventoryOpen = true"
             >
               🎒
             </button>
             <!-- Nút Ẩn/Hiện Nhật ký -->
             <button
+              type="button"
               class="btn-icon hide-mobile"
               :title="isSidebarCollapsed ? 'Hiện Nhật ký' : 'Ẩn Nhật ký'"
+              :aria-label="isSidebarCollapsed ? 'Hiện Nhật ký' : 'Ẩn Nhật ký'"
               :class="{ 'btn-icon-active': !isSidebarCollapsed }"
               @click="isSidebarCollapsed = !isSidebarCollapsed"
             >
@@ -819,15 +827,19 @@ onUnmounted(() => {
             </button>
             <!-- Nút Save - ẩn trên mobile (có trong Menu) -->
             <button
+              type="button"
               class="btn-icon hide-mobile"
               title="Lưu game"
+              aria-label="Lưu game"
               @click="saveGame"
             >
               💾
             </button>
             <button
+              type="button"
               class="btn-icon"
               title="Menu"
+              aria-label="Mở menu"
               @click="isMenuOpen = true"
             >
               ☰
@@ -1797,6 +1809,9 @@ onUnmounted(() => {
   gap: 0.8rem;
 }
 .career-card {
+  width: 100%;
+  font-family: inherit;
+  color: var(--text-primary);
   background: var(--bg-glass);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -1944,12 +1959,12 @@ onUnmounted(() => {
   font-size: 1.1rem;
 }
 .player-career {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 140px;
+  max-width: 260px;
 }
 .header-center {
   display: flex;
@@ -2298,12 +2313,12 @@ onUnmounted(() => {
   z-index: 0;
 }
 .timeline-year {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  font-weight: 600;
+  font-size: 0.72rem;
+  color: #a5b4fc;
+  font-weight: 700;
   margin-bottom: 0.1rem;
   display: block;
-  opacity: 0.6;
+  opacity: 0.92;
   position: relative;
   z-index: 1;
 }
@@ -2334,9 +2349,9 @@ onUnmounted(() => {
   padding: 0 0.5rem;
 }
 .timeline-text {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  line-height: 1.4;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  line-height: 1.45;
   text-align: center;
   width: 100%;
 }
@@ -2861,24 +2876,34 @@ onUnmounted(() => {
   /* Header Game gọn nhẹ */
   .game-header {
     padding: 0.5rem 0 !important;
+    gap: 0.4rem !important;
   }
   .header-left {
-    gap: 0.5rem !important;
+    gap: 0.45rem !important;
+    min-width: 0;
+  }
+  .header-center {
+    gap: 0.65rem !important;
+    flex-shrink: 0;
+  }
+  .header-right {
+    gap: 0.35rem !important;
+    flex-shrink: 0;
   }
   .player-name {
-    font-size: 1rem !important;
+    font-size: 0.96rem !important;
   }
   .player-career {
-    max-width: 100px !important;
-    font-size: 0.7rem !important;
+    max-width: 118px !important;
+    font-size: 0.68rem !important;
   }
   .age-value,
   .year-value {
-    font-size: 1.1rem !important;
+    font-size: 1rem !important;
   }
   .age-label,
   .year-label {
-    font-size: 0.6rem !important;
+    font-size: 0.58rem !important;
   }
   .btn-icon {
     width: 34px !important;
@@ -2887,35 +2912,40 @@ onUnmounted(() => {
     padding: 0.2rem !important;
   }
 
-  /* Chỉ số Stats: Chia lưới 2 cột để hiện đủ 6 chỉ số (Thay vì cuộn ngang) */
+  /* Chỉ số Stats: Chia lưới 2 cột và GIỮ TÊN CHỈ SỐ để người chơi dễ hiểu */
   .stats-panel {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.5rem !important;
-    padding: 0.8rem 0 !important;
+    gap: 0.45rem !important;
+    padding: 0.65rem 0 !important;
     margin: 0 !important;
     width: 100% !important;
     overflow-x: visible !important;
   }
   .stat-item {
     width: 100% !important;
-    padding: 0.5rem 0.7rem !important;
+    padding: 0.48rem 0.6rem !important;
     flex: none !important;
   }
   .stat-name {
-    display: none !important;
+    display: inline-block !important;
+    font-size: 0.7rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .stat-bar {
-    height: 3px !important;
+    height: 4px !important;
   }
   .stat-value {
-    font-size: 0.9rem !important;
+    font-size: 0.85rem !important;
   }
   .stat-icon {
-    font-size: 1rem !important;
+    font-size: 0.95rem !important;
   }
   .stat-header {
-    margin-bottom: 0.2rem !important;
+    margin-bottom: 0.25rem !important;
+    gap: 0.3rem !important;
   }
 
   /* CREATE SCREEN: QUAY LẠI LAYOUT DỌC */

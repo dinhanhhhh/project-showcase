@@ -863,12 +863,12 @@ kbd {
 }
 
 .song-tab {
-  padding: 0.34rem 0.68rem;
+  padding: 0.3rem 0.58rem;
   border-radius: 99px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
   color: var(--text-dim);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -880,12 +880,12 @@ kbd {
 }
 
 .autoplay-btn {
-  padding: 0.38rem 0.85rem;
+  padding: 0.35rem 0.78rem;
   border-radius: 10px;
   background: var(--accent);
   border: none;
   color: var(--text-inverse);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
   cursor: pointer;
 }
@@ -893,15 +893,15 @@ kbd {
 .sheet-notes {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.36rem;
+  gap: 0.28rem;
 }
 
 .sheet-pill {
-  padding: 0.22rem 0.52rem;
-  border-radius: 8px;
+  padding: 0.2rem 0.44rem;
+  border-radius: 7px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-dim);
 }
@@ -1039,12 +1039,87 @@ kbd {
 }
 
 @media (max-width: 768px) {
-  .synth-hud {
-    grid-template-columns: 1fr;
+  .piano-page {
+    padding: 0.8rem 0.65rem 2.2rem;
   }
 
+  .piano-shell {
+    gap: 0.65rem;
+  }
+
+  .piano-header {
+    gap: 0.5rem;
+  }
+
+  .title-block {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .title-block h1 {
+    font-size: 1.32rem;
+  }
+
+  .title-block p {
+    display: none;
+  }
+
+  .wave-selector {
+    flex: 1;
+    justify-content: space-between;
+  }
+
+  .wave-selector button {
+    padding: 0.34rem 0.42rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+
+  .studio-controls {
+    gap: 0.45rem;
+  }
+
+  .segmented {
+    flex: 1 1 auto;
+    justify-content: space-between;
+  }
+
+  .segmented button {
+    flex: 1;
+    padding: 0.36rem 0.42rem;
+    font-size: 0.73rem;
+    white-space: nowrap;
+  }
+
+  .recorder-bar {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .rec-btn,
+  .play-rec-btn {
+    flex: 1;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.76rem;
+  }
+
+  /* Đưa bàn phím lên NGAY TRÊN synth-hud để có thể đánh đàn liền không cần cuộn */
   .keyboard-frame {
-    padding: 0.85rem 0.5rem 1rem;
+    order: 4;
+    padding: 0.75rem 0.45rem 0.9rem;
+    border-radius: 18px;
+  }
+
+  .synth-hud {
+    order: 5;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .now-playing,
+  .song-trainer {
+    padding: 0.85rem;
+    border-radius: 16px;
   }
 
   .white-keys-row {
@@ -1052,12 +1127,12 @@ kbd {
   }
 
   .white-key {
-    height: 190px;
-    padding-bottom: 0.65rem;
+    height: 175px;
+    padding-bottom: 0.55rem;
   }
 
   .black-key {
-    height: 115px;
+    height: 108px;
     width: 8.6%;
   }
 
@@ -1067,7 +1142,7 @@ kbd {
   }
 
   .wk-label {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
   }
 }
 </style>

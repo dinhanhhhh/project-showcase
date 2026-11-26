@@ -1524,6 +1524,10 @@ onUnmounted(() => {
 }
 
 @media (max-width: 880px) {
+  .chess-page {
+    padding-bottom: 4.5rem;
+  }
+
   .chess-grid {
     grid-template-columns: 1fr;
   }

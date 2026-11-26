@@ -20,17 +20,20 @@
   pointer-events: auto;
 }
 
-/* Góc trên-trái: Back button + Avatar tóc bạc + "Trang trại" + Badge 12 */
+/* Góc trên-trái: Thẻ gỗ ấm cổ tích + Avatar + Cấp & Thanh EXP */
 .hud-profile-card {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(18, 12, 8, 0.7);
+  background: linear-gradient(180deg, rgba(94, 59, 32, 0.94) 0%, rgba(58, 34, 17, 0.96) 100%);
   backdrop-filter: blur(8px);
   padding: 4px 14px 4px 6px;
-  border-radius: 26px;
-  border: 1.8px solid #d49a24;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  border-radius: 24px;
+  border: 2px solid #d9a043;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 232, 180, 0.35),
+    0 5px 14px rgba(34, 18, 6, 0.45),
+    0 0 0 1.5px rgba(45, 22, 8, 0.8);
   cursor: pointer;
   user-select: none;
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
@@ -39,7 +42,9 @@
 .hud-profile-card:hover {
   transform: translateY(-2px) scale(1.02);
   border-color: #fde047;
-  box-shadow: 0 8px 24px rgba(251, 191, 36, 0.45);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 240, 195, 0.5),
+    0 8px 20px rgba(45, 24, 8, 0.5);
 }
 
 .hud-profile-card:active {
@@ -66,10 +71,10 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  border: 2.2px solid #facc15;
+  border: 2.2px solid #eab308;
   overflow: hidden;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
-  background: #fff;
+  box-shadow: 0 3px 8px rgba(34, 18, 6, 0.45);
+  background: #fdf6e3;
   flex-shrink: 0;
 }
 
@@ -88,9 +93,9 @@
 .farm-title {
   font-size: 0.95rem;
   font-weight: 800;
-  color: #ffffff;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
-  letter-spacing: 0.3px;
+  color: #fffbeb;
+  text-shadow: 0 1.5px 2px rgba(36, 17, 5, 0.9);
+  letter-spacing: 0.2px;
 }
 
 .stamina-bar-container {
@@ -100,94 +105,143 @@
 }
 
 .stamina-badge {
-  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
-  color: #ffffff;
+  background: linear-gradient(180deg, #e59a24 0%, #a86411 100%);
+  color: #fffbeb;
   font-weight: 900;
   font-size: 0.7rem;
   padding: 1px 6px;
   border-radius: 8px;
-  border: 1.2px solid #fde047;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  border: 1.2px solid #fde68a;
+  box-shadow: 0 2px 4px rgba(34, 18, 6, 0.4);
 }
 
 .stamina-bar-track {
   width: 105px;
   height: 9px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(34, 18, 7, 0.75);
   border-radius: 5px;
-  border: 1px solid #ca8a04;
+  border: 1px solid #c2872b;
   overflow: hidden;
 }
 
 .stamina-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #facc15, #f59e0b);
+  background: linear-gradient(90deg, #facc15, #e59a24);
   border-radius: 4px;
   transition: width 0.4s ease;
 }
 
-/* Góc trên-phải: Năng lượng lá xanh (315 / 315) + Vàng + Kho */
+/* Góc trên-phải: Khung gỗ óc chó mạ đồng ấm áp */
 .hud-top-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
-/* Năng lượng lá xanh chuẩn ảnh mẫu */
+.weather-pill {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(180deg, rgba(96, 61, 32, 0.94) 0%, rgba(61, 36, 18, 0.96) 100%);
+  backdrop-filter: blur(8px);
+  padding: 5px 11px;
+  border-radius: 18px;
+  border: 1.8px solid #d9a043;
+  color: #fef3c7;
+  font-weight: 800;
+  font-size: 0.82rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 180, 0.32),
+    0 4px 10px rgba(34, 18, 6, 0.38),
+    0 0 0 1px rgba(45, 22, 8, 0.7);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+
+.weather-pill.is-rain {
+  border-color: #7dd3fc;
+  color: #e0f2fe;
+  background: linear-gradient(180deg, rgba(38, 78, 108, 0.94) 0%, rgba(23, 52, 76, 0.96) 100%);
+}
+
+.weather-pill.is-rainbow {
+  border-color: #f0abfc;
+  color: #fdf4ff;
+  background: linear-gradient(135deg, rgba(118, 56, 152, 0.92), rgba(186, 114, 34, 0.92));
+}
+
+/* Năng lượng lá xanh: Bấm kích hoạt Bón Phân Tăng Tốc */
 .leaf-energy-pill {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(10, 38, 16, 0.85);
+  background: linear-gradient(180deg, rgba(52, 86, 40, 0.95) 0%, rgba(32, 58, 24, 0.97) 100%);
   backdrop-filter: blur(8px);
-  padding: 5px 12px;
-  border-radius: 20px;
-  border: 1.8px solid #ca8a04;
-  color: #fff;
+  padding: 5px 11px;
+  border-radius: 18px;
+  border: 1.8px solid #c9973b;
+  color: #fefce8;
   font-weight: 800;
-  font-size: 0.88rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  font-size: 0.84rem;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(220, 252, 200, 0.3),
+    0 4px 10px rgba(24, 42, 16, 0.42),
+    0 0 0 1px rgba(32, 52, 20, 0.75);
+  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.leaf-energy-pill:hover {
+  transform: translateY(-2px);
+  border-color: #a3e635;
+  box-shadow: 0 6px 14px rgba(56, 118, 32, 0.45);
+}
+
+.leaf-energy-pill.can-boost {
+  border-color: #86efac;
+  box-shadow: 0 0 10px rgba(134, 239, 172, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .leaf-icon {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
 }
 
 .leaf-value {
-  color: #a7f3d0;
-  letter-spacing: 0.4px;
+  color: #dcfce7;
+  letter-spacing: 0.2px;
 }
 
-.leaf-add-btn {
-  background: #22c55e;
-  color: #fff;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.85rem;
+.leaf-boost-tag {
+  background: linear-gradient(180deg, #5da83e 0%, #3d7a24 100%);
+  color: #fefce8;
+  font-size: 0.67rem;
   font-weight: 900;
-  margin-left: 2px;
-  border: 1px solid #fff;
+  padding: 2px 7px;
+  border-radius: 9px;
+  border: 1px solid #d9f99d;
+  white-space: nowrap;
+  box-shadow: 0 1.5px 0 #264d14;
 }
 
 .currency-pill {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(18, 12, 8, 0.8);
+  background: linear-gradient(180deg, rgba(94, 59, 32, 0.94) 0%, rgba(58, 34, 17, 0.96) 100%);
   backdrop-filter: blur(8px);
   padding: 5px 12px;
-  border-radius: 20px;
-  border: 1.8px solid #ca8a04;
-  color: #fff;
+  border-radius: 18px;
+  border: 1.8px solid #d9a043;
+  color: #fffbeb;
   font-weight: 800;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   cursor: pointer;
   transition: transform 0.15s ease;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 180, 0.32),
+    0 4px 10px rgba(34, 18, 6, 0.38),
+    0 0 0 1px rgba(45, 22, 8, 0.7);
 }
 
 .currency-pill:hover {
@@ -195,16 +249,19 @@
 }
 
 .currency-val {
-  color: #fde047;
+  color: #fde68a;
 }
 
 .audio-btn-compact {
-  background: rgba(18, 12, 8, 0.8);
-  border: 1.8px solid #ca8a04;
-  color: #fff;
+  background: linear-gradient(180deg, rgba(94, 59, 32, 0.94) 0%, rgba(58, 34, 17, 0.96) 100%);
+  border: 1.8px solid #d9a043;
+  color: #fffbeb;
   padding: 6px 10px;
   border-radius: 14px;
   font-size: 1rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 180, 0.3),
+    0 4px 10px rgba(34, 18, 6, 0.38);
 }
 
 /* ================================================= */
@@ -275,26 +332,27 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
-/* Cụm nút góc dưới-phải: Đồng bộ ngôn ngữ Pill bo tròn tối giản với HUD trên */
+/* Cụm nút góc dưới-phải: Xếp 1 hàng ngang cùng Avatar Trợ lý để không bị thanh Thao tác nhanh che */
 .hud-bottom-right-cluster {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 10px;
 }
 
 /* Avatar cô gái đeo kính chuẩn ảnh mẫu */
 .assistant-circle-avatar {
   position: relative;
-  width: 50px;
-  height: 50px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 2.2px solid #facc15;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
   cursor: pointer;
   transition: transform 0.2s ease;
   background: #fff;
-  margin-right: 6px;
+  margin-right: 0;
+  flex-shrink: 0;
 }
 
 .assistant-circle-avatar:hover {
@@ -331,54 +389,86 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  background: rgba(18, 12, 8, 0.85);
-  backdrop-filter: blur(12px);
+  background: linear-gradient(180deg, rgba(98, 62, 34, 0.95) 0%, rgba(62, 36, 18, 0.97) 100%);
+  backdrop-filter: blur(10px);
   padding: 6px 12px;
-  border-radius: 999px;
-  border: 1.6px solid rgba(245, 158, 11, 0.55);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  border-radius: 18px;
+  border: 1.7px solid #d49b3b;
+  box-shadow:
+    inset 0 1.2px 0 rgba(255, 232, 180, 0.34),
+    0 3px 0 #331c0b,
+    0 5px 12px rgba(30, 15, 4, 0.4);
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
-  color: #fff;
+  transition: all 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: #fffbeb;
   outline: none;
 }
 
 .hud-pill-action-btn:hover {
   transform: translateY(-2px);
-  border-color: #facc15;
-  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.4);
-  background: rgba(28, 18, 12, 0.95);
+  border-color: #fde68a;
+  box-shadow:
+    inset 0 1.2px 0 rgba(255, 240, 200, 0.45),
+    0 4px 0 #331c0b,
+    0 7px 16px rgba(42, 22, 6, 0.45);
+  background: linear-gradient(180deg, rgba(114, 73, 40, 0.96) 0%, rgba(72, 42, 20, 0.98) 100%);
 }
 
 .hud-pill-action-btn:active {
-  transform: scale(0.95);
+  transform: translateY(1px) scale(0.97);
+  box-shadow: 0 1px 0 #331c0b;
 }
 
 .pill-btn-icon {
-  font-size: 1.15rem;
+  font-size: 1.12rem;
   line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+  filter: drop-shadow(0 1px 2px rgba(34, 18, 6, 0.5));
 }
 
 .pill-btn-label {
   font-size: 0.72rem;
   font-weight: 800;
-  color: #f1f5f9;
+  color: #fef3c7;
+  text-shadow: 0 1px 1.5px rgba(34, 16, 4, 0.85);
   letter-spacing: 0.2px;
 }
 
 .pill-btn-badge {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  color: #fef08a;
+  background: linear-gradient(180deg, #4b8f34 0%, #316420 100%);
+  color: #fefce8;
   font-size: 0.62rem;
   font-weight: 900;
   padding: 1px 6px;
   border-radius: 999px;
-  border: 1px solid rgba(254, 240, 138, 0.5);
+  border: 1px solid rgba(254, 243, 199, 0.6);
   letter-spacing: 0.3px;
+}
+
+.hud-pill-action-btn {
+  position: relative;
+}
+
+.pill-order-dot {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5ca33b, #387020);
+  color: #fffef0;
+  border: 1.6px solid #fef3c7;
+  font-size: 0.64rem;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(34, 68, 16, 0.55);
+  animation: badgePulse 1.6s infinite ease-in-out;
 }
 
 /* Tool icon SVG căn giữa */
@@ -390,7 +480,7 @@
 }
 
 /* ================================================= */
-/* 3. DOCK CÔNG CỤ THAO TÁC LÀM NÔNG NHANH           */
+/* 3. KHAY GỖ CÔNG CỤ THAO TÁC NHANH (COZY WOOD UI)  */
 /* ================================================= */
 .bottom-dock-container {
   position: fixed;
@@ -407,106 +497,104 @@
 .quick-action-dock {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: rgba(18, 12, 8, 0.88);
-  backdrop-filter: blur(14px);
-  padding: 6px 12px;
-  border-radius: 28px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.15);
-  border: 1.8px solid #ca8a04;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(102, 64, 34, 0.95) 0%, rgba(62, 36, 17, 0.97) 100%);
+  backdrop-filter: blur(12px);
+  padding: 6px 10px 8px 10px;
+  border-radius: 22px;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 232, 180, 0.32),
+    0 10px 24px rgba(34, 18, 6, 0.48),
+    0 0 0 1.5px rgba(45, 22, 8, 0.85);
+  border: 2px solid #d49b3b;
 }
 
 .quick-action-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: 1.5px solid transparent;
+  gap: 9px;
+  padding: 8px 15px;
+  border-radius: 15px;
+  border: 1.5px solid rgba(254, 243, 199, 0.48);
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease;
   user-select: none;
   font-family: inherit;
   font-weight: 800;
-  font-size: 0.88rem;
-  color: #ffffff;
+  font-size: 0.86rem;
+  color: #fffef5;
   position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  text-shadow: 0 1px 2px rgba(34, 16, 4, 0.65);
 }
 
 .quick-action-btn:hover {
   transform: translateY(-2px);
-  filter: brightness(1.1);
+  filter: brightness(1.07);
 }
 
 .quick-action-btn:active {
-  transform: translateY(1px) scale(0.96);
+  transform: translateY(2px) scale(0.98);
 }
 
-/* Nút Tự Động Gieo */
+/* 1. Tự Động Gieo — Xanh rêu thảo mộc ấm (Meadow Sage) */
 .btn-auto-plant {
-  background: linear-gradient(135deg, #10b981 0%, #047857 100%);
-  border-color: #6ee7b7;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
+  background: linear-gradient(180deg, #5da041 0%, #3d7527 100%);
+  border-color: #c5e8a4;
+  box-shadow: inset 0 1.5px 0 rgba(235, 255, 210, 0.38), 0 3px 0 #264d16, 0 5px 10px rgba(24, 48, 12, 0.35);
 }
 
 .btn-auto-plant:hover {
-  box-shadow: 0 6px 18px rgba(110, 231, 183, 0.6);
-  border-color: #a7f3d0;
+  border-color: #e2f8ca;
 }
 
-/* Nút Gieo Ngẫu Nhiên */
+/* 2. Gieo Ngẫu Nhiên — Tím quả mọng trầm ấm (Plum Berry) */
 .btn-random-plant {
-  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
-  border-color: #c4b5fd;
-  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.45);
+  background: linear-gradient(180deg, #875ea1 0%, #5f3c78 100%);
+  border-color: #d8c3e8;
+  box-shadow: inset 0 1.5px 0 rgba(245, 232, 255, 0.32), 0 3px 0 #3f2454, 0 5px 10px rgba(42, 22, 56, 0.35);
 }
 
 .btn-random-plant:hover {
-  box-shadow: 0 6px 18px rgba(196, 181, 253, 0.6);
-  border-color: #ddd6fe;
+  border-color: #ecdef7;
 }
 
-/* Nút Tưới Tất Cả */
+/* 3. Tưới Tất Cả — Xanh suối dịu mắt (Stream Blue) */
 .btn-water-all {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  border-color: #38bdf8;
-  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45);
+  background: linear-gradient(180deg, #4b8fb5 0%, #2f6787 100%);
+  border-color: #b8e0f5;
+  box-shadow: inset 0 1.5px 0 rgba(224, 245, 255, 0.35), 0 3px 0 #1c445c, 0 5px 10px rgba(18, 46, 66, 0.35);
 }
 
 .btn-water-all:hover {
-  box-shadow: 0 6px 18px rgba(56, 189, 248, 0.6);
-  border-color: #7dd3fc;
+  border-color: #d8f1ff;
 }
 
-/* Nút Thu Hoạch Tất Cả */
+/* 4. Thu Hoạch Tất Cả — Vàng mật ong lúa chín (Harvest Honey) */
 .btn-harvest-all {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  border-color: #fde047;
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+  background: linear-gradient(180deg, #dc9828 0%, #a86b12 100%);
+  border-color: #fde68a;
+  box-shadow: inset 0 1.5px 0 rgba(255, 248, 210, 0.42), 0 3px 0 #6e4207, 0 5px 10px rgba(72, 42, 6, 0.38);
 }
 
 .btn-harvest-all:hover {
-  box-shadow: 0 6px 18px rgba(253, 224, 71, 0.6);
-  border-color: #fef08a;
+  border-color: #fef3c7;
 }
 
-/* Nút Đào Cây (Nhổ Bỏ) */
+/* 5. Đào Cây — Đất nung tuyết tùng ấm (Terracotta Cedar) */
 .btn-dig-crop {
-  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
-  border-color: #fb923c;
-  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.45);
+  background: linear-gradient(180deg, #c26236 0%, #8f401d 100%);
+  border-color: #f4bea3;
+  box-shadow: inset 0 1.5px 0 rgba(255, 228, 212, 0.34), 0 3px 0 #5e260d, 0 5px 10px rgba(66, 26, 8, 0.36);
 }
 
 .btn-dig-crop:hover {
-  box-shadow: 0 6px 18px rgba(251, 146, 60, 0.6);
-  border-color: #fdba74;
+  border-color: #fbd7c4;
 }
 
 .btn-dig-crop.active {
-  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
-  border-color: #fca5a5;
-  box-shadow: 0 0 0 2px #fff, 0 0 16px rgba(239, 68, 68, 0.7);
+  background: linear-gradient(180deg, #cf4638 0%, #99251b 100%);
+  border-color: #fde68a;
+  box-shadow: 0 0 0 2px #fffbeb, 0 3px 0 #61140d, 0 0 14px rgba(207, 70, 56, 0.6);
   transform: translateY(-2px);
 }
 
@@ -533,13 +621,13 @@
 
 .quick-btn-badge {
   position: absolute;
-  top: -8px;
-  right: -12px;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
+  top: -10px;
+  right: -8px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
   border-radius: 10px;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 900;
   display: inline-flex;
   align-items: center;
@@ -547,6 +635,7 @@
   border: 1.8px solid #ffffff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   animation: badgePulse 2s infinite ease-in-out;
+  z-index: 2;
 }
 
 .badge-plant {
@@ -665,26 +754,30 @@
 /* Toast */
 .toast-container {
   position: fixed;
-  top: 80px;
-  right: 20px;
+  top: 66px;
+  right: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 340px;
   z-index: 99;
   pointer-events: none;
 }
 
 .toast-item {
-  background: rgba(18, 12, 8, 0.92);
-  color: #fff;
-  padding: 10px 18px;
-  border-radius: 14px;
-  font-size: 0.85rem;
+  background: linear-gradient(180deg, rgba(84, 52, 27, 0.96) 0%, rgba(52, 30, 14, 0.97) 100%);
+  color: #fffbeb;
+  padding: 7px 14px;
+  border-radius: 12px;
+  font-size: 0.78rem;
   font-weight: 700;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 6px 16px rgba(30, 15, 4, 0.42),
+    0 0 0 1px rgba(212, 155, 59, 0.45);
   backdrop-filter: blur(8px);
-  border-left: 4px solid #f59e0b;
-  animation: slideToast 0.3s ease;
+  border-left: 4px solid #e5a330;
+  animation: slideToast 0.25s ease;
   pointer-events: auto;
 }
 
@@ -696,25 +789,219 @@
   border-left-color: #ef4444;
 }
 
+.toast-item.fade-out {
+  opacity: 0;
+  transform: translateX(24px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
 @keyframes slideToast {
   0% { transform: translateX(50px); opacity: 0; }
   100% { transform: translateX(0); opacity: 1; }
 }
 
 @media (max-width: 768px) {
+  .game-hud-top {
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .hud-profile-card {
+    padding: 3px 10px 3px 4px;
+    gap: 6px;
+    border-radius: 20px;
+  }
+
+  .btn-back-nav {
+    font-size: 1.35rem;
+    padding: 0 2px;
+  }
+
+  .avatar-frame {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+  }
+
+  .farm-title {
+    font-size: 0.78rem;
+  }
+
+  .stamina-bar-track {
+    width: 62px;
+    height: 7px;
+  }
+
+  .hud-top-right {
+    width: 100%;
+    justify-content: space-between;
+    gap: 4px;
+  }
+
+  .weather-pill {
+    padding: 4px 7px;
+    font-size: 0.7rem;
+    gap: 3px;
+  }
+
+  .weather-label {
+    display: none;
+  }
+
+  .leaf-energy-pill,
+  .currency-pill {
+    padding: 4px 7px;
+    font-size: 0.72rem;
+    gap: 3px;
+    white-space: nowrap;
+  }
+
+  .leaf-boost-tag {
+    font-size: 0.6rem;
+    padding: 1px 5px;
+  }
+
+  .leaf-icon {
+    font-size: 0.9rem;
+  }
+
+  .audio-btn-compact {
+    padding: 4px 7px;
+    font-size: 0.85rem;
+    border-radius: 12px;
+  }
+
+  /* Đưa hộp Nhiệm vụ gọn lên ngay dưới HUD trên để không bao giờ bị thanh công cụ đáy chém ngang */
   .hud-quest-ribbon {
-    max-width: 220px;
-    padding: 6px 10px;
+    position: fixed;
+    top: 94px;
+    left: 10px;
+    right: 10px;
+    max-width: none;
+    padding: 5px 10px;
+    border-radius: 12px;
+    gap: 7px;
+    z-index: 30;
   }
-  .diamond-btn {
-    width: 44px;
-    height: 44px;
+
+  .ribbon-tag {
+    width: 24px;
+    height: 24px;
+    font-size: 0.88rem;
+    border-radius: 7px;
   }
-  .diamond-buttons-row {
-    gap: 10px;
+
+  .ribbon-text {
+    font-size: 0.72rem;
+    line-height: 1.25;
   }
+
+  /* Thanh thao tác nhanh co gọn vừa khít 100% chiều ngang 390px, hiện đủ 5 nút không cắt mép */
   .bottom-dock-container {
-    bottom: 74px;
+    bottom: 58px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    width: auto;
+    max-width: none;
+  }
+
+  .quick-action-dock {
+    width: 100%;
+    gap: 4px;
+    padding: 5px 6px;
+    border-radius: 18px;
+    justify-content: space-between;
+  }
+
+  .quick-action-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 3px;
+    border-radius: 12px;
+    font-size: 0.62rem;
+  }
+
+  .quick-btn-icon {
+    font-size: 1.05rem;
+  }
+
+  .quick-btn-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .quick-btn-label {
+    font-size: 0.6rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .quick-btn-badge {
+    top: -6px;
+    right: -10px;
+    min-width: 16px;
+    height: 16px;
+    font-size: 0.58rem;
+  }
+
+  /* Đáy màn hình: 4 nút Kho/Hạt/Đơn/Sổ + Trợ lý xếp gọn 1 hàng không tràn mép phải */
+  .game-hud-bottom {
+    bottom: 8px;
+    padding: 0 8px;
+    justify-content: center;
+  }
+
+  .hud-bottom-right-cluster {
+    width: 100%;
+    flex-direction: row-reverse;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .assistant-circle-avatar {
+    width: 38px;
+    height: 38px;
+    margin-right: 0;
+    flex-shrink: 0;
+  }
+
+  .hud-pill-buttons-row {
+    flex: 1;
+    gap: 5px;
+    padding-bottom: 0;
+    justify-content: space-between;
+  }
+
+  .hud-pill-action-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 6px;
+    gap: 3px;
+  }
+
+  .pill-btn-icon {
+    font-size: 0.95rem;
+  }
+
+  .pill-btn-label {
+    font-size: 0.68rem;
+  }
+
+  .toast-container {
+    top: 142px;
+    right: 10px;
+    max-width: 260px;
   }
 }
 

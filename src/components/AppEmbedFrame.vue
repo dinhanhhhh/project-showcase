@@ -75,8 +75,9 @@ onUnmounted(() => {
         <RouterLink
           to="/"
           class="back-btn"
+          aria-label="Về Launcher"
         >
-          ← Launcher
+          ← <span class="back-label">Launcher</span>
         </RouterLink>
         <div class="title-group">
           <h1 class="app-title">
@@ -103,7 +104,7 @@ onUnmounted(() => {
         </button>
         <button
           type="button"
-          class="tool-btn"
+          class="tool-btn hide-xs"
           title="Ẩn thanh trên để chơi rộng hơn"
           @click="isTheaterMode = true"
         >
@@ -130,7 +131,7 @@ onUnmounted(() => {
           :href="props.src"
           target="_blank"
           rel="noopener noreferrer"
-          class="tool-btn"
+          class="tool-btn hide-xs"
           title="Mở ở tab mới"
         >
           ↗ <span class="btn-label">Tab mới</span>
@@ -365,6 +366,42 @@ onUnmounted(() => {
 
   .tool-btn {
     padding: 0.38rem 0.55rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .embed-topbar {
+    height: 46px;
+    padding: 0 0.55rem;
+    gap: 0.45rem;
+  }
+
+  .topbar-left {
+    gap: 0.45rem;
+    flex: 1;
+  }
+
+  .back-btn {
+    padding: 0.34rem 0.6rem;
+    font-size: 0.9rem;
+  }
+
+  .back-label,
+  .hide-xs {
+    display: none;
+  }
+
+  .app-title {
+    font-size: 0.88rem;
+  }
+
+  .topbar-actions {
+    gap: 0.3rem;
+  }
+
+  .tool-btn {
+    padding: 0.34rem 0.48rem;
+    font-size: 0.82rem;
   }
 }
 </style>

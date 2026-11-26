@@ -255,7 +255,10 @@ onUnmounted(() => {
       </header>
 
       <!-- Thanh chỉ số -->
-      <section class="metrics-strip">
+      <section
+        class="metrics-strip"
+        :class="{ 'four-cols': gameMode === 'time_attack' }"
+      >
         <div class="metric-pill">
           <span>Điểm</span>
           <strong>{{ score }}</strong>
@@ -507,7 +510,7 @@ onUnmounted(() => {
           :class="`cols-${gridSize === 4 ? 2 : 3}`"
         >
           <button
-            v-for="item in options"
+            v-for="(item, idx) in options"
             :key="item.hex"
             type="button"
             class="color-tile"
@@ -516,6 +519,7 @@ onUnmounted(() => {
               winner: isRoundWon && item.hex === target.hex,
             }"
             :style="{ backgroundColor: item.rgb }"
+            :aria-label="`Ô màu ${idx + 1}`"
             @click="handlePick(item)"
           >
             <span
@@ -617,8 +621,12 @@ onUnmounted(() => {
 
 .metrics-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
+}
+
+.metrics-strip.four-cols {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .metric-pill {
@@ -981,18 +989,98 @@ onUnmounted(() => {
   color: var(--text-inverse);
 }
 
-@media (max-width: 600px) {
-  .channel-bars,
-  .summary-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 640px) {
+  .color-page {
+    padding: 0.85rem 0.75rem 2rem;
+  }
+
+  .color-shell {
+    gap: 0.65rem;
+  }
+
+  .top-bar {
+    gap: 0.5rem;
+  }
+
+  .title-wrap {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .title-wrap h1 {
+    font-size: 1.32rem;
+  }
+
+  .title-wrap p {
+    font-size: 0.74rem;
+  }
+
+  .metrics-strip {
+    gap: 0.4rem;
+  }
+
+  .metric-pill {
+    padding: 0.42rem 0.35rem;
+    border-radius: 11px;
+  }
+
+  .metric-pill span {
+    font-size: 0.6rem;
+  }
+
+  .metric-pill strong {
+    font-size: 0.98rem;
+  }
+
+  .toolbar-row {
+    gap: 0.45rem;
+  }
+
+  .segmented button {
+    padding: 0.36rem 0.6rem;
+    font-size: 0.75rem;
+  }
+
+  .studio-card {
+    padding: 0.9rem;
+    gap: 0.85rem;
+    border-radius: 18px;
+  }
+
+  .code-display {
+    padding: 0.75rem 0.7rem;
+  }
+
+  .target-code {
+    font-size: 1.3rem;
+    margin: 0.25rem 0 0.65rem;
+  }
+
+  .channel-bars {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .ch-label {
+    font-size: 0.68rem;
+  }
+
+  .color-grid {
+    gap: 0.65rem;
   }
 
   .color-grid.cols-3 {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .color-tile {
-    height: 96px;
+    height: 80px;
+    border-radius: 14px;
+    padding: 0.4rem;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -53,28 +53,34 @@
 
   /* Tối ưu typography ô đất trên mobile để không tràn hay đè chữ */
   .tile-name {
-    font-size: clamp(6.2px, 12cqw, 8.5px);
-    line-height: 1;
-    letter-spacing: 0;
+    font-size: clamp(5.6px, 10.5cqw, 7.6px);
+    line-height: 1.02;
+    letter-spacing: -0.15px;
     padding: 0 1px;
+    word-break: normal;
+    overflow-wrap: break-word;
   }
 
   .edge-left .tile-name,
   .edge-right .tile-name {
-    font-size: clamp(6px, 11cqw, 8px);
-    line-height: 0.95;
+    font-size: clamp(5.4px, 9.5cqw, 7.2px);
+    line-height: 0.98;
     padding: 0;
+    word-break: normal;
+    overflow-wrap: break-word;
   }
 
   .tile-price {
-    font-size: clamp(7px, 13cqw, 9.5px);
+    font-size: clamp(6px, 11cqw, 8px);
     padding-bottom: 0;
+    flex-shrink: 0;
   }
 
   .edge-left .tile-price,
   .edge-right .tile-price {
-    font-size: clamp(6.8px, 11cqw, 9px);
+    font-size: clamp(5.8px, 10cqw, 7.8px);
     padding: 0;
+    flex-shrink: 0;
   }
 
   /* Ẩn chữ 'THUÊ' khi đang hiển thị tiền thuê để số tiền không bị tràn làm mất chữ T */
@@ -146,8 +152,8 @@
 
   /* Ô Thăm tù trên mobile */
   .jail-inmate-box {
-    width: 58% !important;
-    height: 58% !important;
+    width: 52% !important;
+    height: 50% !important;
     padding: 1px 2px !important;
   }
 
@@ -566,22 +572,23 @@
   box-sizing: border-box;
 }
 
-/* Tên ô đất: Font Be Vietnam Pro, clamp(11px, 20cqw, 13.5px), tên đậm, to rõ, tự xuống 2 dòng */
+/* Tên ô đất: Font Be Vietnam Pro, vừa vặn không gãy giữa chữ và không đẩy mất giá tiền */
 .tile-name {
   font-family: var(--font-ui);
-  font-size: clamp(10px, 17cqw, 12px);
+  font-size: clamp(7.5px, 14cqw, 9.6px);
   font-weight: 800;
   color: #1e293b;
-  line-height: 1.1;
+  line-height: 1.05;
   width: 100%;
   max-width: 100%;
   text-align: center;
   white-space: normal;
-  word-break: break-word;
-  overflow: visible;
-  padding: 1px 1px;
+  word-break: normal;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  padding: 0 1px;
   text-transform: uppercase;
-  letter-spacing: 0.2px;
+  letter-spacing: -0.1px;
 }
 
 .tile-icon-box {
@@ -589,24 +596,25 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 28px;
-  min-height: 28px;
+  height: 24px;
+  min-height: 20px;
   flex-shrink: 0;
-  margin: 1px 0;
+  margin: 0;
 }
 
-/* Giá tiền ô đất: Font Be Vietnam Pro, container query clamp(10.5px, 18cqw, 12.5px), giá đậm */
+/* Giá tiền ô đất: luôn hiển thị rõ ràng, không bị cắt mép dưới */
 .tile-price {
   font-family: var(--font-ui);
-  font-size: clamp(10.5px, 18cqw, 12.5px);
+  font-size: clamp(8px, 14.5cqw, 10.5px);
   font-weight: 800;
   color: #1f6f8b;
   width: auto;
   max-width: 100%;
   text-align: center;
-  line-height: 1.1;
+  line-height: 1.05;
   white-space: nowrap;
-  padding-bottom: 2px;
+  flex-shrink: 0;
+  padding-bottom: 1px;
 }
 
 .tile-special .tile-price {
@@ -684,31 +692,33 @@
 .edge-left .tile-name,
 .edge-right .tile-name {
   font-family: var(--font-ui);
-  font-size: clamp(9px, 12cqw, 10px);
+  font-size: clamp(7px, 10.5cqw, 9px);
   font-weight: 800;
   color: #1e293b;
-  line-height: 1.05;
+  line-height: 1.02;
   text-align: center;
   width: 100%;
   white-space: normal;
-  word-break: break-word;
-  overflow: visible;
+  word-break: normal;
+  overflow-wrap: break-word;
+  overflow: hidden;
   padding: 0;
   text-transform: uppercase;
-  letter-spacing: 0.2px;
+  letter-spacing: -0.1px;
 }
 
 .edge-left .tile-price,
 .edge-right .tile-price {
   font-family: var(--font-ui);
-  font-size: clamp(9.5px, 12cqw, 11px);
+  font-size: clamp(7.5px, 11cqw, 9.5px);
   font-weight: 800;
   color: #1f6f8b;
-  line-height: 1.1;
+  line-height: 1.05;
   text-align: center;
   width: auto;
   max-width: 100%;
   white-space: nowrap;
+  flex-shrink: 0;
   padding: 0;
 }
 
@@ -718,7 +728,7 @@
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 1px 4px;
+  padding: 2px 1px 2px;
   box-sizing: border-box;
   width: 100%;
   height: 100%;

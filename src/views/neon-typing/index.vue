@@ -343,7 +343,7 @@ onUnmounted(() => {
           </strong>
         </div>
         <div class="stat-cell featured">
-          <span class="label">TỐC ĐỘ (WPM)</span>
+          <span class="label">WPM</span>
           <strong class="val neon">
             {{ state.isFinished ? state.score.wpm : state.isActive ? wpmRealtime : 0 }}
           </strong>
@@ -358,7 +358,7 @@ onUnmounted(() => {
         </div>
         <div class="stat-cell">
           <span class="label">
-            {{ typingMode === 'timed' ? 'KỶ LỤC WPM' : 'KỶ LỤC TỪ' }}
+            {{ typingMode === 'timed' ? 'KỶ LỤC' : 'KỶ LỤC TỪ' }}
           </span>
           <strong class="val accent">
             {{ typingMode === 'timed' ? store.bestWpm : store.bestSuddenDeathWords }}
@@ -432,7 +432,7 @@ onUnmounted(() => {
             ref="inputRef"
             v-model="state.inputValue"
             type="text"
-            placeholder="Bắt đầu gõ từ hiển thị ở trên rồi nhấn Space..."
+            placeholder="Gõ từ ở trên rồi nhấn Space..."
             spellcheck="false"
             autocomplete="off"
             autocapitalize="off"
@@ -634,9 +634,10 @@ onUnmounted(() => {
 
 .stat-cell .label {
   font-size: 0.66rem;
-  letter-spacing: 1.2px;
+  letter-spacing: 1px;
   color: var(--text-dim);
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .stat-cell .val {
@@ -975,12 +976,78 @@ onUnmounted(() => {
 }
 
 @media (max-width: 680px) {
+  .typing-page {
+    padding: 0.85rem 0.75rem 2rem;
+  }
+
+  .typing-shell {
+    gap: 0.65rem;
+  }
+
+  .top-nav {
+    gap: 0.5rem;
+  }
+
+  .title-block {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .title-block h1 {
+    font-size: 1.35rem;
+  }
+
+  .title-block p {
+    font-size: 0.76rem;
+  }
+
+  .config-strip {
+    gap: 0.45rem;
+  }
+
+  .segmented button,
+  .pack-pills button {
+    padding: 0.34rem 0.58rem;
+    font-size: 0.75rem;
+  }
+
   .stats-bar {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.3rem;
+    padding: 0.7rem 0.5rem;
+  }
+
+  .stat-cell .label {
+    font-size: 0.58rem;
+    letter-spacing: 0.3px;
+  }
+
+  .stat-cell .val {
+    font-size: 1.1rem;
+  }
+
+  .val.hearts {
+    font-size: 0.82rem;
+    letter-spacing: 0;
   }
 
   .arena-card {
-    padding: 1.25rem 1rem;
+    padding: 1rem 0.85rem;
+    gap: 0.9rem;
+  }
+
+  .target-word {
+    font-size: 1.75rem;
+    padding: 0.48rem 1rem;
+  }
+
+  .upcoming-word {
+    font-size: 0.82rem;
+  }
+
+  .input-wrap input {
+    padding: 0.8rem 0.9rem;
+    font-size: 0.96rem;
   }
 
   .result-grid {

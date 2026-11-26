@@ -4,8 +4,8 @@
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(8px);
+  background: rgba(32, 18, 8, 0.58);
+  backdrop-filter: blur(6px);
   z-index: 100;
   display: flex;
   align-items: center;
@@ -19,17 +19,20 @@
   100% { opacity: 1; }
 }
 
+/* Modal giấy da kem ấm & khung gỗ cổ tích thay nền trắng bệnh viện */
 .modal-card {
-  background: #ffffff;
-  border-radius: 28px;
+  background: linear-gradient(180deg, #fdf7ea 0%, #f6ecd5 100%);
+  border-radius: 24px;
   width: 100%;
   max-width: 580px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 22px 48px rgba(32, 16, 4, 0.45),
+    0 0 0 2px rgba(62, 34, 14, 0.85);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 2.5px solid #d9a043;
   animation: modalScaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -38,14 +41,15 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* Modal Header */
+/* Modal Header gỗ óc chó ấm áp */
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px;
-  border-bottom: 1px solid #f1f5f9;
-  background: #f8fafc;
+  padding: 15px 22px;
+  border-bottom: 2px solid #c79038;
+  background: linear-gradient(180deg, #6d4324 0%, #4b2b14 100%);
+  box-shadow: inset 0 1.5px 0 rgba(255, 232, 180, 0.3);
 }
 
 .modal-title-group {
@@ -55,22 +59,24 @@
 }
 
 .modal-header-icon {
-  font-size: 1.6rem;
+  font-size: 1.55rem;
 }
 
 .modal-title-group h3 {
-  font-size: 1.25rem;
+  font-size: 1.18rem;
   font-weight: 800;
-  color: #1e293b;
+  color: #fffbeb;
+  text-shadow: 0 1.5px 2px rgba(34, 16, 4, 0.8);
 }
 
 .modal-close {
-  background: #e2e8f0;
-  color: #64748b;
-  width: 34px;
-  height: 34px;
+  background: rgba(255, 244, 214, 0.16);
+  color: #fef3c7;
+  border: 1.5px solid rgba(254, 240, 180, 0.35);
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -79,24 +85,26 @@
 }
 
 .modal-close:hover {
-  background: #cbd5e1;
-  color: #0f172a;
+  background: rgba(220, 38, 38, 0.85);
+  color: #ffffff;
+  border-color: #fecaca;
 }
 
 /* Modal Body */
 .modal-body {
-  padding: 20px 24px;
+  padding: 18px 22px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  color: #3d2412;
 }
 
 /* Modal Footer */
 .modal-footer {
-  padding: 14px 24px;
-  background: #f8fafc;
-  border-top: 1px solid #f1f5f9;
+  padding: 13px 22px;
+  background: #f2e5c7;
+  border-top: 1.5px solid #e0cba0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -109,21 +117,22 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
-  background: #fff;
-  border: 2px solid #e2e8f0;
-  border-radius: 18px;
+  padding: 13px 16px;
+  background: #fffdf7;
+  border: 1.8px solid #e3d0ab;
+  border-radius: 16px;
+  box-shadow: 0 2px 6px rgba(92, 56, 24, 0.08);
   transition: all 0.15s ease;
 }
 
 .shop-item-card:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-color: #d49b3b;
+  box-shadow: 0 4px 12px rgba(92, 56, 24, 0.14);
 }
 
 .shop-item-card.locked {
-  background: #f8fafc;
-  opacity: 0.7;
+  background: #f5ebd6;
+  opacity: 0.72;
 }
 
 .shop-item-header {
@@ -133,25 +142,26 @@
 }
 
 .shop-item-icon {
-  font-size: 2.2rem;
-  background: #f1f5f9;
-  width: 52px;
-  height: 52px;
+  font-size: 2.1rem;
+  background: #f6ead0;
+  border: 1px solid #e3cca1;
+  width: 50px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
+  border-radius: 14px;
 }
 
 .shop-item-meta h4 {
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 800;
-  color: #1e293b;
+  color: #442712;
 }
 
 .shop-item-desc {
   font-size: 0.75rem;
-  color: #64748b;
+  color: #7c5838;
   font-weight: 600;
 }
 
@@ -220,12 +230,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f5f3ff;
+  background: #f5e6c8;
   padding: 12px 18px;
-  border-radius: 16px;
-  border: 1px solid #ddd6fe;
+  border-radius: 14px;
+  border: 1.5px solid #d9bc86;
   font-size: 0.9rem;
-  color: #5b21b6;
+  color: #5c3718;
   font-weight: 700;
 }
 
@@ -234,9 +244,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #fff;
-  border: 2px solid #f1f5f9;
-  border-radius: 16px;
+  background: #fffdf7;
+  border: 1.8px solid #e3d0ab;
+  border-radius: 15px;
 }
 
 .barn-item-left {
@@ -335,20 +345,21 @@
 /* Bảng Đơn Hàng (Order Board Cards)                 */
 /* ------------------------------------------------- */
 .order-card {
-  background: #fff;
-  border: 2px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 16px;
+  background: #fffdf7;
+  border: 1.8px solid #e3d0ab;
+  border-radius: 18px;
+  padding: 15px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 11px;
+  box-shadow: 0 2px 8px rgba(92, 56, 24, 0.08);
   transition: all 0.2s ease;
 }
 
 .order-card.ready {
-  border-color: #86efac;
-  background: #f0fdf4;
-  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.15);
+  border-color: #6bb045;
+  background: #f4fae9;
+  box-shadow: 0 4px 12px rgba(72, 134, 38, 0.16);
 }
 
 .order-header {

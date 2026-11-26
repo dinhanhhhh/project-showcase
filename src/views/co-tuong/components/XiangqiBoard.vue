@@ -305,7 +305,7 @@ function isCheckedGeneral(piece: Piece): boolean {
   width: 100%;
   max-width: 548px;
   margin: 0 auto;
-  padding: 10px clamp(14px, 3.2%, 24px);
+  padding: 8px clamp(16px, 4%, 26px);
   border-radius: 20px;
   background: linear-gradient(145deg, #d6a469, #b57a3c);
   border: 3px solid #6b4423;
@@ -314,7 +314,7 @@ function isCheckedGeneral(piece: Piece): boolean {
     inset 0 0 0 2px rgba(255, 244, 214, 0.3);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
 }
 
 .file-coords {
@@ -322,15 +322,17 @@ function isCheckedGeneral(piece: Piece): boolean {
   justify-content: space-between;
   font-size: 0.72rem;
   font-weight: 800;
-  color: rgba(68, 37, 13, 0.8);
+  color: rgba(68, 37, 13, 0.9);
   user-select: none;
   padding: 0 2px;
+  line-height: 1.2;
 }
 
 .board-canvas {
   position: relative;
   width: 100%;
   aspect-ratio: 8 / 9;
+  margin: 5.5% 0;
   background: radial-gradient(circle at center, #f3d6a4 0%, #e4bc7d 100%);
 }
 

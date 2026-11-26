@@ -25,8 +25,13 @@ export const useNgareStore = defineStore('ngare', {
     },
 
     loadFromStorage() {
-      // persistedstate tự động hydrate từ localStorage khi store khởi tạo.
-      // Hàm này chỉ còn để sync engine.state với gameState từ store
+      // persistedstate chỉ hydrate gameState; bảo vệ engine luôn là instance GameEngine hợp lệ
+      if (!(this.engine instanceof GameEngine)) {
+        this.engine = new GameEngine()
+      }
+      if (!(this.engine.usedEvents instanceof Set)) {
+        this.engine.usedEvents = new Set()
+      }
       if (this.gameState) {
         this.engine.state = JSON.parse(JSON.stringify(this.gameState))
       }
@@ -34,13 +39,19 @@ export const useNgareStore = defineStore('ngare', {
 
     resetGame() {
       this.gameState = null
-      // persistedstate sẽ tự động xóa key trong localStorage khi gameState = null
+      if (!(this.engine instanceof GameEngine)) {
+        this.engine = new GameEngine()
+      } else {
+        this.engine.state = null
+        this.engine.usedEvents = new Set()
+      }
     }
   },
 
-  // Pinia persistedstate tự động lo việc sync với localStorage
+  // Pinia persistedstate chỉ lưu thuần JSON gameState, tuyệt đối không serialize class instance engine
   persist: {
     key: 'ngare_game_state',
     storage: localStorage,
+    pick: ['gameState'],
   }
 })
