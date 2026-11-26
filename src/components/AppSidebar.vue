@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 interface Props {
   isSidebarCollapsed: boolean
   userName: string
@@ -7,9 +6,15 @@ interface Props {
   onlyShowFavorites: boolean
   selectedCategory: string
   searchQuery: string
+  totalApps?: number
+  favoriteCount?: number
 }
 
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  totalApps: 0,
+  favoriteCount: 0,
+})
+
 const emit = defineEmits<{
   (e: 'toggle-sidebar'): void
   (e: 'open-settings'): void
@@ -24,20 +29,30 @@ const emit = defineEmits<{
   >
     <div class="logo-area">
       <div class="v-logo">
-        V
+        <span>V</span>
       </div>
       <div
         v-if="!isSidebarCollapsed"
         class="v-brand"
       >
-        <span class="brand-name">Vibe</span>
-        <span class="brand-tag">Platform</span>
+        <div class="brand-row">
+          <span class="brand-name">Vibe</span>
+          <span class="brand-version">v2.0</span>
+        </div>
+        <span class="brand-tag">Digital Curator</span>
       </div>
     </div>
 
+    <div
+      v-if="!isSidebarCollapsed"
+      class="nav-section-title"
+    >
+      ĐIỀU HƯỚNG
+    </div>
+
     <nav class="side-nav">
-      <a
-        href="javascript:void(0)"
+      <button
+        type="button"
         class="nav-item"
         :class="{ active: !onlyShowFavorites && selectedCategory === 'all' && !searchQuery }"
         :data-tooltip="isSidebarCollapsed ? 'Trang chủ' : undefined"
@@ -48,24 +63,31 @@ const emit = defineEmits<{
           v-if="!isSidebarCollapsed"
           class="label"
         >Trang chủ</span>
-      </a>
-      <a
-        href="javascript:void(0)"
+        <span
+          v-if="!isSidebarCollapsed && totalApps > 0"
+          class="nav-badge"
+        >{{ totalApps }}</span>
+      </button>
+
+      <button
+        type="button"
         class="nav-item"
-        :data-tooltip="isSidebarCollapsed ? 'Danh mục' : undefined"
+        :class="{ active: !onlyShowFavorites && selectedCategory !== 'all' }"
+        :data-tooltip="isSidebarCollapsed ? 'Khám phá danh mục' : undefined"
         @click="emit('set-view', 'categories')"
       >
-        <span class="icon">🔍</span>
+        <span class="icon">🧭</span>
         <span
           v-if="!isSidebarCollapsed"
           class="label"
         >Danh mục</span>
-      </a>
-      <a
-        href="javascript:void(0)"
+      </button>
+
+      <button
+        type="button"
         class="nav-item"
         :class="{ active: onlyShowFavorites }"
-        :data-tooltip="isSidebarCollapsed ? 'Yêu thích' : undefined"
+        :data-tooltip="isSidebarCollapsed ? 'Đã ghim yêu thích' : undefined"
         @click="emit('set-view', 'favorites')"
       >
         <span class="icon">⭐</span>
@@ -73,11 +95,16 @@ const emit = defineEmits<{
           v-if="!isSidebarCollapsed"
           class="label"
         >Yêu thích</span>
-      </a>
-      <a
-        href="javascript:void(0)"
+        <span
+          v-if="!isSidebarCollapsed && favoriteCount > 0"
+          class="nav-badge accent"
+        >{{ favoriteCount }}</span>
+      </button>
+
+      <button
+        type="button"
         class="nav-item"
-        :data-tooltip="isSidebarCollapsed ? 'Cài đặt' : undefined"
+        :data-tooltip="isSidebarCollapsed ? 'Cài đặt hệ thống' : undefined"
         @click="emit('open-settings')"
       >
         <span class="icon">⚙️</span>
@@ -85,19 +112,20 @@ const emit = defineEmits<{
           v-if="!isSidebarCollapsed"
           class="label"
         >Cài đặt</span>
-      </a>
+      </button>
     </nav>
 
     <button
+      type="button"
       class="collapse-trigger"
-      :data-tooltip="isSidebarCollapsed ? 'Mở rộng' : 'Thu nhỏ'"
+      :data-tooltip="isSidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn'"
       @click="emit('toggle-sidebar')"
     >
       <span class="t-icon">
         <svg
           v-if="isSidebarCollapsed"
-          width="20"
-          height="20"
+          width="18"
+          height="18"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -107,8 +135,8 @@ const emit = defineEmits<{
         ><path d="m9 18 6-6-6-6" /></svg>
         <svg
           v-else
-          width="20"
-          height="20"
+          width="18"
+          height="18"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -120,13 +148,13 @@ const emit = defineEmits<{
       <span
         v-if="!isSidebarCollapsed"
         class="label"
-      >Thu nhỏ thanh bên</span>
+      >Thu gọn thanh bên</span>
     </button>
 
-    <div
+    <button
+      type="button"
       class="user-profile"
       :data-tooltip="isSidebarCollapsed ? userName : undefined"
-      style="cursor: pointer;"
       @click="emit('open-settings')"
     >
       <div class="avatar">
@@ -143,146 +171,211 @@ const emit = defineEmits<{
           {{ userRole }}
         </div>
       </div>
-    </div>
+    </button>
   </aside>
 </template>
 
 <style scoped>
-/* === SIDEBAR — Self-contained styles === */
 .sidebar {
-  width: 260px;
+  width: 268px;
+  flex-shrink: 0;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--outline);
   display: flex;
   flex-direction: column;
-  padding: 2rem 1.5rem;
+  padding: 1.75rem 1.25rem;
   z-index: 10;
+  position: sticky;
+  top: 0;
+  height: 100dvh;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s ease;
 }
 
 .sidebar.collapsed {
-  width: 80px;
-  padding: 2rem 1rem;
+  width: 82px;
+  padding: 1.75rem 0.85rem;
 }
 
 .logo-area {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 3rem;
-  position: relative;
+  gap: 0.85rem;
+  margin-bottom: 2.25rem;
+  padding: 0 0.35rem;
 }
 
 .sidebar.collapsed .logo-area {
   justify-content: center;
+  padding: 0;
 }
 
 .v-logo {
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Manrope', sans-serif;
   font-weight: 800;
-  font-size: 1.5rem;
-  color: #060e20;
+  font-size: 1.45rem;
+  color: var(--text-inverse);
+  box-shadow: 0 8px 20px var(--primary-glow);
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 .brand-name {
-  display: block;
   font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.brand-version {
+  font-size: 0.68rem;
   font-weight: 700;
-  font-size: 1.2rem;
-  line-height: 1;
+  padding: 0.1rem 0.42rem;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  border: 1px solid rgba(109, 221, 255, 0.25);
 }
 
 .brand-tag {
-  font-size: 0.75rem;
+  display: block;
+  margin-top: 0.18rem;
+  font-size: 0.7rem;
   color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 1.6px;
+}
+
+.nav-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  color: var(--text-muted);
+  padding: 0 0.75rem;
+  margin-bottom: 0.6rem;
 }
 
 .side-nav {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .nav-item {
+  position: relative;
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.8rem 1rem;
+  gap: 0.85rem;
+  padding: 0.78rem 0.9rem;
   border-radius: 12px;
+  background: transparent;
+  border: 1px solid transparent;
   color: var(--text-dim);
-  text-decoration: none;
-  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
   white-space: nowrap;
+  text-align: left;
 }
 
 .sidebar.collapsed .nav-item {
   justify-content: center;
-  padding: 0.8rem 0;
+  padding: 0.78rem 0;
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
 }
 
 .nav-item.active {
-  background: rgba(109, 221, 255, 0.1);
+  background: var(--primary-soft);
+  border-color: rgba(109, 221, 255, 0.24);
   color: var(--primary);
+  font-weight: 600;
 }
 
-/* Collapse Trigger */
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--primary);
+  box-shadow: 0 0 10px var(--primary);
+}
+
+.nav-badge {
+  margin-left: auto;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}
+
+.nav-badge.accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .collapse-trigger {
-  margin-top: 1rem;
-  margin-bottom: 2rem;
+  margin-top: 0.75rem;
+  margin-bottom: 1.25rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.8rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
+  gap: 0.75rem;
+  padding: 0.72rem 0.9rem;
+  background: rgba(255, 255, 255, 0.025);
   border: 1px solid var(--outline);
   border-radius: 12px;
   color: var(--text-dim);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-fast);
   width: 100%;
 }
 
 .sidebar.collapsed .collapse-trigger {
   justify-content: center;
-  padding: 0.8rem 0;
-  border-color: transparent;
-  background: none;
+  padding: 0.72rem 0;
 }
 
 .collapse-trigger:hover {
-  background: rgba(109, 221, 255, 0.1);
+  background: var(--primary-soft);
   color: var(--primary);
-  border-color: var(--primary-glow);
+  border-color: var(--outline-strong);
 }
 
 .collapse-trigger .t-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.3s ease;
 }
 
 .collapse-trigger .label {
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   font-weight: 500;
 }
 
-/* Tooltips */
 [data-tooltip] {
   position: relative;
 }
@@ -292,56 +385,88 @@ const emit = defineEmits<{
   position: absolute;
   left: 100%;
   top: 50%;
-  transform: translateY(-50%) translateX(10px);
-  padding: 0.5rem 0.8rem;
-  background: var(--bg-sidebar);
-  border: 1px solid var(--outline);
+  transform: translateY(-50%) translateX(8px);
+  padding: 0.45rem 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--outline-strong);
   border-radius: 8px;
-  color: white;
-  font-size: 0.8rem;
+  color: var(--text);
+  font-size: 0.78rem;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: all 0.2s ease;
+  transition: var(--transition-fast);
   z-index: 100;
 }
 
 [data-tooltip]:hover::before {
   opacity: 1;
-  transform: translateY(-50%) translateX(20px);
+  transform: translateY(-50%) translateX(14px);
 }
 
-/* User Profile */
 .user-profile {
   margin-top: auto;
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding-top: 2rem;
-  border-top: 1px solid var(--outline);
+  gap: 0.85rem;
+  padding: 0.75rem;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  cursor: pointer;
+  transition: var(--transition-fast);
+  text-align: left;
+}
+
+.user-profile:hover {
+  border-color: var(--outline-strong);
 }
 
 .sidebar.collapsed .user-profile {
   justify-content: center;
+  padding: 0.55rem;
 }
 
 .avatar {
-  width: 40px;
-  height: 40px;
-  background: var(--bg-card);
-  border: 1px solid var(--outline);
-  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(109, 221, 255, 0.2), rgba(210, 119, 255, 0.2));
+  border: 1px solid var(--outline-strong);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 0.8rem;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--primary);
 }
 
-.u-name { font-weight: 600; font-size: 0.9rem; }
-.u-role { font-size: 0.75rem; color: var(--text-dim); }
+.user-info {
+  min-width: 0;
+}
+
+.u-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-role {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 @media (max-width: 768px) {
-  .sidebar { display: none; }
+  .sidebar {
+    display: none;
+  }
 }
 </style>

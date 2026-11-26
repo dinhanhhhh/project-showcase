@@ -1,16 +1,108 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
-import { usePagesStore } from '@/stores/usePagesStore'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { useHomeSettings } from '@/composables/useHomeSettings'
-import { useParticlesBackground } from '@/composables/useParticlesBackground'
 import AppSidebar from '@/components/AppSidebar.vue'
 import SettingsModal from '@/components/SettingsModal.vue'
+import { useHomeSettings } from '@/composables/useHomeSettings'
+import { useParticlesBackground } from '@/composables/useParticlesBackground'
+import { usePagesStore } from '@/stores/usePagesStore'
+import type { PageEntry } from '@/types/page'
+
+interface AppVisualMeta {
+  icon: string
+  accent: string
+  badge: string
+  tags: string[]
+  featured?: boolean
+}
+
+const APP_VISUALS: Record<string, AppVisualMeta> = {
+  ngare: {
+    icon: '🧭',
+    accent: '#6dddff',
+    badge: 'Flagship RPG',
+    tags: ['Mô phỏng cuộc đời', 'Sự kiện & Nghề nghiệp', 'Pinia Persist'],
+    featured: true,
+  },
+  'co-tuong': {
+    icon: '♟️',
+    accent: '#fbbf24',
+    badge: 'AI Minimax',
+    tags: ['Cờ Tướng chuẩn luật', 'AI 3 cấp độ', '2 Người & Web Audio'],
+    featured: true,
+  },
+  'saigon-tycoon': {
+    icon: '🎲',
+    accent: '#34d399',
+    badge: '40 Ô Sài Gòn',
+    tags: ['Luật quốc tế', 'Bot AI & Đấu giá', 'Đài Radio Lo-Fi'],
+    featured: true,
+  },
+  'anime-farm': {
+    icon: '🌾',
+    accent: '#a3e635',
+    badge: 'Isometric 2.5D',
+    tags: ['Nông trại Anime', 'Kéo thả gieo hạt', 'Kho & Đơn hàng'],
+    featured: true,
+  },
+  'oop-flashcards': {
+    icon: '🎴',
+    accent: '#38bdf8',
+    badge: '21 Thẻ Phỏng Vấn',
+    tags: ['OOP & SOLID', 'Thẻ lật 3D', 'Code Highlight'],
+  },
+  'hom-nay-an-gi': {
+    icon: '🍜',
+    accent: '#fb7185',
+    badge: 'Food Roulette',
+    tags: ['20+ Món Việt', 'Thực đơn cá nhân', 'Lọc theo bữa'],
+  },
+  'oracle-tarot': {
+    icon: '🔮',
+    accent: '#d277ff',
+    badge: 'Mystic Tarot',
+    tags: ['Trải bài Tarot', 'Thông điệp vũ trụ', 'Hiệu ứng lật bài'],
+  },
+  'neon-typing': {
+    icon: '⌨️',
+    accent: '#22d3ee',
+    badge: 'Realtime WPM',
+    tags: ['Luyện gõ tốc độ', 'Đếm WPM & Combo', 'Hiệu ứng Neon'],
+  },
+  'mini-piano': {
+    icon: '🎹',
+    accent: '#c084fc',
+    badge: 'Web Audio Synth',
+    tags: ['13 Phím trắng & đen', '4 Âm sắc Synth', 'Bản nhạc mẫu'],
+  },
+  'color-game': {
+    icon: '🎨',
+    accent: '#f472b6',
+    badge: 'RGB & HEX',
+    tags: ['Phản xạ màu sắc', '3 Cấp độ 4/6/9 ô', 'Chuỗi Streak'],
+  },
+  monopoly: {
+    icon: '🏦',
+    accent: '#f59e0b',
+    badge: 'Classic 20 Ô',
+    tags: ['Neo-Monopoly', 'Ván nhanh với AI'],
+  },
+}
+
+const CATEGORY_META: Record<string, { label: string; icon: string }> = {
+  all: { label: 'Tất cả', icon: '✨' },
+  game: { label: 'Trò chơi', icon: '🎮' },
+  tool: { label: 'Công cụ', icon: '🛠️' },
+  education: { label: 'Học tập', icon: '🎓' },
+  creative: { label: 'Sáng tạo', icon: '🎨' },
+  spiritual: { label: 'Tâm linh', icon: '🔮' },
+}
 
 const store = usePagesStore()
 const searchQuery = ref('')
 const selectedCategory = ref('all')
 const onlyShowFavorites = ref(false)
+const searchInputRef = ref<HTMLInputElement | null>(null)
 
 const {
   userName,
@@ -24,6 +116,25 @@ const {
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const { init: initParticles } = useParticlesBackground(canvasRef, enableParticles)
 
+function getCategoryLabel(category: string): string {
+  return CATEGORY_META[category]?.label ?? category
+}
+
+function getCategoryIcon(category: string): string {
+  return CATEGORY_META[category]?.icon ?? '📦'
+}
+
+function getAppVisual(page: PageEntry): AppVisualMeta {
+  return (
+    APP_VISUALS[page.slug] ?? {
+      icon: getCategoryIcon(page.category),
+      accent: '#6dddff',
+      badge: getCategoryLabel(page.category),
+      tags: [getCategoryLabel(page.category)],
+    }
+  )
+}
+
 function setView(view: 'home' | 'favorites' | 'categories') {
   if (view === 'home') {
     onlyShowFavorites.value = false
@@ -33,8 +144,13 @@ function setView(view: 'home' | 'favorites' | 'categories') {
     onlyShowFavorites.value = true
   } else {
     onlyShowFavorites.value = false
-    document.querySelector('.search-wrap')?.scrollIntoView({ behavior: 'smooth' })
+    document.querySelector('.controls-toolbar')?.scrollIntoView({ behavior: 'smooth' })
   }
+}
+
+function selectCategoryPill(category: string) {
+  onlyShowFavorites.value = false
+  selectedCategory.value = category
 }
 
 function handleClearData() {
@@ -43,31 +159,60 @@ function handleClearData() {
   }
 }
 
+const categories = computed(() => {
+  const cats = new Set(store.pages.map((p) => p.category))
+  return ['all', ...Array.from(cats)]
+})
+
+function countByCategory(category: string): number {
+  if (category === 'all') return store.pages.length
+  return store.pages.filter((p) => p.category === category).length
+}
+
+const featuredPages = computed(() =>
+  store.pages.filter((page) => APP_VISUALS[page.slug]?.featured),
+)
+
 const filteredPages = computed(() => {
   let list = store.pages
   if (onlyShowFavorites.value) {
     list = list.filter((p) => store.isFavorite(p.slug))
   }
+  const q = searchQuery.value.trim().toLowerCase()
   return list.filter((page) => {
+    const visual = getAppVisual(page)
     const matchesQuery =
-      page.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      page.description.toLowerCase().includes(searchQuery.value.toLowerCase())
+      q.length === 0 ||
+      page.name.toLowerCase().includes(q) ||
+      page.description.toLowerCase().includes(q) ||
+      visual.tags.some((t) => t.toLowerCase().includes(q))
     const matchesCategory =
       selectedCategory.value === 'all' || page.category === selectedCategory.value
     return matchesQuery && matchesCategory
   })
 })
 
-const categories = computed(() => {
-  const cats = new Set(store.pages.map((p) => p.category))
-  return ['all', ...Array.from(cats)]
-})
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (
+    e.key === '/' &&
+    !(e.target instanceof HTMLInputElement) &&
+    !(e.target instanceof HTMLTextAreaElement)
+  ) {
+    e.preventDefault()
+    searchInputRef.value?.focus()
+  }
+}
 
 onMounted(() => {
   if (store.pages.length === 0) {
     void store.loadPages()
   }
   initParticles()
+  window.addEventListener('keydown', handleGlobalKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeydown)
 })
 </script>
 
@@ -78,7 +223,6 @@ onMounted(() => {
       class="nebula-canvas"
     />
 
-    <!-- Sidebar -->
     <AppSidebar
       :is-sidebar-collapsed="isSidebarCollapsed"
       :user-name="userName"
@@ -86,86 +230,246 @@ onMounted(() => {
       :only-show-favorites="onlyShowFavorites"
       :selected-category="selectedCategory"
       :search-query="searchQuery"
+      :total-apps="store.pages.length"
+      :favorite-count="store.favoritePages.length"
       @toggle-sidebar="toggleSidebar"
       @open-settings="isSettingsOpen = true"
       @set-view="setView"
     />
 
-    <!-- Main Content -->
     <main class="content-hub">
-      <header class="hub-header">
-        <div class="header-text">
+      <!-- Thanh điều hướng nhanh dành riêng cho Mobile (< 768px) -->
+      <div class="mobile-topbar">
+        <div class="m-brand">
+          <span class="m-logo">V</span>
+          <div>
+            <strong>Vibe Platform</strong>
+            <small>{{ store.pages.length }} mini-apps</small>
+          </div>
+        </div>
+        <div class="m-actions">
+          <button
+            type="button"
+            class="m-btn"
+            :class="{ active: onlyShowFavorites }"
+            @click="onlyShowFavorites = !onlyShowFavorites"
+          >
+            ⭐ {{ store.favoritePages.length }}
+          </button>
+          <button
+            type="button"
+            class="m-btn"
+            aria-label="Mở cài đặt"
+            @click="isSettingsOpen = true"
+          >
+            ⚙️
+          </button>
+        </div>
+      </div>
+
+      <!-- Hero Banner & Thống kê nhanh -->
+      <header class="hub-hero">
+        <div class="hero-copy">
+          <div class="eyebrow-pill">
+            <span class="pulse-dot" />
+            <span>DIGITAL CURATOR ECOSYSTEM · VIBE PLATFORM</span>
+          </div>
           <h1 class="display-title">
-            Kiến tạo <span class="text-glow">thực tại số</span> của bạn.
+            Khám phá <span class="text-glow">vũ trụ Mini-Apps</span> &amp; Trò chơi tương tác.
           </h1>
           <p class="body-text">
-            Truy cập các ứng dụng mini hiệu năng cao từ một trung tâm đắm chìm duy nhất.
+            Hệ sinh thái ứng dụng &amp; boardgame hiệu năng cao chạy trực tiếp trên trình duyệt — không cần cài đặt, tự động lưu tiến trình.
           </p>
         </div>
 
-        <div class="search-wrap">
-          <div class="search-box">
-            <span class="s-icon">🔍</span>
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Tìm kiếm ứng dụng..."
-            >
+        <div class="telemetry-row">
+          <div class="kpi-card">
+            <span class="kpi-icon">📦</span>
+            <div>
+              <strong class="kpi-val">{{ store.pages.length }}</strong>
+              <span class="kpi-lbl">Tổng ứng dụng</span>
+            </div>
           </div>
-          <div class="filter-box">
-            <select v-model="selectedCategory">
-              <option
-                v-for="cat in categories"
-                :key="cat"
-                :value="cat"
-              >
-                {{ cat === 'all' ? 'Tất cả' : (cat === 'game' ? 'Trò chơi' : (cat === 'creative' ? 'Sáng tạo' : cat)) }}
-              </option>
-            </select>
+          <div class="kpi-card">
+            <span class="kpi-icon">⭐</span>
+            <div>
+              <strong class="kpi-val">{{ store.favoritePages.length }}</strong>
+              <span class="kpi-lbl">Đã ghim</span>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <span class="kpi-icon">⚡</span>
+            <div>
+              <strong class="kpi-val">{{ store.recentlyViewedPages.length }}</strong>
+              <span class="kpi-lbl">Mở gần đây</span>
+            </div>
           </div>
         </div>
       </header>
 
-      <!-- App Grid -->
+      <!-- Khu vực Tâm Điểm Nổi Bật (chỉ hiện khi ở chế độ xem tất cả) -->
+      <section
+        v-if="!onlyShowFavorites && selectedCategory === 'all' && !searchQuery && featuredPages.length > 0"
+        class="spotlight-strip"
+      >
+        <div class="spotlight-head">
+          <span class="spotlight-tag">🔥 TÂM ĐIỂM NỔI BẬT</span>
+          <span class="spotlight-sub">Các dự án có chiều sâu gameplay &amp; đồ họa đặc sắc nhất</span>
+        </div>
+        <div class="spotlight-grid">
+          <RouterLink
+            v-for="fp in featuredPages"
+            :key="`spot-${fp.slug}`"
+            :to="fp.path"
+            class="spotlight-item"
+            :style="{ '--item-accent': getAppVisual(fp).accent }"
+          >
+            <span class="spot-icon">{{ getAppVisual(fp).icon }}</span>
+            <div class="spot-info">
+              <div class="spot-top">
+                <strong>{{ fp.name }}</strong>
+                <span class="spot-badge">{{ getAppVisual(fp).badge }}</span>
+              </div>
+              <p>{{ fp.description }}</p>
+            </div>
+            <span class="spot-arrow">→</span>
+          </RouterLink>
+        </div>
+      </section>
+
+      <!-- Thanh Tìm kiếm & Bộ lọc Category Pills -->
+      <section class="controls-toolbar">
+        <div class="search-box">
+          <span class="s-icon">🔍</span>
+          <input
+            ref="searchInputRef"
+            v-model="searchQuery"
+            type="search"
+            placeholder="Tìm ứng dụng, thể loại, tính năng... (Nhấn / để tìm nhanh)"
+            aria-label="Tìm kiếm ứng dụng"
+          >
+          <button
+            v-if="searchQuery"
+            type="button"
+            class="clear-search"
+            title="Xóa từ khóa"
+            @click="searchQuery = ''"
+          >
+            ✕
+          </button>
+          <kbd
+            v-else
+            class="search-kbd"
+          >/</kbd>
+        </div>
+
+        <div class="category-pills">
+          <button
+            v-for="cat in categories"
+            :key="cat"
+            type="button"
+            class="cat-pill"
+            :class="{ active: !onlyShowFavorites && selectedCategory === cat }"
+            @click="selectCategoryPill(cat)"
+          >
+            <span>{{ getCategoryIcon(cat) }}</span>
+            <span>{{ getCategoryLabel(cat) }}</span>
+            <span class="cat-count">{{ countByCategory(cat) }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="cat-pill fav-pill"
+            :class="{ active: onlyShowFavorites }"
+            @click="onlyShowFavorites = !onlyShowFavorites"
+          >
+            <span>⭐</span>
+            <span>Yêu thích</span>
+            <span class="cat-count">{{ store.favoritePages.length }}</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Danh sách Ứng dụng chính -->
       <section class="app-section">
-        <h2 class="section-label">
-          {{ onlyShowFavorites ? 'Ứng dụng yêu thích' : 'Vừa thêm gần đây' }}
-        </h2>
+        <div class="section-header">
+          <h2 class="section-label">
+            {{ onlyShowFavorites ? '⭐ Ứng dụng yêu thích đã ghim' : 'Danh sách mini-app' }}
+          </h2>
+          <span class="result-count">
+            Hiển thị <strong>{{ filteredPages.length }}</strong> / {{ store.pages.length }} ứng dụng
+          </span>
+        </div>
+
         <div
           v-if="filteredPages.length > 0"
           class="app-grid"
         >
-          <RouterLink 
-            v-for="page in filteredPages" 
-            :key="page.slug" 
+          <RouterLink
+            v-for="page in filteredPages"
+            :key="page.slug"
             :to="page.path"
             class="app-card"
+            :style="{ '--card-accent': getAppVisual(page).accent }"
           >
             <div class="card-glow" />
             <div class="card-content">
               <div class="card-body">
                 <div class="app-header">
                   <div class="app-icon">
-                    {{ page.name.charAt(0) }}
+                    <span>{{ getAppVisual(page).icon }}</span>
                   </div>
-                  <div class="app-category">
-                    {{ page.category }}
+                  <div class="header-badges">
+                    <span class="app-badge">
+                      {{ getAppVisual(page).badge }}
+                    </span>
+                    <span class="app-category">
+                      {{ getCategoryIcon(page.category) }} {{ getCategoryLabel(page.category) }}
+                    </span>
                   </div>
                 </div>
+
                 <h3 class="app-name">
                   {{ page.name }}
                 </h3>
                 <p class="app-desc">
                   {{ page.description }}
                 </p>
+
+                <div class="tag-row">
+                  <span
+                    v-for="tag in getAppVisual(page).tags"
+                    :key="tag"
+                    class="feature-tag"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
               </div>
+
               <div class="card-footer">
-                <span class="launch-btn">Khởi chạy</span>
+                <div class="footer-left">
+                  <span class="launch-cta">
+                    Khởi chạy <span class="cta-arrow">→</span>
+                  </span>
+                  <span
+                    v-if="page.author"
+                    class="author-meta"
+                  >
+                    bởi {{ page.author }}
+                  </span>
+                </div>
+
                 <button
+                  type="button"
                   class="fav-btn"
+                  :class="{ active: store.isFavorite(page.slug) }"
+                  :title="store.isFavorite(page.slug) ? 'Bỏ ghim yêu thích' : 'Ghim yêu thích'"
+                  aria-label="Favorite"
                   @click.prevent="store.toggleFavorite(page.slug)"
                 >
-                  {{ store.isFavorite(page.slug) ? '★' : '☆' }}
+                  <span aria-hidden="true">{{ store.isFavorite(page.slug) ? '★' : '☆' }}</span>
+                  <span class="sr-only">Favorite</span>
                 </button>
               </div>
             </div>
@@ -177,16 +481,27 @@ onMounted(() => {
           class="empty-state"
         >
           <div class="empty-icon">
-            🕳️
+            🪐
           </div>
-          <p>Không tìm thấy ứng dụng nào khớp với tiêu chí của bạn.</p>
+          <h3>Không tìm thấy ứng dụng phù hợp</h3>
+          <p>Thử đổi từ khóa tìm kiếm hoặc chuyển sang danh mục khác.</p>
+          <button
+            type="button"
+            class="reset-filter-btn"
+            @click="setView('home')"
+          >
+            Xem lại tất cả ứng dụng
+          </button>
         </div>
       </section>
 
-      <!-- History / Favorites side by side -->
+      <!-- Khu vực Ghim & Hoạt động gần đây -->
       <div class="secondary-grid">
         <section class="mini-panel">
-          <h3>Yêu thích đã ghim</h3>
+          <div class="panel-head">
+            <h3>⭐ Yêu thích đã ghim</h3>
+            <span class="panel-count">{{ store.favoritePages.length }}</span>
+          </div>
           <div
             v-if="store.favoritePages.length"
             class="mini-list"
@@ -197,7 +512,11 @@ onMounted(() => {
               :to="p.path"
               class="mini-item"
             >
-              <span>{{ p.name }}</span>
+              <span class="mini-emoji">{{ getAppVisual(p).icon }}</span>
+              <div class="mini-text">
+                <strong>{{ p.name }}</strong>
+                <small>{{ getCategoryLabel(p.category) }}</small>
+              </div>
               <span class="m-icon">↗</span>
             </RouterLink>
           </div>
@@ -205,12 +524,15 @@ onMounted(() => {
             v-else
             class="dim-text"
           >
-            Thêm ứng dụng vào mục yêu thích để truy cập nhanh.
+            Bấm biểu tượng ngôi sao ☆ trên thẻ ứng dụng để ghim truy cập nhanh tại đây.
           </p>
         </section>
 
         <section class="mini-panel">
-          <h3>Hoạt động gần đây</h3>
+          <div class="panel-head">
+            <h3>⚡ Hoạt động gần đây</h3>
+            <span class="panel-count">{{ store.recentlyViewedPages.length }}</span>
+          </div>
           <div
             v-if="store.recentlyViewedPages.length"
             class="mini-list"
@@ -221,21 +543,24 @@ onMounted(() => {
               :to="p.path"
               class="mini-item"
             >
-              <span>{{ p.name }}</span>
-              <span class="m-icon">⌚</span>
+              <span class="mini-emoji">{{ getAppVisual(p).icon }}</span>
+              <div class="mini-text">
+                <strong>{{ p.name }}</strong>
+                <small>{{ getAppVisual(p).badge }}</small>
+              </div>
+              <span class="m-icon">→</span>
             </RouterLink>
           </div>
           <p
             v-else
             class="dim-text"
           >
-            Các ứng dụng gần đây của bạn sẽ xuất hiện ở đây.
+            Các ứng dụng bạn vừa trải nghiệm sẽ tự động lưu lịch sử tại đây.
           </p>
         </section>
       </div>
     </main>
 
-    <!-- Settings Modal -->
     <SettingsModal
       v-model="isSettingsOpen"
       :user-name="userName"
@@ -250,199 +575,508 @@ onMounted(() => {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@700;800&display=swap');
-
 .vibe-layout {
   display: flex;
   width: 100%;
-  min-height: 100vh; /* Thay đổi từ height: 100vh */
-  background: var(--bg);
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(109, 221, 255, 0.08) 0%, transparent 38%),
+    radial-gradient(circle at 85% 18%, rgba(210, 119, 255, 0.08) 0%, transparent 40%),
+    var(--bg);
   color: var(--text);
   font-family: 'Inter', sans-serif;
   position: relative;
 }
 
 .nebula-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
+  position: fixed;
+  inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
   z-index: 0;
 }
 
-/* Content Hub */
 .content-hub {
   flex: 1;
-  padding: 3rem 4rem;
+  min-width: 0;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2.25rem 3rem 4rem;
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
-.hub-header {
-  margin-bottom: 4rem;
+/* Mobile Topbar */
+.mobile-topbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+}
+
+.m-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.m-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: var(--text-inverse);
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.m-brand strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.m-brand small {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+}
+
+.m-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.m-btn {
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.m-btn.active {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Hero Section */
+.hub-hero {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
+  gap: 2rem;
+  padding: 2rem 2.25rem;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(18, 29, 53, 0.88) 0%, rgba(9, 19, 40, 0.92) 100%);
+  border: 1px solid var(--outline);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(14px);
+}
+
+.hero-copy {
+  max-width: 680px;
+}
+
+.eyebrow-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.32rem 0.8rem;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  border: 1px solid rgba(109, 221, 255, 0.25);
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  margin-bottom: 1rem;
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary);
 }
 
 .display-title {
   font-family: 'Manrope', sans-serif;
-  font-size: 3.5rem;
+  font-size: clamp(1.85rem, 3.2vw, 2.75rem);
   font-weight: 800;
-  line-height: 1.1;
-  max-width: 600px;
-  margin-bottom: 1rem;
+  line-height: 1.15;
+  margin-bottom: 0.75rem;
 }
 
 .text-glow {
-  color: var(--primary);
-  text-shadow: 0 0 30px var(--primary-glow);
+  background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .body-text {
   color: var(--text-dim);
-  font-size: 1.2rem;
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
-.search-wrap {
+.telemetry-row {
   display: flex;
-  gap: 1rem;
+  gap: 0.85rem;
+  flex-shrink: 0;
+}
+
+.kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1.15rem;
+  border-radius: 16px;
+  background: rgba(6, 14, 32, 0.6);
+  border: 1px solid var(--outline);
+  min-width: 138px;
+}
+
+.kpi-icon {
+  font-size: 1.4rem;
+}
+
+.kpi-val {
+  display: block;
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.kpi-lbl {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+
+/* Spotlight Strip */
+.spotlight-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.spotlight-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.spotlight-tag {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--primary);
+}
+
+.spotlight-sub {
+  font-size: 0.84rem;
+  color: var(--text-dim);
+}
+
+.spotlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem;
+}
+
+.spotlight-item {
+  --item-accent: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.15rem;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(23, 37, 68, 0.85), rgba(18, 29, 53, 0.75));
+  border: 1px solid var(--outline);
+  text-decoration: none;
+  color: inherit;
+  transition: var(--transition-normal);
+}
+
+.spotlight-item:hover {
+  transform: translateY(-3px);
+  border-color: var(--item-accent);
+  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.65);
+}
+
+.spot-icon {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.55rem;
+}
+
+.spot-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.spot-top {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.2rem;
+}
+
+.spot-top strong {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.96rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spot-badge {
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(109, 221, 255, 0.12);
+  color: var(--item-accent);
+}
+
+.spot-info p {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spot-arrow {
+  color: var(--item-accent);
+  font-weight: 800;
+  font-size: 1.1rem;
+  transition: transform 0.2s ease;
+}
+
+.spotlight-item:hover .spot-arrow {
+  transform: translateX(4px);
+}
+
+/* Search & Category Pills */
+.controls-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
 }
 
 .search-box {
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
-  padding: 0.8rem 1.5rem;
-  border-radius: 99px;
+  padding: 0.75rem 1.15rem;
+  border-radius: 16px;
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  flex: 1; /* Thay đổi từ width cố định sang flex: 1 */
-  min-width: 200px;
+  gap: 0.75rem;
+  transition: var(--transition-fast);
+}
+
+.search-box:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .search-box input {
   background: none;
   border: none;
-  color: white;
+  color: var(--text);
+  font-size: 0.95rem;
   width: 100%;
   outline: none;
 }
 
-.filter-box select {
-  background: var(--bg-sidebar);
-  border: 1px solid var(--outline);
-  padding: 0.8rem 1.5rem;
-  border-radius: 99px;
-  color: var(--text-dim);
-  outline: none;
-  width: 100%; /* Đảm bảo chiếm hết ngang trên mobile */
+.search-box input::placeholder {
+  color: var(--text-muted);
 }
 
-/* App Grid */
+.clear-search {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--text-dim);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.search-kbd {
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+.category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.cat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.52rem 0.95rem;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.cat-pill:hover {
+  border-color: var(--outline-strong);
+  color: var(--text);
+}
+
+.cat-pill.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--text-inverse);
+  box-shadow: 0 0 18px var(--primary-glow);
+}
+
+.cat-count {
+  padding: 0.08rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.cat-pill.active .cat-count {
+  background: rgba(6, 14, 32, 0.22);
+  color: var(--text-inverse);
+}
+
+.fav-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 18px var(--accent-glow);
+}
+
+/* App Section & Cards */
 .app-section {
-  margin-bottom: 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .section-label {
   font-family: 'Manrope', sans-serif;
   text-transform: uppercase;
-  letter-spacing: 3px;
-  font-size: 0.8rem;
+  letter-spacing: 2px;
+  font-size: 0.85rem;
   color: var(--text-dim);
-  margin-bottom: 2rem;
+}
+
+.result-count {
+  font-size: 0.84rem;
+  color: var(--text-dim);
+}
+
+.result-count strong {
+  color: var(--primary);
 }
 
 .app-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 1.35rem;
 }
 
 .app-card {
+  --card-accent: var(--primary);
   position: relative;
-  background: var(--bg-card);
-  border-radius: 20px;
-  padding: 2rem;
+  background: linear-gradient(160deg, rgba(23, 37, 68, 0.82) 0%, rgba(14, 23, 44, 0.92) 100%);
+  border-radius: 22px;
+  padding: 1.5rem;
   text-decoration: none;
   color: inherit;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: var(--transition-normal);
   border: 1px solid var(--outline);
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-card);
+}
+
+.app-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--card-accent), transparent 85%);
+  opacity: 0.75;
 }
 
 .app-card:hover {
-  transform: translateY(-8px);
-  border-color: var(--primary);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  transform: translateY(-6px);
+  border-color: var(--card-accent);
+  box-shadow: 0 22px 45px -12px rgba(0, 0, 0, 0.75);
 }
 
 .card-glow {
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle at center, var(--primary-glow) 0%, transparent 60%);
-  opacity: 0;
-  transition: opacity 0.5s ease;
+  top: -40%;
+  right: -40%;
+  width: 160%;
+  height: 160%;
+  background: radial-gradient(circle at top right, var(--card-accent) 0%, transparent 55%);
+  opacity: 0.05;
+  transition: opacity 0.35s ease;
   pointer-events: none;
 }
 
 .app-card:hover .card-glow {
-  opacity: 0.15;
-}
-
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-}
-
-.app-icon {
-  width: 48px;
-  height: 48px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--primary);
-}
-
-.app-category {
-  font-size: 0.7rem;
-  background: rgba(109, 221, 255, 0.1);
-  color: var(--primary);
-  padding: 0.3rem 0.6rem;
-  border-radius: 99px;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.app-name {
-  font-family: 'Manrope', sans-serif;
-  font-size: 1.4rem;
-  margin-bottom: 0.8rem;
-}
-
-.app-desc {
-  color: var(--text-dim);
-  font-size: 0.9rem;
-  line-height: 1.6;
-  margin-bottom: 2rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  opacity: 0.14;
 }
 
 .card-content {
@@ -454,125 +1088,349 @@ onMounted(() => {
 }
 
 .card-body {
-  flex-grow: 1; /* Đẩy footer xuống dưới */
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1.15rem;
+}
+
+.app-icon {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+
+.header-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.app-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--card-accent);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-category {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.app-name {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-bottom: 0.55rem;
+  color: var(--text);
+}
+
+.app-desc {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.58;
+  margin-bottom: 1.1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tag-row {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.feature-tag {
+  font-size: 0.72rem;
+  padding: 0.22rem 0.58rem;
+  border-radius: 8px;
+  background: rgba(6, 14, 32, 0.55);
+  border: 1px solid var(--outline);
+  color: var(--text-dim);
+  font-weight: 500;
 }
 
 .card-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 1.5rem; /* Khoảng cách tối thiểu với mô tả */
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--outline);
 }
 
-.launch-btn {
-  font-size: 0.9rem;
-  font-weight: 600;
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.launch-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  border: 1px solid rgba(109, 221, 255, 0.25);
+  font-size: 0.84rem;
+  font-weight: 700;
   color: var(--primary);
+  transition: var(--transition-fast);
+}
+
+.app-card:hover .launch-cta {
+  background: var(--primary);
+  color: var(--text-inverse);
+}
+
+.cta-arrow {
+  transition: transform 0.2s ease;
+}
+
+.app-card:hover .cta-arrow {
+  transform: translateX(3px);
+}
+
+.author-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fav-btn {
-  background: none;
-  border: none;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: rgba(6, 14, 32, 0.55);
+  border: 1px solid var(--outline);
   color: var(--text-dim);
-  font-size: 1.2rem;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  transition: var(--transition-fast);
 }
 
-.fav-btn:hover { color: var(--accent); }
+.fav-btn:hover {
+  border-color: var(--warning);
+  color: var(--warning);
+  transform: scale(1.06);
+}
+
+.fav-btn.active {
+  background: rgba(251, 191, 36, 0.14);
+  border-color: rgba(251, 191, 36, 0.45);
+  color: var(--warning);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Secondary Grid */
 .secondary-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  gap: 1.35rem;
 }
 
 .mini-panel {
   background: var(--bg-sidebar);
   border-radius: 20px;
-  padding: 1.5rem;
+  padding: 1.4rem;
   border: 1px solid var(--outline);
 }
 
-.mini-panel h3 {
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.1rem;
+}
+
+.panel-head h3 {
   font-family: 'Manrope', sans-serif;
-  font-size: 1.1rem;
-  margin-bottom: 1.5rem;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.panel-count {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
 }
 
 .mini-list {
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.6rem;
 }
 
 .mini-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.8rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  border-radius: 14px;
   text-decoration: none;
-  color: var(--text-dim);
-  transition: all 0.2s ease;
+  color: var(--text);
+  transition: var(--transition-fast);
 }
 
 .mini-item:hover {
-  background: rgba(109, 221, 255, 0.05);
+  border-color: var(--primary);
+  transform: translateX(4px);
+}
+
+.mini-emoji {
+  font-size: 1.35rem;
+}
+
+.mini-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.mini-text strong {
+  display: block;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-text small {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+
+.m-icon {
   color: var(--primary);
-  transform: translateX(5px);
+  font-weight: 700;
 }
 
 .dim-text {
   color: var(--text-dim);
-  font-size: 0.9rem;
-  font-style: italic;
+  font-size: 0.86rem;
+  line-height: 1.5;
 }
 
 .empty-state {
   text-align: center;
-  padding: 4rem;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 3.5rem 1.5rem;
+  background: rgba(18, 29, 53, 0.5);
   border-radius: 24px;
-  border: 2px dashed var(--outline);
+  border: 1px dashed var(--outline-strong);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
 }
 
 .empty-icon {
   font-size: 3rem;
-  margin-bottom: 1rem;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--bg-card); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--outline); }
+.empty-state h3 {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.2rem;
+}
 
-@media (max-width: 1200px) {
-  .display-title { font-size: 2.5rem; }
-  .hub-header { flex-direction: column; align-items: flex-start; gap: 2rem; }
+.empty-state p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.reset-filter-btn {
+  margin-top: 0.5rem;
+  padding: 0.65rem 1.2rem;
+  border-radius: 12px;
+  background: var(--primary);
+  border: none;
+  color: var(--text-inverse);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 1180px) {
+  .hub-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .telemetry-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 768px) {
-  .sidebar { display: none; }
-  .content-hub { padding: 1.5rem; }
-  .secondary-grid { grid-template-columns: 1fr; }
-  
-  .display-title { font-size: 2.2rem; }
-  
-  .search-wrap {
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-  }
-  
-  .search-box {
-    width: 100%;
+  .content-hub {
+    padding: 1rem 1rem 3rem;
+    gap: 1.35rem;
   }
 
-  .hub-header {
-    margin-bottom: 2rem;
+  .mobile-topbar {
+    display: flex;
+  }
+
+  .hub-hero {
+    padding: 1.35rem;
+  }
+
+  .telemetry-row {
+    grid-template-columns: 1fr;
+  }
+
+  .secondary-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

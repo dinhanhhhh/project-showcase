@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Nông Trại Anime - Mobile Farm Simulation</title>
+  <meta name="description" content="Nông Trại Anime 2.5D Isometric - Trồng trọt, thu hoạch nông sản và hoàn thành bách khoa toàn thư.">
+  
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/farm.css">
+  <link rel="stylesheet" href="css/ui.css">
+  <link rel="stylesheet" href="css/modals.css">
+</head>
+<body>
+
+  <!-- Khung nền toàn cảnh Anime Farm từ asset được tạo -->
+  <div class="farm-scenery-bg">
+    <img src="assets/farm_bg.jpg" alt="Anime Farm Background" class="bg-panoramic" />
+    <div class="bg-vignette-overlay"></div>
+  </div>
+
+  <div id="app-container">
+    <!-- ================================================= -->
+    <!-- 1. GIAO DIỆN TRÊN CÙNG (CHUẨN 1:1 THEO ẢNH MẪU)   -->
+    <!-- ================================================= -->
+    <header class="game-hud-top">
+      <!-- Góc trên-trái: Back btn + Avatar tóc bạc + "Trang trại" + Badge 12 -->
+      <div class="hud-profile-card" id="hud-profile-card" role="button" tabindex="0" title="Nhấp để xem thông tin & kinh nghiệm lên cấp">
+        <button class="btn-back-nav" title="Trở về">‹</button>
+        <div class="avatar-frame">
+          <img src="assets/farmer_avatar.jpg" alt="Avatar Nông Dân" class="avatar-photo" />
+        </div>
+        <div class="profile-info">
+          <div class="farm-title">Trang trại</div>
+          <div class="stamina-bar-container">
+            <div class="stamina-badge" id="hud-level-badge">1</div>
+            <div class="stamina-bar-track">
+              <div id="hud-exp-progress" class="stamina-bar-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Góc trên-phải: Năng lượng lá xanh (315 / 315) + Vàng + Âm thanh -->
+      <div class="hud-top-right">
+        <!-- Năng lượng lá xanh chuẩn ảnh mẫu -->
+        <div class="leaf-energy-pill" title="Năng lượng canh tác">
+          <span class="leaf-icon">🍃</span>
+          <span class="leaf-value">100 / 100</span>
+          <button class="leaf-add-btn" id="btn-quick-energy">+</button>
+        </div>
+
+        <!-- Tiền Vàng Khởi Nghiệp -->
+        <div class="currency-pill gold-pill" id="btn-quick-shop" title="Tiền vàng">
+          <span class="currency-icon">💰</span>
+          <span id="hud-coins" class="currency-val">100</span>
+        </div>
+
+        <!-- Sức chứa kho -->
+        <div class="currency-pill barn-pill" id="btn-header-barn" title="Nhà kho">
+          <span class="currency-icon">🧺</span>
+          <span id="hud-barn-count" class="currency-val">0/60</span>
+        </div>
+
+        <!-- Âm thanh -->
+        <button id="btn-audio-toggle" class="audio-btn-compact" title="Bật/Tắt âm thanh">
+          🔊
+        </button>
+      </div>
+    </header>
+
+    <!-- Định nghĩa Gradient cho các luống đất Isometric 2.5D chuẩn 1:1 ảnh mẫu Liên Quân -->
+    <svg id="iso-defs" style="position:absolute;width:0;height:0;overflow:hidden;" aria-hidden="true">
+      <defs>
+        <!-- Bờ luống đất cày xới khô (Ridge Tilled) -->
+        <linearGradient id="soilRidgeTilled" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#9d6135" />
+          <stop offset="50%" stop-color="#844d24" />
+          <stop offset="100%" stop-color="#693714" />
+        </linearGradient>
+        <!-- Lòng luống đất cày khô trũng sâu (Trough Tilled) -->
+        <radialGradient id="soilTroughTilled" cx="50%" cy="45%" r="65%">
+          <stop offset="0%" stop-color="#6e3e1c" />
+          <stop offset="70%" stop-color="#552c0e" />
+          <stop offset="100%" stop-color="#3f1e07" />
+        </radialGradient>
+        <!-- Bờ luống đất tưới nước ẩm mượt (Ridge Watered) -->
+        <linearGradient id="soilRidgeWatered" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#5e3415" />
+          <stop offset="50%" stop-color="#49240c" />
+          <stop offset="100%" stop-color="#351704" />
+        </linearGradient>
+        <!-- Lòng luống đất tưới nước ẩm ướt (Trough Watered) -->
+        <radialGradient id="soilTroughWatered" cx="50%" cy="45%" r="65%">
+          <stop offset="0%" stop-color="#3f1e09" />
+          <stop offset="70%" stop-color="#2c1203" />
+          <stop offset="100%" stop-color="#1c0901" />
+        </radialGradient>
+        <!-- Bờ gò cỏ non chưa mở khóa (Locked Ridge Grass - chuẩn xanh cốm ảnh 1) -->
+        <linearGradient id="lockedRidgeGrass" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#a6e338" />
+          <stop offset="50%" stop-color="#8dcb24" />
+          <stop offset="100%" stop-color="#70a915" />
+        </linearGradient>
+        <!-- Mặt gò cỏ non chưa mở khóa (Locked Trough Grass) -->
+        <radialGradient id="lockedTroughGrass" cx="50%" cy="45%" r="65%">
+          <stop offset="0%" stop-color="#b6f046" />
+          <stop offset="70%" stop-color="#94d627" />
+          <stop offset="100%" stop-color="#74b316" />
+        </radialGradient>
+      </defs>
+    </svg>
+
+    <!-- ================================================= -->
+    <!-- 2. KHU VỰC CÁNH ĐỒNG ISOMETRIC 2.5D CHUẨN ẢNH MẪU -->
+    <!-- ================================================= -->
+    <main class="farm-viewport">
+      <div class="farm-island-wrapper">
+        <!-- Thảm cỏ nghiêng 2.5D -->
+        <div class="farm-lawn-plateau">
+          <!-- Hàng rào gỗ và cờ hoa -->
+          <!-- Hàng rào gỗ và cờ hoa -->
+          <div class="fence-garland">
+            <div class="fence-wood left-fence"></div>
+            <div class="fence-wood right-fence"></div>
+          </div>
+
+          <!-- Rắc hoa dại và đốm sáng trang trí quanh thảm cỏ -->
+          <div class="lawn-decorations">
+            <span class="wild-flower" style="top: -8px; left: 32%;">🌼</span>
+            <span class="wild-flower" style="top: 22%; left: -16px;">🌸</span>
+            <span class="wild-flower" style="bottom: 18%; left: -14px;">🌼</span>
+            <span class="wild-flower" style="bottom: -10px; left: 24%;">🪻</span>
+            <span class="wild-flower" style="bottom: -8px; left: 62%;">🌼</span>
+            <span class="wild-flower" style="top: 12%; right: -16px;">🌸</span>
+            <span class="wild-flower" style="top: 52%; right: -18px;">🪻</span>
+            <span class="wild-flower" style="top: -8px; right: 28%;">🌼</span>
+            <span class="lawn-sparkle" style="top: 14%; left: 18%;">✨</span>
+            <span class="lawn-sparkle" style="bottom: 22%; right: 15%;">✨</span>
+            <span class="lawn-sparkle" style="top: 42%; left: -6px;">✨</span>
+            <span class="lawn-sparkle" style="bottom: -4px; right: 38%;">✨</span>
+          </div>
+
+          <!-- Lưới 12 ô đất Isometric -->
+          <div id="farm-grid" class="farm-grid">
+            <!-- Render tự động qua farmRenderer.js -->
+          </div>
+
+          <!-- Chú ếch mascot xanh ngồi cạnh kênh nước -->
+          <div class="frog-mascot-canal" id="frog-mascot" title="Ếch xanh may mắn!">
+            <div class="frog-bubble">🐸</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ================================================= -->
+    <!-- 3. GIAO DIỆN ĐÁY MÀN HÌNH (CHUẨN 1:1 THEO ẢNH MẪU) -->
+    <!-- ================================================= -->
+    <footer class="game-hud-bottom">
+      <!-- Góc dưới-trái: Dải ruy băng nâu viền vàng hướng dẫn tân thủ -->
+      <div class="hud-quest-ribbon">
+        <div class="ribbon-tag">
+          <span class="clipboard-icon">📋</span>
+        </div>
+        <div class="ribbon-content">
+          <span class="ribbon-text" id="ribbon-text-display">Nhiệm vụ: Chạm vào ô đất để <strong>chọn cây gieo trồng</strong>!</span>
+        </div>
+      </div>
+
+      <!-- Góc dưới-phải: Avatar trợ lý đeo kính + 4 Nút Pill bo tròn tối giản đồng bộ HUD trên -->
+      <div class="hud-bottom-right-cluster">
+        <!-- Avatar cô gái đeo kính chuẩn ảnh mẫu -->
+        <div class="assistant-circle-avatar" id="btn-assistant" title="Trợ lý nông trại">
+          <img src="assets/assistant_avatar.jpg" alt="Trợ lý" class="assistant-photo" />
+          <div class="assistant-badge-dot"></div>
+        </div>
+
+        <!-- 4 Nút Pill bo tròn tối giản mạ viền vàng (Đồng bộ ngôn ngữ với HUD trên) -->
+        <div class="hud-pill-buttons-row">
+          <!-- 1. Nhà kho -->
+          <button id="btn-open-barn" class="hud-pill-action-btn btn-barn" title="Nhà Kho">
+            <span class="pill-btn-icon">🏠</span>
+            <span class="pill-btn-label">Kho</span>
+          </button>
+
+          <!-- 2. Túi hạt giống -->
+          <button id="btn-open-shop" class="hud-pill-action-btn btn-shop" title="Túi Hạt Giống">
+            <span class="pill-btn-icon">🌱</span>
+            <span class="pill-btn-label">Hạt</span>
+          </button>
+
+          <!-- 3. Bạn bè / Đơn hàng -->
+          <button id="btn-open-orders" class="hud-pill-action-btn btn-orders" title="Đơn Hàng Thị Trấn">
+            <span class="pill-btn-icon">📜</span>
+            <span class="pill-btn-label">Đơn</span>
+          </button>
+
+          <!-- 4. Sổ Bách Khoa Cây Trồng -->
+          <button id="btn-open-guide" class="hud-pill-action-btn btn-guide" title="Bách Khoa Cây Trồng">
+            <span class="pill-btn-icon">📖</span>
+            <span class="pill-btn-badge" id="guide-progress-text">2/6</span>
+          </button>
+        </div>
+      </div>
+    </footer>
+
+    <!-- ================================================= -->
+    <!-- 4. THANH CÔNG CỤ NHANH: TƯỚI TẤT CẢ & THU HOẠCH TẤT CẢ -->
+    <!-- ================================================= -->
+    <div class="bottom-dock-container">
+      <div id="seed-picker-dock" class="seed-picker-dock hidden"></div>
+      <nav class="quick-action-dock" aria-label="Thao tác nhanh">
+        <!-- 1. Tự Động Gieo Hạt -->
+        <button id="btn-auto-plant" class="quick-action-btn btn-auto-plant" title="Tự động gieo hạt giống vào tất cả các ô đất trống">
+          <span class="btn-icon-wrapper">
+            <span class="quick-btn-icon">🌱</span>
+            <span id="badge-plant-count" class="quick-btn-badge badge-plant hidden">0</span>
+          </span>
+          <span class="quick-btn-label">Tự Động Gieo</span>
+        </button>
+
+        <!-- 2. Gieo Ngẫu Nhiên -->
+        <button id="btn-random-plant" class="quick-action-btn btn-random-plant" title="Gieo ngẫu nhiên các loại cây trồng đã mở khóa">
+          <span class="btn-icon-wrapper">
+            <span class="quick-btn-icon">🎲</span>
+          </span>
+          <span class="quick-btn-label">Gieo Ngẫu Nhiên</span>
+        </button>
+
+        <!-- 3. Tưới Tất Cả -->
+        <button id="btn-water-all" class="quick-action-btn btn-water-all" title="Tưới tất cả các ô cần nước">
+          <span class="btn-icon-wrapper">
+            <span class="quick-btn-icon">🚿</span>
+            <span id="badge-water-count" class="quick-btn-badge badge-water hidden">0</span>
+          </span>
+          <span class="quick-btn-label">Tưới Tất Cả</span>
+        </button>
+
+        <!-- 4. Thu Hoạch Tất Cả -->
+        <button id="btn-harvest-all" class="quick-action-btn btn-harvest-all" title="Thu hoạch tất cả nông sản đã chín">
+          <span class="btn-icon-wrapper">
+            <span class="quick-btn-icon">
+              <!-- SVG Liềm gặt anime vàng óng -->
+              <svg viewBox="0 0 32 32" width="22" height="22">
+                <path d="M12 4 C18 4 26 10 26 18 C26 21 24.5 23.5 23 24 C23 21 21 16 16 12 C13 9.5 10 8 7 8 C8 6.5 10 4 12 4 Z" fill="#fef08a" stroke="#ca8a04" stroke-width="1.2"/>
+                <path d="M11 6 C16 6 23 11 23 18 C21 15 17 11 11 8 Z" fill="#ffffff" opacity="0.8"/>
+                <rect x="7" y="16" width="5" height="12" rx="2.5" transform="rotate(-30 7 16)" fill="#854d2b" stroke="#5c2f16" stroke-width="1.2"/>
+                <circle cx="10" cy="18" r="2" fill="#eab308"/>
+              </svg>
+            </span>
+            <span id="badge-harvest-count" class="quick-btn-badge badge-harvest hidden">0</span>
+          </span>
+          <span class="quick-btn-label">Thu Hoạch Tất Cả</span>
+        </button>
+
+        <!-- 5. Đào Cây (Nhổ Bỏ Cây Đang Trồng) -->
+        <button id="btn-dig-crop" class="quick-action-btn btn-dig-crop" title="Chọn công cụ cuốc đào để nhổ bỏ cây trên ô đất">
+          <span class="btn-icon-wrapper">
+            <span class="quick-btn-icon">⛏️</span>
+          </span>
+          <span class="quick-btn-label">Đào Cây</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- POPUP MENU CHỌN CÂY TRỒNG NỔI KHI ẤN VÀO Ô ĐẤT -->
+    <div id="plot-crop-popup" class="plot-crop-popup hidden">
+      <div class="crop-popup-arrow"></div>
+      <div class="crop-popup-header">
+        <span class="crop-popup-title">🌱 CHỌN CÂY TRỒNG</span>
+        <div class="crop-popup-actions">
+          <button id="btn-popup-random-plant" class="popup-mini-btn" title="Gieo ngẫu nhiên tất cả ô trống">🎲 Ngẫu nhiên</button>
+          <button id="btn-close-crop-popup" class="crop-popup-close">✕</button>
+        </div>
+      </div>
+      <div id="crop-popup-list" class="crop-popup-list"></div>
+    </div>
+
+    <!-- POPUP THÔNG TIN CÂY TRỒNG ĐANG LỚN KHI ẤN VÀO CÂY -->
+    <div id="crop-info-popup" class="crop-info-popup hidden">
+      <div class="crop-info-arrow"></div>
+      <div class="crop-info-header">
+        <div class="crop-info-title-group">
+          <span id="crop-info-icon" class="crop-info-icon">🌱</span>
+          <div>
+            <div id="crop-info-name" class="crop-info-name">Cây Trồng</div>
+            <div id="crop-info-status" class="crop-info-status">Đang phát triển 🌱</div>
+          </div>
+        </div>
+        <button id="btn-close-crop-info" class="crop-popup-close">✕</button>
+      </div>
+
+      <div class="crop-info-body">
+        <div class="crop-info-progress-section">
+          <div class="crop-info-progress-header">
+            <span class="progress-title">Tiến trình lớn</span>
+            <span id="crop-info-time-rem" class="progress-countdown">⏳ 0s</span>
+          </div>
+          <div class="crop-info-bar-track">
+            <div id="crop-info-bar-fill" class="crop-info-bar-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="crop-info-stats-row">
+          <div class="crop-info-stat-pill">
+            <span class="pill-label">Bán được</span>
+            <span id="crop-info-sell" class="pill-val">0 💰</span>
+          </div>
+          <div class="crop-info-stat-pill">
+            <span class="pill-label">Kinh nghiệm</span>
+            <span id="crop-info-exp" class="pill-val">+0 ⭐</span>
+          </div>
+          <div class="crop-info-stat-pill">
+            <span class="pill-label">Tưới nước</span>
+            <span id="crop-info-water-boost" class="pill-val">-0s 💧</span>
+          </div>
+        </div>
+
+        <div id="crop-info-water-action" class="crop-info-water-action"></div>
+        <button id="btn-crop-info-dig" class="crop-info-dig-btn" title="Nhổ bỏ cây này để làm tơi lại ô đất">⛏️ Đào Cây (Nhổ Bỏ)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CÁC MODAL DIALOG -->
+  <!-- 1. Cửa hàng hạt giống -->
+  <div id="shop-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-header-icon">🌱</span>
+          <h3>Túi Hạt Giống</h3>
+        </div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div id="shop-items-list" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 2. Nhà kho nông sản -->
+  <div id="barn-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-header-icon">🏠</span>
+          <h3>Nhà Kho Nông Sản</h3>
+        </div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="barn-summary-bar">
+        <span>Sức chứa: <strong><span id="barn-usage-text">0</span> / <span id="barn-capacity-text">60</span></strong></span>
+        <button id="btn-upgrade-barn" class="btn-action-primary">Nâng cấp</button>
+      </div>
+      <div id="barn-items-list" class="modal-body"></div>
+      <div class="modal-footer">
+        <span style="font-size: 0.85rem; color: #64748b;">Nông sản giao đơn hàng được thưởng nhiều vàng hơn!</span>
+        <button id="btn-sell-all" class="btn-action-secondary">Bán hết</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Bảng đơn hàng thị trấn -->
+  <div id="orders-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-header-icon">📜</span>
+          <h3>Đơn Đặt Hàng</h3>
+        </div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div id="orders-items-list" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 4. Sổ Bách Khoa Toàn Thư Cây Trồng -->
+  <div id="guide-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-header-icon">📖</span>
+          <h3>Bách Khoa Toàn Thư Cây Trồng</h3>
+        </div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div id="guide-items-list" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 5. Modal Thông Tin Nông Trại & Cấp Độ -->
+  <div id="profile-modal" class="modal-backdrop hidden">
+    <div class="modal-card profile-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-header-icon">🧑‍🌾</span>
+          <h3>Thông Tin Nông Trại</h3>
+        </div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div id="profile-modal-body" class="modal-body profile-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 6. Chúc mừng thăng cấp -->
+  <div id="levelup-modal" class="modal-backdrop hidden">
+    <div class="modal-card" style="max-width: 420px;">
+      <div class="levelup-content">
+        <div class="levelup-stars">🌟✨🎉</div>
+        <h2 class="levelup-title">LÊN CẤP MỚI!</h2>
+        <div class="levelup-badge-large" id="levelup-number">2</div>
+        <div class="reward-gold" id="levelup-reward" style="font-size: 1.3rem;">+50 💰 Tiền thưởng</div>
+        <div class="levelup-note-box" id="levelup-note">Mở khóa cây trồng mới!</div>
+        <button id="btn-close-levelup" class="btn-levelup-claim">Nhận thưởng ngay!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast thông báo -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- App Script Chạy Trực Tiếp Không Cần Server -->
+  <script src="js/bundle.js"></script>
+</body>
+</html>

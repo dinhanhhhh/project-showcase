@@ -1,218 +1,582 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 
-const targetColor = ref('')
-const colorOptions = ref<string[]>([])
-const message = ref('Hãy chọn màu đúng!')
+interface RgbColor {
+  r: number
+  g: number
+  b: number
+  rgb: string
+  hex: string
+}
+
+type ColorFormat = 'rgb' | 'hex'
+type GridSize = 4 | 6 | 9
+
+const colorFormat = ref<ColorFormat>('rgb')
+const gridSize = ref<GridSize>(6)
+const target = ref<RgbColor>({ r: 109, g: 221, b: 255, rgb: 'rgb(109, 221, 255)', hex: '#6DDDFF' })
+const options = ref<RgbColor[]>([])
+const eliminatedHexes = ref<Record<string, boolean>>({})
 const score = ref(0)
-const isGameOver = ref(false)
+const streak = ref(0)
+const bestScore = ref(0)
+const statusText = ref('Quan sát tỷ lệ Đỏ (R) · Lục (G) · Lam (B) và chọn ô màu khớp nhất!')
+const statusType = ref<'neutral' | 'win' | 'miss'>('neutral')
+const isRoundWon = ref(false)
 
-const generateRandomColor = () => {
+let nextRoundTimer: ReturnType<typeof setTimeout> | null = null
+
+function toHexChannel(n: number): string {
+  return n.toString(16).padStart(2, '0').toUpperCase()
+}
+
+function randomColor(): RgbColor {
   const r = Math.floor(Math.random() * 256)
   const g = Math.floor(Math.random() * 256)
   const b = Math.floor(Math.random() * 256)
-  return `rgb(${r}, ${g}, ${b})`
+  return {
+    r,
+    g,
+    b,
+    rgb: `rgb(${r}, ${g}, ${b})`,
+    hex: `#${toHexChannel(r)}${toHexChannel(g)}${toHexChannel(b)}`,
+  }
 }
 
-const startNewGame = () => {
-  targetColor.value = generateRandomColor()
-  const options = [targetColor.value]
-  while (options.length < 4) {
-    const randomColor = generateRandomColor()
-    if (!options.includes(randomColor)) {
-      options.push(randomColor)
+const displayCode = computed(() =>
+  colorFormat.value === 'rgb' ? target.value.rgb : target.value.hex,
+)
+
+function formatTileLabel(c: RgbColor): string {
+  return colorFormat.value === 'rgb' ? c.rgb : c.hex
+}
+
+function startNewRound() {
+  if (nextRoundTimer) {
+    clearTimeout(nextRoundTimer)
+    nextRoundTimer = null
+  }
+  const answer = randomColor()
+  const list: RgbColor[] = [answer]
+  const seen = new Set<string>([answer.hex])
+
+  while (list.length < gridSize.value) {
+    const candidate = randomColor()
+    if (!seen.has(candidate.hex)) {
+      seen.add(candidate.hex)
+      list.push(candidate)
     }
   }
-  colorOptions.value = options.sort(() => Math.random() - 0.5)
-  message.value = 'Hãy chọn màu đúng!'
-  isGameOver.value = false
+
+  target.value = answer
+  options.value = list.sort(() => Math.random() - 0.5)
+  eliminatedHexes.value = {}
+  isRoundWon.value = false
+  statusType.value = 'neutral'
+  statusText.value = 'Chọn ô màu khớp với mã bên trên!'
 }
 
-const checkColor = (color: string) => {
-  if (isGameOver.value) return
-  
-  if (color === targetColor.value) {
-    score.value++
-    message.value = 'Chính xác! 🎉'
-    isGameOver.value = true
-    setTimeout(startNewGame, 1500)
+function setGridSize(size: GridSize) {
+  gridSize.value = size
+  startNewRound()
+}
+
+function handlePick(choice: RgbColor) {
+  if (isRoundWon.value || eliminatedHexes.value[choice.hex]) return
+
+  if (choice.hex === target.value.hex) {
+    isRoundWon.value = true
+    const bonus = gridSize.value === 9 ? 3 : gridSize.value === 6 ? 2 : 1
+    score.value += bonus
+    streak.value += 1
+    if (score.value > bestScore.value) {
+      bestScore.value = score.value
+    }
+    statusType.value = 'win'
+    statusText.value = `Chính xác! +${bonus} điểm (Chuỗi thắng ${streak.value} 🔥)`
+    nextRoundTimer = setTimeout(startNewRound, 1300)
   } else {
-    message.value = 'Sai rồi! Thử lại nhé. ❌'
+    eliminatedHexes.value = { ...eliminatedHexes.value, [choice.hex]: true }
+    streak.value = 0
     score.value = Math.max(0, score.value - 1)
+    statusType.value = 'miss'
+    statusText.value = `Chưa đúng! Ô đó là ${formatTileLabel(choice)} — thử ô khác nhé.`
   }
 }
 
 onMounted(() => {
-  startNewGame()
+  startNewRound()
+})
+
+onUnmounted(() => {
+  if (nextRoundTimer) clearTimeout(nextRoundTimer)
 })
 </script>
 
 <template>
-  <div class="color-game-container">
-    <div class="game-header">
-      <RouterLink
-        class="back-link"
-        to="/"
-      >
-        ← Về trang chủ
-      </RouterLink>
-      <div class="stats">
-        <span class="score">Điểm: {{ score }}</span>
-      </div>
+  <div class="color-page">
+    <div class="color-shell">
+      <header class="top-bar">
+        <RouterLink
+          class="back-btn"
+          to="/"
+        >
+          ← Về Launcher
+        </RouterLink>
+
+        <div class="title-wrap">
+          <h1>🎨 Color Studio Reflex</h1>
+          <p>Luyện cảm nhận mã màu RGB &amp; HEX dành cho Designer &amp; Developer</p>
+        </div>
+
+        <div class="metrics-bar">
+          <div class="metric-pill">
+            <span>Điểm</span>
+            <strong>{{ score }}</strong>
+          </div>
+          <div class="metric-pill streak">
+            <span>Streak</span>
+            <strong>{{ streak }} 🔥</strong>
+          </div>
+          <div class="metric-pill best">
+            <span>Kỷ lục</span>
+            <strong>{{ bestScore }} 🏆</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="toolbar-row">
+        <div class="segmented">
+          <button
+            type="button"
+            :class="{ active: colorFormat === 'rgb' }"
+            @click="colorFormat = 'rgb'"
+          >
+            Mã RGB
+          </button>
+          <button
+            type="button"
+            :class="{ active: colorFormat === 'hex' }"
+            @click="colorFormat = 'hex'"
+          >
+            Mã HEX
+          </button>
+        </div>
+
+        <div class="segmented">
+          <button
+            type="button"
+            :class="{ active: gridSize === 4 }"
+            @click="setGridSize(4)"
+          >
+            Dễ (4 ô)
+          </button>
+          <button
+            type="button"
+            :class="{ active: gridSize === 6 }"
+            @click="setGridSize(6)"
+          >
+            Khó (6 ô)
+          </button>
+          <button
+            type="button"
+            :class="{ active: gridSize === 9 }"
+            @click="setGridSize(9)"
+          >
+            Cao thủ (9 ô)
+          </button>
+        </div>
+      </section>
+
+      <main class="studio-card">
+        <div class="code-display">
+          <span class="code-eyebrow">MÃ MÀU MỤC TIÊU</span>
+          <div class="target-code">
+            {{ displayCode }}
+          </div>
+
+          <div class="channel-bars">
+            <div class="channel-item">
+              <div class="ch-label">
+                <span>R (Đỏ)</span>
+                <strong>{{ Math.round((target.r / 255) * 100) }}%</strong>
+              </div>
+              <div class="ch-track">
+                <div
+                  class="ch-fill red"
+                  :style="{ width: `${(target.r / 255) * 100}%` }"
+                />
+              </div>
+            </div>
+
+            <div class="channel-item">
+              <div class="ch-label">
+                <span>G (Lục)</span>
+                <strong>{{ Math.round((target.g / 255) * 100) }}%</strong>
+              </div>
+              <div class="ch-track">
+                <div
+                  class="ch-fill green"
+                  :style="{ width: `${(target.g / 255) * 100}%` }"
+                />
+              </div>
+            </div>
+
+            <div class="channel-item">
+              <div class="ch-label">
+                <span>B (Lam)</span>
+                <strong>{{ Math.round((target.b / 255) * 100) }}%</strong>
+              </div>
+              <div class="ch-track">
+                <div
+                  class="ch-fill blue"
+                  :style="{ width: `${(target.b / 255) * 100}%` }"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="color-grid"
+          :class="`cols-${gridSize === 4 ? 2 : 3}`"
+        >
+          <button
+            v-for="item in options"
+            :key="item.hex"
+            type="button"
+            class="color-tile"
+            :class="{
+              eliminated: eliminatedHexes[item.hex],
+              winner: isRoundWon && item.hex === target.hex,
+            }"
+            :style="{ backgroundColor: item.rgb }"
+            @click="handlePick(item)"
+          >
+            <span
+              v-if="eliminatedHexes[item.hex] || isRoundWon"
+              class="tile-code"
+            >
+              {{ isRoundWon && item.hex === target.hex ? '✓ ' : '✕ ' }}{{ formatTileLabel(item) }}
+            </span>
+          </button>
+        </div>
+
+        <div class="footer-bar">
+          <p
+            class="status-msg"
+            :class="statusType"
+          >
+            {{ statusText }}
+          </p>
+          <button
+            type="button"
+            class="skip-btn"
+            @click="startNewRound"
+          >
+            🔄 Đổi mã màu khác
+          </button>
+        </div>
+      </main>
     </div>
-
-    <main class="game-content">
-      <h1 class="title">
-        Trò chơi Màu sắc
-      </h1>
-      <p class="description">
-        Tìm xem màu nào tương ứng với mã RGB dưới đây:
-      </p>
-      
-      <div class="target-code">
-        {{ targetColor }}
-      </div>
-
-      <div class="color-grid">
-        <button 
-          v-for="color in colorOptions" 
-          :key="color"
-          class="color-btn"
-          :style="{ backgroundColor: color }"
-          @click="checkColor(color)"
-        />
-      </div>
-
-      <p
-        class="message"
-        :class="{ success: isGameOver }"
-      >
-        {{ message }}
-      </p>
-      
-      <button
-        class="reset-btn"
-        @click="startNewGame"
-      >
-        Đổi mã màu khác
-      </button>
-    </main>
   </div>
 </template>
 
 <style scoped>
-.color-game-container {
-  min-height: 100vh;
-  background: #060e20;
-  color: #dee5ff;
+.color-page {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  padding: 1.25rem;
   font-family: 'Inter', sans-serif;
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
 }
 
-.game-header {
+.color-shell {
+  max-width: 820px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.back-btn {
+  padding: 0.5rem 0.95rem;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.title-wrap {
+  text-align: center;
+  flex: 1;
+}
+
+.title-wrap h1 {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(1.35rem, 2.8vw, 1.85rem);
+  font-weight: 800;
+}
+
+.title-wrap p {
+  font-size: 0.84rem;
+  color: var(--text-dim);
+}
+
+.metrics-bar {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.metric-pill {
+  padding: 0.4rem 0.75rem;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 68px;
+}
+
+.metric-pill span {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.metric-pill strong {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1rem;
+  color: var(--primary);
+}
+
+.metric-pill.streak strong {
+  color: var(--warning);
+}
+
+.metric-pill.best strong {
+  color: var(--accent);
+}
+
+.toolbar-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 3rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.back-link {
-  color: #6dddff;
-  text-decoration: none;
-  font-weight: 500;
-  transition: opacity 0.2s;
+.segmented {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  border-radius: 12px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
 }
 
-.back-link:hover { opacity: 0.8; }
-
-.score {
-  font-size: 1.2rem;
+.segmented button {
+  padding: 0.45rem 0.85rem;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.82rem;
   font-weight: 700;
-  background: rgba(109, 221, 255, 0.1);
-  padding: 0.5rem 1rem;
-  border-radius: 99px;
-  color: #6dddff;
+  cursor: pointer;
+  transition: var(--transition-fast);
 }
 
-.game-content {
-  flex: 1;
+.segmented button.active {
+  background: var(--primary);
+  color: var(--text-inverse);
+}
+
+.studio-card {
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  border-radius: 24px;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  max-width: 600px;
-  margin: 0 auto;
+  gap: 1.35rem;
+  box-shadow: var(--shadow-card);
+}
+
+.code-display {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  padding: 1.25rem;
   text-align: center;
 }
 
-.title {
-  font-size: 2.5rem;
-  font-weight: 800;
-  margin-bottom: 1rem;
-}
-
-.description {
-  color: #a3aac4;
-  margin-bottom: 2rem;
+.code-eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 1.6px;
+  color: var(--text-dim);
+  font-weight: 700;
 }
 
 .target-code {
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 2rem;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: clamp(1.45rem, 3.5vw, 2.2rem);
   font-weight: 800;
-  padding: 1.5rem 3rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(109, 221, 255, 0.2);
-  border-radius: 20px;
-  margin-bottom: 3rem;
-  color: #6dddff;
+  color: var(--primary);
+  margin: 0.35rem 0 1rem;
 }
+
+.channel-bars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.85rem;
+}
+
+.channel-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ch-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.ch-track {
+  height: 7px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.ch-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+
+.ch-fill.red { background: #ff5555; }
+.ch-fill.green { background: #34d399; }
+.ch-fill.blue { background: #38bdf8; }
 
 .color-grid {
   display: grid;
+  gap: 1rem;
+}
+
+.color-grid.cols-2 {
   grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
-  width: 100%;
-  margin-bottom: 2rem;
 }
 
-.color-btn {
-  height: 120px;
-  border: none;
-  border-radius: 20px;
+.color-grid.cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.color-tile {
+  height: 118px;
+  border-radius: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.14);
   cursor: pointer;
-  transition: transform 0.2s;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0.65rem;
+  transition: transform 0.18s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
 }
 
-.color-btn:hover {
-  transform: scale(1.05);
+.color-tile:hover:not(.eliminated) {
+  transform: translateY(-4px) scale(1.02);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 
-.message {
-  font-size: 1.2rem;
+.color-tile.eliminated {
+  opacity: 0.28;
+  transform: scale(0.96);
+  cursor: not-allowed;
+}
+
+.color-tile.winner {
+  border-color: #ffffff;
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.6);
+  transform: scale(1.03);
+}
+
+.tile-code {
+  padding: 0.22rem 0.6rem;
+  border-radius: 8px;
+  background: rgba(6, 14, 32, 0.82);
+  color: var(--text);
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.status-msg {
+  font-size: 0.92rem;
   font-weight: 600;
-  margin-bottom: 2rem;
-  height: 1.5rem;
+  color: var(--text-dim);
 }
 
-.message.success { color: #4ade80; }
+.status-msg.win {
+  color: var(--success);
+}
 
-.reset-btn {
-  background: none;
-  border: 1px solid rgba(109, 221, 255, 0.3);
-  color: #a3aac4;
-  padding: 0.8rem 1.5rem;
-  border-radius: 99px;
+.status-msg.miss {
+  color: var(--danger);
+}
+
+.skip-btn {
+  padding: 0.6rem 1.15rem;
+  border-radius: 12px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline-strong);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: var(--transition-fast);
 }
 
-.reset-btn:hover {
-  background: rgba(109, 221, 255, 0.1);
-  color: #6dddff;
-  border-color: #6dddff;
+.skip-btn:hover {
+  background: var(--primary);
+  color: var(--text-inverse);
+}
+
+@media (max-width: 600px) {
+  .channel-bars {
+    grid-template-columns: 1fr;
+  }
+
+  .color-grid.cols-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .color-tile {
+    height: 96px;
+  }
 }
 </style>

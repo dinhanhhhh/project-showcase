@@ -1,0 +1,1679 @@
+/* ==========================================================================
+   BOARD.CSS - Bàn Cờ Cờ Tỷ Phú Sài Gòn (CSS Grid 11x11 - 3D Diorama Pastel)
+   ========================================================================== */
+
+:root {
+  /* Bảng màu cổ điển hiện đại */
+  --board-wood: #3b2a1a; /* Viền nâu sẫm cà phê */
+  --board-tile-bg: #fffdf8; /* Nền trắng ngà chuẩn */
+  --board-tile-hover: #f6f1e6;
+  --board-grid-line: #8a7358; /* Đường kẻ viền 1.5px #8A7358 */
+  --color-primary: #1f6f8b; /* Xanh sông chủ đạo */
+  --color-accent: #ff7a00; /* Cam nút chính */
+
+  /* Thẻ bài */
+  --chance-color: #ffb399;
+  --chest-color: #ffe066;
+}
+
+/* Khung bàn cờ chính: Viền nâu đậm #3B2A1A, đệm kem #F4EEDD 5px, bo góc & đổ bóng nhẹ */
+.monopoly-board {
+  display: grid;
+  grid-template-columns: 1.65fr repeat(9, 1fr) 1.65fr;
+  grid-template-rows: 1.65fr repeat(9, 1fr) 1.65fr;
+  width: min(calc(100dvh - 116px), calc(100vw - 520px), 614px);
+  height: min(calc(100dvh - 116px), calc(100vw - 520px), 614px);
+  aspect-ratio: 1 / 1;
+  background-color: #f4eedd;
+  border: 4px solid #3b2a1a;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(59, 42, 26, 0.22);
+  padding: 5px;
+  box-sizing: border-box;
+  position: relative;
+  overflow: visible;
+}
+
+@media (max-width: 900px) {
+  .monopoly-board {
+    width: min(94vw, calc(100dvh - 200px), 520px);
+    height: min(94vw, calc(100dvh - 200px), 520px);
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .monopoly-board {
+    width: min(95vw, calc(100dvh - 245px), 440px);
+    height: min(95vw, calc(100dvh - 245px), 440px);
+    padding: 3px;
+    border-width: 3px;
+    border-radius: 8px;
+  }
+
+  /* Tối ưu typography ô đất trên mobile để không tràn hay đè chữ */
+  .tile-name {
+    font-size: clamp(6.2px, 12cqw, 8.5px);
+    line-height: 1;
+    letter-spacing: 0;
+    padding: 0 1px;
+  }
+
+  .edge-left .tile-name,
+  .edge-right .tile-name {
+    font-size: clamp(6px, 11cqw, 8px);
+    line-height: 0.95;
+    padding: 0;
+  }
+
+  .tile-price {
+    font-size: clamp(7px, 13cqw, 9.5px);
+    padding-bottom: 0;
+  }
+
+  .edge-left .tile-price,
+  .edge-right .tile-price {
+    font-size: clamp(6.8px, 11cqw, 9px);
+    padding: 0;
+  }
+
+  /* Ẩn chữ 'THUÊ' khi đang hiển thị tiền thuê để số tiền không bị tràn làm mất chữ T */
+  .tile-price.tile-rent-active .rent-label,
+  .tile-price.tile-rent-hotel .rent-label {
+    display: none !important;
+  }
+
+  .tile-icon-box {
+    height: 18px;
+    min-height: 18px;
+    margin: 0;
+  }
+
+  .tile-icon-box svg {
+    max-width: 18px;
+    max-height: 16px;
+  }
+
+  /* Tối ưu quân cờ khi đứng chung ô */
+  .tile-tokens-grid {
+    grid-template-columns: repeat(2, 13px);
+    grid-auto-rows: 13px;
+    gap: 1px;
+  }
+
+  .player-token {
+    width: 13px;
+    height: 13px;
+    border-width: 1.2px !important;
+  }
+
+  .token-badge {
+    font-size: 8px;
+  }
+
+  .token-svg svg {
+    width: 9px;
+    height: 9px;
+  }
+
+  /* Thu nhỏ khay thẻ Cơ hội / Khí vận giữa bàn cờ */
+  .deck-slot {
+    width: 68px;
+    height: 48px;
+    padding: 2px;
+  }
+
+  .deck-title {
+    font-size: 0.62rem;
+  }
+
+  .deck-bottom-label {
+    font-size: 0.5rem;
+  }
+
+  .deck-count-tag {
+    font-size: 0.5rem;
+    padding: 0 3px;
+  }
+
+  .retro-main-title {
+    font-size: 1.1rem;
+  }
+
+  .retro-sub-ribbon {
+    font-size: 0.65rem;
+  }
+
+  /* Ô Thăm tù trên mobile */
+  .jail-inmate-box {
+    width: 58% !important;
+    height: 58% !important;
+    padding: 1px 2px !important;
+  }
+
+  .jail-inmate-header {
+    font-size: 0.48rem !important;
+    gap: 2px !important;
+  }
+
+  .jail-inmate-header svg {
+    width: 9px !important;
+    height: 9px !important;
+  }
+
+  .jail-visiting-strip {
+    bottom: 2px !important;
+    left: 3px !important;
+  }
+
+  .jail-visiting-strip .corner-title {
+    font-size: 0.52rem !important;
+    letter-spacing: 0.2px !important;
+  }
+
+  /* Ô Vào Tù trên mobile */
+  .tile-corner-gotojail .corner-icon-box {
+    height: 18px !important;
+    min-height: 18px !important;
+  }
+
+  .tile-corner-gotojail .corner-icon-box svg {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .tile-corner-gotojail .corner-title {
+    font-size: 0.52rem !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .monopoly-board {
+    padding: 2px;
+    border-width: 2.5px;
+  }
+
+  .tile-name {
+    font-size: clamp(6.8px, 13cqw, 9.5px);
+  }
+
+  .edge-left .tile-name,
+  .edge-right .tile-name {
+    font-size: clamp(6.5px, 10cqw, 8px);
+  }
+
+  .tile-price {
+    font-size: clamp(6.8px, 12cqw, 8.5px);
+  }
+
+  .edge-left .tile-price,
+  .edge-right .tile-price {
+    font-size: clamp(6.5px, 10cqw, 8px);
+  }
+
+  .deck-slot {
+    width: 56px;
+    height: 42px;
+  }
+
+  .retro-main-title {
+    font-size: 0.95rem;
+  }
+}
+
+/* Bo góc 4 ô góc khớp với viền bàn cờ khi overflow: visible */
+#tile-20 {
+  border-top-left-radius: 8px;
+}
+#tile-30 {
+  border-top-right-radius: 8px;
+}
+#tile-10 {
+  border-bottom-left-radius: 8px;
+}
+#tile-0 {
+  border-bottom-right-radius: 8px;
+}
+
+/* ================= Ô CỜ CHUNG (Board Tiles): Đường ngăn 1.5px #8A7358 ================= */
+.board-tile {
+  background-color: var(--board-tile-bg);
+  border: 1.5px solid #8a7358;
+  display: flex;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  overflow: hidden;
+  user-select: none;
+  container-type: inline-size;
+}
+
+/* Tô màu ô thẻ theo chuẩn mẫu hoài cổ (Cơ Hội kem cam nhạt, Khí Vận xanh băng nhạt) */
+.board-tile.tile-chance {
+  background-color: #fdf3ed !important;
+}
+
+.board-tile.tile-chest {
+  background-color: #ebf5fb !important;
+}
+
+.board-tile:hover {
+  background-color: var(--board-tile-hover);
+  z-index: 5;
+  transform: scale(1.03);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  border-color: #8a7358;
+}
+
+/* Cạnh đáy: Dải màu ở trên đỉnh ô (mép trong bàn cờ) */
+.edge-bottom {
+  flex-direction: column;
+  --building-rotate: 0deg;
+}
+.edge-bottom .tile-color-bar {
+  width: 100%;
+  height: 17%;
+  min-height: 14px;
+  border-bottom: 1.5px solid #8a7358;
+}
+
+/* Cạnh trên: Dải màu ở đáy ô (mép trong bàn cờ) */
+.edge-top {
+  flex-direction: column-reverse;
+  --building-rotate: 180deg;
+}
+.edge-top .tile-color-bar {
+  width: 100%;
+  height: 17%;
+  min-height: 14px;
+  border-top: 1.5px solid #8a7358;
+}
+
+/* Cạnh trái: Dải màu ở bên phải ô (mép trong bàn cờ) */
+.edge-left {
+  flex-direction: row-reverse;
+  --building-rotate: 90deg;
+}
+.edge-left .tile-color-bar {
+  width: 17%;
+  min-width: 14px;
+  height: 100%;
+  border-left: 1.5px solid #8a7358;
+}
+
+/* Cạnh phải: Dải màu ở bên trái ô (mép trong bàn cờ) */
+.edge-right {
+  flex-direction: row;
+  --building-rotate: -90deg;
+}
+.edge-right .tile-color-bar {
+  width: 17%;
+  min-width: 14px;
+  height: 100%;
+  border-right: 1.5px solid #8a7358;
+}
+
+/* ================= 4 Ô GÓC ĐẶC BIỆT ================= */
+.tile-corner {
+  background: #fffdf8;
+  display: flex;
+  flex-direction: column;
+  padding: 5px 3px;
+  text-align: center;
+  justify-content: space-evenly;
+  align-items: center;
+  gap: 2px;
+}
+
+.corner-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+}
+
+.corner-parking-p {
+  width: 30px;
+  height: 30px;
+  background: #0284c7;
+  color: #fff;
+  font-family: var(--font-retro);
+  font-size: 1.35rem;
+  font-weight: 800;
+  border-radius: 7px;
+  border: 2px solid #3b2a1a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.3);
+}
+
+.tile-corner .corner-title {
+  font-family: var(--font-retro);
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #000000;
+  text-transform: uppercase;
+  line-height: 1.15;
+}
+
+.tile-corner .corner-sub {
+  display: none;
+}
+
+/* Riêng ô góc 20 Quỹ Trúng Thưởng: căn chỉnh vừa khít ô cờ, không bao giờ bị tràn */
+.tile-corner-jackpot {
+  padding: 3px 2px !important;
+  justify-content: space-evenly !important;
+  align-items: center !important;
+  gap: 1px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.tile-corner-jackpot .corner-icon-box {
+  height: 22px !important;
+  min-height: 22px !important;
+  margin: 0 !important;
+}
+
+.tile-corner-jackpot .jackpot-slot-icon {
+  width: 22px !important;
+  height: 22px !important;
+  font-size: 1.15rem !important;
+  border-radius: 5px !important;
+  border: 1.5px solid #3b2a1a !important;
+  background: linear-gradient(135deg, #f39c12, #e67e22) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  box-shadow: 0 1px 3px rgba(211, 84, 0, 0.4) !important;
+}
+
+.tile-corner-jackpot .corner-title {
+  font-size: clamp(8px, 12cqw, 9.5px) !important;
+  line-height: 1.05 !important;
+  font-weight: 900 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  letter-spacing: -0.2px !important;
+}
+
+/* ================= Ô 30: VÀO TÙ ================= */
+.tile-corner-gotojail {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 2px !important;
+  box-sizing: border-box !important;
+  text-align: center !important;
+}
+
+.tile-corner-gotojail .corner-icon-box {
+  height: 22px !important;
+  min-height: 22px !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.tile-corner-gotojail .corner-icon-box svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+.tile-corner-gotojail .corner-title {
+  font-size: clamp(8px, 12cqw, 10px) !important;
+  line-height: 1.1 !important;
+  font-weight: 900 !important;
+  margin: 2px 0 0 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  color: #78281f !important;
+}
+
+/* Badge số tiền hũ Quỹ Trúng Thưởng Jackpot trên ô 20 */
+.jackpot-pool-badge {
+  background: linear-gradient(135deg, #f39c12, #d35400);
+  color: #ffffff;
+  font-family: var(--font-retro);
+  font-size: clamp(9px, 13cqw, 10.5px);
+  font-weight: 900;
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1px solid #ba4a00;
+  box-shadow: 0 1px 4px rgba(211, 84, 0, 0.45);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  line-height: 1.2;
+  margin: 0 !important;
+  animation: pulseGold 2s infinite ease-in-out;
+}
+
+@keyframes pulseGold {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 1px 4px rgba(211, 84, 0, 0.45);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(243, 156, 18, 0.7);
+  }
+}
+
+/* ================= MÀU NỀN 3 Ô GÓC THEO YÊU CẦU ================= */
+.tile-corner-go,
+#tile-0 {
+  background-color: #fff1c9 !important;
+  padding: 4px !important;
+  box-sizing: border-box !important;
+}
+
+.tile-corner-jackpot,
+#tile-20 {
+  background-color: #e6f1fb !important;
+}
+
+.tile-corner-gotojail,
+#tile-30 {
+  background-color: #fde8e4 !important;
+}
+
+.go-corner-layout {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.go-arrow-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.go-arrow-box svg {
+  width: clamp(26px, 32cqw, 34px);
+  height: auto;
+}
+
+.go-title {
+  font-family: var(--font-retro);
+  font-size: clamp(10.5px, 14cqw, 12.5px);
+  font-weight: 900;
+  color: #be123c;
+  text-transform: uppercase;
+  line-height: 1.1;
+  letter-spacing: 0.2px;
+}
+
+.go-reward {
+  font-family: var(--font-ui);
+  font-size: clamp(8.5px, 11cqw, 10px);
+  font-weight: 800;
+  color: #1f6f8b;
+  line-height: 1.1;
+  margin-top: 1px;
+  transition: color 0.25s ease, background-color 0.25s ease;
+}
+
+.go-reward.zero {
+  color: #e11d48;
+  font-weight: 900;
+  background: rgba(225, 29, 72, 0.12);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* ================= NỘI DUNG Ô ĐẤT & Ô ĐẶC BIỆT ================= */
+.tile-property,
+.tile-special {
+  padding: 0;
+}
+
+.tile-color-bar {
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Ô đặc biệt không có dải màu đất, dành toàn bộ diện tích cho icon SVG to */
+.tile-special .tile-color-bar {
+  display: none;
+}
+
+.tile-content {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 2px;
+  text-align: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Tên ô đất: Font Be Vietnam Pro, clamp(11px, 20cqw, 13.5px), tên đậm, to rõ, tự xuống 2 dòng */
+.tile-name {
+  font-family: var(--font-ui);
+  font-size: clamp(10px, 17cqw, 12px);
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.1;
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
+  padding: 1px 1px;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+.tile-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 28px;
+  min-height: 28px;
+  flex-shrink: 0;
+  margin: 1px 0;
+}
+
+/* Giá tiền ô đất: Font Be Vietnam Pro, container query clamp(10.5px, 18cqw, 12.5px), giá đậm */
+.tile-price {
+  font-family: var(--font-ui);
+  font-size: clamp(10.5px, 18cqw, 12.5px);
+  font-weight: 800;
+  color: #1f6f8b;
+  width: auto;
+  max-width: 100%;
+  text-align: center;
+  line-height: 1.1;
+  white-space: nowrap;
+  padding-bottom: 2px;
+}
+
+.tile-special .tile-price {
+  color: #555555;
+  font-size: clamp(10.5px, 18cqw, 12.5px);
+  font-weight: 800;
+}
+
+/* Tiền thuê thực tế khi đã có chủ sở hữu */
+.tile-price.tile-rent-active,
+.edge-left .tile-price.tile-rent-active,
+.edge-right .tile-price.tile-rent-active {
+  color: #c0392b !important;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: clamp(10px, 14cqw, 11px);
+  max-width: 100%;
+  padding: 0 1px;
+}
+
+.tile-price.tile-rent-active .rent-label {
+  font-size: clamp(8.5px, 11cqw, 9.5px);
+  font-weight: 700;
+  opacity: 0.85;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #c0392b !important;
+}
+
+.tile-price.tile-rent-active .rent-val {
+  font-size: clamp(10px, 14cqw, 11px);
+  font-weight: 900;
+  line-height: 1;
+  color: #c0392b !important;
+}
+
+/* Tiền thuê Khách Sạn (cấp tối đa cực khủng: Đỏ sẫm báo động) */
+.tile-price.tile-rent-hotel,
+.edge-left .tile-price.tile-rent-hotel,
+.edge-right .tile-price.tile-rent-hotel {
+  color: #922b21 !important;
+  font-weight: 900;
+  text-shadow: 0 0 1px rgba(146, 43, 33, 0.45);
+}
+
+.tile-price.tile-rent-hotel .rent-label {
+  color: #922b21 !important;
+  font-weight: 800;
+}
+
+.tile-price.tile-rent-hotel .rent-val {
+  color: #78281f !important;
+  font-weight: 900;
+  font-size: clamp(10.5px, 15cqw, 11.5px);
+}
+
+/* ================= BỐ CỤC ĐẶC BIỆT 2 CẠNH TRÁI & PHẢI: XẾP NGANG, KHÔNG XOAY CHỮ ================= */
+.edge-left .tile-content,
+.edge-right .tile-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 2px 2px;
+  gap: 1px;
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
+.edge-left .tile-name,
+.edge-right .tile-name {
+  font-family: var(--font-ui);
+  font-size: clamp(9px, 12cqw, 10px);
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.05;
+  text-align: center;
+  width: 100%;
+  white-space: normal;
+  word-break: break-word;
+  overflow: visible;
+  padding: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+.edge-left .tile-price,
+.edge-right .tile-price {
+  font-family: var(--font-ui);
+  font-size: clamp(9.5px, 12cqw, 11px);
+  font-weight: 800;
+  color: #1f6f8b;
+  line-height: 1.1;
+  text-align: center;
+  width: auto;
+  max-width: 100%;
+  white-space: nowrap;
+  padding: 0;
+}
+
+.edge-bottom .tile-content,
+.edge-top .tile-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 1px 4px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
+/* Ô đặc biệt ở 2 cạnh bên: icon SVG vừa vặn, không đè lên chữ */
+.edge-left.tile-special .tile-content,
+.edge-right.tile-special .tile-content {
+  justify-content: space-evenly;
+  padding: 2px 2px;
+  gap: 1px;
+}
+
+.edge-left.tile-special .tile-icon-box,
+.edge-right.tile-special .tile-icon-box {
+  height: 20px;
+  min-height: 20px;
+}
+
+.edge-left.tile-special .tile-icon-box svg,
+.edge-right.tile-special .tile-icon-box svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ================= ĐỊNH DẠNG Ô CƠ HỘI & KHÍ VẬN THEO MẪU ================= */
+.tile-chance .tile-name,
+.tile-chance .tile-card-action {
+  color: #c0392b;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+}
+
+.tile-chest .tile-name,
+.tile-chest .tile-card-action {
+  color: #0284c7;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+}
+
+.tile-card-action {
+  font-family: var(--font-ui);
+  font-size: clamp(8px, 10cqw, 9.5px);
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  margin-top: auto;
+  padding-bottom: 2px;
+}
+
+.chance-mark-symbol {
+  font-size: clamp(22px, 26cqw, 26px);
+  font-weight: 900;
+  line-height: 1;
+  background: linear-gradient(180deg, #ff4b72 0%, #d81b60 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+  filter: drop-shadow(0 1px 1px rgba(216, 27, 96, 0.25));
+}
+
+.chest-mark-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tile-chance .tile-content,
+.tile-chest .tile-content {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 4px 2px 3px !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.tile-chance .tile-icon-box,
+.tile-chest .tile-icon-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1px 0;
+}
+
+/* ================= QUÂN CỜ NGƯỜI CHƠI (VÙNG GIỮA Ô, GIỮA TÊN VÀ GIÁ, LƯỚI 2x2, KHÔNG CHE TÊN) ================= */
+.tile-tokens-grid {
+  position: absolute;
+  display: grid;
+  grid-template-columns: repeat(2, 18px);
+  grid-auto-rows: 18px;
+  gap: 2px;
+  z-index: 20;
+  pointer-events: none;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  height: max-content;
+}
+
+/* Vị trí vùng giữa ô (giữa tên và giá) cho từng cạnh */
+.edge-bottom .tile-tokens-grid {
+  top: 58%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.edge-top .tile-tokens-grid {
+  top: 48%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.edge-left .tile-tokens-grid {
+  top: 58%;
+  left: 45%;
+  transform: translate(-50%, -50%);
+}
+.edge-right .tile-tokens-grid {
+  top: 58%;
+  left: 55%;
+  transform: translate(-50%, -50%);
+}
+
+/* 4 ô góc */
+#tile-0 .tile-tokens-grid {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+#tile-10 .tile-tokens-grid {
+  bottom: 6px;
+  right: 6px;
+  transform: none;
+}
+#tile-20 .tile-tokens-grid {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+#tile-30 .tile-tokens-grid {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.player-token {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.tile-tokens-grid:has(.player-token:only-child) {
+  grid-template-columns: 20px;
+  grid-auto-rows: 20px;
+}
+.tile-tokens-grid .player-token:only-child {
+  width: 20px;
+  height: 20px;
+}
+
+.token-svg {
+  width: 80%;
+  height: 80%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.token-svg svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+.token-badge {
+  display: none;
+}
+
+/* ================= Ô 10: THĂM TÙ & BUỒNG GIAM ĐANG NGỒI TÙ ================= */
+.tile-corner-jail {
+  padding: 0 !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.jail-corner-layout {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.jail-inmate-box {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 60%;
+  height: 60%;
+  background: #efebe4;
+  border: 1.5px solid #78281f;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  padding: 2px 3px;
+  box-sizing: border-box;
+  box-shadow: inset 0 0 4px rgba(120, 40, 31, 0.2);
+  z-index: 5;
+}
+
+.jail-inmate-header {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-retro);
+  font-size: 0.58rem;
+  font-weight: 800;
+  color: #78281f;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.jail-inmate-tokens {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 20px);
+  grid-auto-rows: 20px;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  padding-top: 2px;
+}
+
+.jail-inmate-tokens .player-token {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #ffffff !important;
+}
+
+.jail-visiting-strip {
+  position: absolute;
+  bottom: 4px;
+  left: 6px;
+  z-index: 3;
+}
+
+.jail-visiting-strip .corner-title {
+  font-family: var(--font-retro);
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: var(--color-teal);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* ================= DẢI MÀU CHỦ SỞ HỮU DÀY 7PX Ở CẠNH NGOÀI CỦA Ô & CHẤM MÀU CẠNH GIÁ ================= */
+.tile-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  flex-shrink: 0;
+  margin-top: auto;
+  z-index: 4;
+}
+
+.tile-owner-dot {
+  display: none !important;
+}
+
+/* ================= HUY HIỆU QUÂN CỜ CHỦ SỞ HỮU TRONG DẢI MÀU (Nhỏ gọn 10px, viền 1px nằm gọn trong dải màu) ================= */
+.tile-owner-token-badge {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+  padding: 0.5px;
+  box-sizing: border-box;
+}
+
+.tile-owner-token-badge svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Cạnh đáy & Cạnh trên: Dải màu nằm ngang -> Badge ở góc phải dải màu */
+.edge-bottom .tile-color-bar .tile-owner-token-badge,
+.edge-top .tile-color-bar .tile-owner-token-badge {
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
+}
+
+/* Cạnh trái & Cạnh phải: Dải màu nằm dọc -> Badge ở góc dưới dải màu */
+.edge-left .tile-color-bar .tile-owner-token-badge,
+.edge-right .tile-color-bar .tile-owner-token-badge {
+  left: 50%;
+  bottom: 3px;
+  transform: translateX(-50%);
+}
+
+/* Với ô đặc biệt không có dải màu (ga tàu, tiện ích) */
+.tile-special .tile-owner-token-badge {
+  bottom: 3px;
+  right: 3px;
+  top: auto;
+  left: auto;
+}
+
+/* ================= HIỆU ỨNG HOVER PANEL NGƯỜI CHƠI ================= */
+.board-tile.tile-dimmed {
+  opacity: 0.55 !important;
+  transition:
+    opacity 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.board-tile.tile-highlight-owner {
+  opacity: 1 !important;
+  z-index: 15 !important;
+  box-shadow:
+    0 0 12px 3px var(--glow-color, #7b4bd8),
+    inset 0 0 0 1.5px var(--glow-color, #7b4bd8) !important;
+  transform: scale(1.03);
+  transition:
+    opacity 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+/* Ghim giá cho Tiện ích (Điện Lực, Cấp Nước) & Ga tàu, icon co gọn không che chữ/giá */
+.tile-utility-railroad .tile-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  padding: 2px 1px 1px;
+  box-sizing: border-box;
+}
+
+.tile-utility-railroad .tile-name {
+  line-height: 1.05;
+  margin-bottom: 1px;
+}
+
+.tile-utility-railroad .tile-icon-box,
+.edge-left.tile-utility-railroad .tile-icon-box,
+.edge-right.tile-utility-railroad .tile-icon-box,
+.edge-top.tile-utility-railroad .tile-icon-box {
+  flex: 0 0 auto;
+  min-height: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin: 0;
+}
+
+.tile-utility-railroad .tile-icon-box svg {
+  max-height: 14px;
+  max-width: 14px;
+  width: auto;
+  height: auto;
+}
+
+.tile-utility-railroad .tile-price-row {
+  margin-top: auto;
+  flex-shrink: 0;
+  padding-bottom: 1px;
+}
+
+/* ================= TRUNG TÂM BÀN CỜ PHONG CÁCH BẢN GIẤY TRUYỀN THỐNG ================= */
+.board-center {
+  grid-area: 2 / 2 / 11 / 11;
+  position: relative;
+  background-color: #faf7f0;
+  border: 1.5px solid #8a7358;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Lớp Tranh Nghệ Thuật Sài Gòn Hoài Cổ */
+.center-retro-art-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.retro-artwork-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.96;
+}
+
+.center-retro-layout {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Tiêu đề CỜ TỶ PHÚ — SÀI GÒN — phong cách vintage nổi bật trên tranh */
+.center-title-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  pointer-events: none;
+  transform: translateY(-28%);
+  background: rgba(244, 235, 221, 0.82);
+  padding: 4px 20px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(46, 36, 27, 0.25);
+  box-shadow: 0 4px 12px rgba(46, 36, 27, 0.12);
+  backdrop-filter: blur(3px);
+}
+
+.retro-ribbon-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.retro-main-title {
+  font-family: var(--font-retro);
+  font-size: clamp(1.4rem, 2.9vw, 2.2rem);
+  font-weight: 900;
+  color: #176b78;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  line-height: 1.05;
+  text-shadow:
+    2px 2px 0 #ffffff,
+    -2px -2px 0 #ffffff,
+    2px -2px 0 #ffffff,
+    -2px 2px 0 #ffffff,
+    0 4px 10px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+}
+
+.retro-sub-ribbon {
+  font-family: var(--font-retro);
+  font-size: clamp(0.9rem, 1.8vw, 1.3rem);
+  font-weight: 800;
+  color: #176b78;
+  letter-spacing: 3px;
+  line-height: 1;
+  text-shadow:
+    1.5px 1.5px 0 #ffffff,
+    -1.5px -1.5px 0 #ffffff,
+    1.5px -1.5px 0 #ffffff,
+    -1.5px 1.5px 0 #ffffff,
+    0 2px 6px rgba(0, 0, 0, 0.15);
+  margin-top: 1px;
+}
+
+/* Hai khay bài CƠ HỘI & KHÍ VẬN ở trung tâm bàn cờ - Chuẩn style ô viền */
+.deck-slot {
+  position: absolute;
+  width: clamp(52px, 7.2vw, 64px);
+  height: clamp(74px, 10.2vw, 90px);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(46, 36, 27, 0.28);
+  cursor: pointer;
+  transition:
+    transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1),
+    box-shadow 0.22s ease;
+  z-index: 5;
+  pointer-events: auto;
+  user-select: none;
+}
+
+.deck-slot:hover {
+  transform: scale(1.12) !important;
+  box-shadow: 0 10px 24px rgba(46, 36, 27, 0.42);
+}
+
+.deck-slot:active {
+  transform: scale(1.04) !important;
+}
+
+.deck-slot-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 3px 4px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+/* Khay Cơ Hội: Sát góc trên bên trái (Giống hệt ô Cơ Hội trên viền) */
+.deck-chance {
+  top: 6%;
+  left: 6%;
+  background: #fff8f5;
+  border: 1.6px solid #c0392b;
+  transform: rotate(-32deg);
+}
+
+.deck-chance .deck-title {
+  font-family: var(--font-retro), "Baloo 2", sans-serif;
+  font-size: clamp(9px, 1.25vw, 11px);
+  font-weight: 900;
+  color: #c0392b;
+  letter-spacing: 0.4px;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.deck-chance .deck-mark {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deck-chance-glyph {
+  font-family: var(--font-retro), "Baloo 2", sans-serif;
+  font-size: clamp(24px, 3.4vw, 30px) !important;
+  font-weight: 900;
+  color: #e63946;
+  line-height: 1 !important;
+  display: block;
+  text-shadow: 0 1px 2px rgba(230, 57, 70, 0.25);
+}
+
+.deck-chance .deck-bottom-label {
+  font-family: var(--font-retro), "Baloo 2", sans-serif;
+  font-size: clamp(7.5px, 1.05vw, 9px);
+  font-weight: 900;
+  color: #c0392b;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.deck-chance .deck-count-tag {
+  font-size: clamp(6.5px, 0.9vw, 7.5px);
+  font-weight: 800;
+  color: #ffffff;
+  background: #c0392b;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  letter-spacing: 0.2px;
+}
+
+/* Khay Khí Vận: Sát góc dưới bên phải (Giống hệt ô Khí Vận trên viền) */
+.deck-chest {
+  bottom: 6%;
+  right: 6%;
+  background: #f0f9ff;
+  border: 1.6px solid #0284c7;
+  transform: rotate(38deg);
+}
+
+.deck-chest .deck-title {
+  font-family: var(--font-retro), "Baloo 2", sans-serif;
+  font-size: clamp(9px, 1.25vw, 11px);
+  font-weight: 900;
+  color: #0284c7;
+  letter-spacing: 0.4px;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.deck-chest .deck-mark {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deck-chest .chest-mark-symbol svg {
+  width: clamp(24px, 3.2vw, 30px);
+  height: clamp(20px, 2.6vw, 24px);
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(62, 39, 35, 0.2));
+}
+
+.deck-chest .deck-bottom-label {
+  font-family: var(--font-retro), "Baloo 2", sans-serif;
+  font-size: clamp(7.5px, 1.05vw, 9px);
+  font-weight: 900;
+  color: #0284c7;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.deck-chest .deck-count-tag {
+  font-size: clamp(6.5px, 0.9vw, 7.5px);
+  font-weight: 800;
+  color: #ffffff;
+  background: #0284c7;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  letter-spacing: 0.2px;
+}
+
+/* ==========================================================================
+   DICE & CONTROLS 3D - Bảng Điều Khiển Xúc Xắc 3D & Animation Bước Nhảy
+   ========================================================================== */
+
+/* Viên xúc xắc 3D */
+.die {
+  width: 42px;
+  height: 42px;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.die.rolling {
+  animation: diceRollAnim 0.7s infinite linear;
+}
+
+@keyframes diceRollAnim {
+  0% {
+    transform: var(--die-scale, scale(1)) rotateX(0deg) rotateY(0deg)
+      rotateZ(0deg);
+  }
+  50% {
+    transform: var(--die-scale, scale(1)) rotateX(360deg) rotateY(180deg)
+      rotateZ(180deg);
+  }
+  100% {
+    transform: var(--die-scale, scale(1)) rotateX(720deg) rotateY(360deg)
+      rotateZ(360deg);
+  }
+}
+
+.die-face {
+  position: absolute;
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(145deg, #ffffff 0%, #fffef7 50%, #f5ecd9 100%);
+  border: 1.5px solid #a38258;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.95),
+    inset 0 -1.5px 3px rgba(163, 130, 88, 0.3),
+    0 2px 5px rgba(45, 30, 18, 0.28);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  padding: 4px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Chấm xí ngầu khắc chìm sơn bóng */
+.dot {
+  width: 7.5px;
+  height: 7.5px;
+  background: radial-gradient(circle at 35% 35%, #34495e 0%, #1e2b37 80%);
+  border-radius: 50%;
+  align-self: center;
+  justify-self: center;
+  box-shadow:
+    inset 0 1px 1.5px rgba(0, 0, 0, 0.6),
+    0 0.5px 1px rgba(255, 255, 255, 0.5);
+}
+
+.dot-red {
+  width: 12.5px;
+  height: 12.5px;
+  background: radial-gradient(
+    circle at 35% 35%,
+    #ff4d5a 0%,
+    #c0392b 70%,
+    #921f14 100%
+  );
+  box-shadow:
+    inset 0 1.5px 2px rgba(0, 0, 0, 0.5),
+    0 0.5px 1px rgba(255, 255, 255, 0.6);
+}
+
+.dot-center {
+  grid-column: 2;
+  grid-row: 2;
+}
+.dot-top-left {
+  grid-column: 1;
+  grid-row: 1;
+}
+.dot-top-right {
+  grid-column: 3;
+  grid-row: 1;
+}
+.dot-middle-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+.dot-middle-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+.dot-bottom-left {
+  grid-column: 1;
+  grid-row: 3;
+}
+.dot-bottom-right {
+  grid-column: 3;
+  grid-row: 3;
+}
+
+/* Các mặt trong không gian 3D */
+.face-1 {
+  transform: rotateY(0deg) translateZ(21px);
+}
+.face-2 {
+  transform: rotateY(90deg) translateZ(21px);
+}
+.face-3 {
+  transform: rotateY(180deg) translateZ(21px);
+}
+.face-4 {
+  transform: rotateY(-90deg) translateZ(21px);
+}
+.face-5 {
+  transform: rotateX(90deg) translateZ(21px);
+}
+.face-6 {
+  transform: rotateX(-90deg) translateZ(21px);
+}
+
+/* Vị trí dừng của các mặt */
+.die.show-1 {
+  transform: var(--die-scale, scale(1)) rotateX(0deg) rotateY(0deg);
+}
+.die.show-2 {
+  transform: var(--die-scale, scale(1)) rotateX(0deg) rotateY(-90deg);
+}
+.die.show-3 {
+  transform: var(--die-scale, scale(1)) rotateX(0deg) rotateY(-180deg);
+}
+.die.show-4 {
+  transform: var(--die-scale, scale(1)) rotateX(0deg) rotateY(90deg);
+}
+.die.show-5 {
+  transform: var(--die-scale, scale(1)) rotateX(-90deg) rotateY(0deg);
+}
+.die.show-6 {
+  transform: var(--die-scale, scale(1)) rotateX(90deg) rotateY(0deg);
+}
+
+/* ================= ANIMATION BƯỚC NHẢY (HOPPING BOUNCE) ================= */
+.token-hopping {
+  animation: tokenHopAnim 0.22s ease-in-out;
+}
+
+@keyframes tokenHopAnim {
+  0% {
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    transform: scale(1.25) translateY(-14px);
+    filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.4));
+  }
+  100% {
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ================= TOAST NOTIFICATION: NẰM GỌN TRÊN BẦU TRỜI TRANH RETRO ================= */
+.game-toast {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  background: linear-gradient(
+    135deg,
+    rgba(23, 107, 120, 0.95),
+    rgba(15, 76, 86, 0.98)
+  );
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-family: var(--font-retro);
+  font-weight: 800;
+  font-size: 0.88rem;
+  letter-spacing: 0.3px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  border: 1.5px solid #ffd875;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+  text-align: center;
+  max-width: 75%;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.game-toast.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* -------------------------------------------------------------
+ * BUILDINGS: NHÀ XANH & KHÁCH SẠN ĐỎ 3D MINIATURE
+ * ------------------------------------------------------------- */
+.tile-buildings-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  z-index: 8;
+  pointer-events: none;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.edge-left .tile-buildings-container,
+.edge-right .tile-buildings-container {
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Nhà Xanh 3D: Có mái ngói dốc, xoay theo hướng dải ô */
+.house-cube {
+  width: 9px;
+  height: 8px;
+  background: linear-gradient(180deg, #2ecc71 0%, #27ae60 60%, #1e8449 100%);
+  border: 1px solid #145a32;
+  border-radius: 1px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  display: inline-block;
+  position: relative;
+  margin: 0;
+  flex-shrink: 0;
+  transform: rotate(var(--building-rotate, 0deg));
+  transform-origin: center center;
+  animation: popBuilding 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.house-cube::before {
+  content: "";
+  position: absolute;
+  top: -2.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4.5px solid transparent;
+  border-right: 4.5px solid transparent;
+  border-bottom: 2.5px solid #145a32;
+}
+
+/* Khách Sạn Đỏ 3D: Kích thước tinh chỉnh, xoay theo hướng dải ô */
+.hotel-cube {
+  width: 18px;
+  height: 9.5px;
+  padding: 0 2px;
+  background: linear-gradient(180deg, #e74c3c 0%, #c0392b 60%, #922b21 100%);
+  border: 1px solid #641e16;
+  border-radius: 1.5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: 0;
+  box-sizing: border-box;
+  transform: rotate(var(--building-rotate, 0deg));
+  transform-origin: center center;
+  animation: popBuilding 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.hotel-cube::before {
+  content: "";
+  position: absolute;
+  top: -2.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 2.5px solid #641e16;
+}
+
+.hotel-label {
+  font-family: inherit;
+  font-size: 7.5px;
+  font-weight: 900;
+  color: #ffe066;
+  font-style: normal;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+@keyframes popBuilding {
+  0% {
+    transform: rotate(var(--building-rotate, 0deg)) scale(0);
+    opacity: 0;
+  }
+  70% {
+    transform: rotate(var(--building-rotate, 0deg)) scale(1.15);
+  }
+  100% {
+    transform: rotate(var(--building-rotate, 0deg)) scale(1);
+    opacity: 1;
+  }
+}

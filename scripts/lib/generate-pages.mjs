@@ -23,13 +23,14 @@ export function validateMeta(meta) {
 }
 
 function parseMetaFromTs(source) {
-  // Loại bỏ các dòng import/export type để tránh làm rối Regex
+  // Chuẩn hóa CRLF -> LF và loại bỏ các dòng import để tránh làm rối Regex
   const stripped = source
+    .replace(/\r\n?/g, '\n')
     .replace(/^import.*$/gm, '')
     .trim()
 
   // Tìm biến meta theo cấu trúc: const meta: PageMeta = { ... }
-  const metaMatch = stripped.match(/const\s+meta\s*(?::\s*[\w\s<>|]+)?\s*=\s*({[\s\S]*?})(?=;|\n|export)/)
+  const metaMatch = stripped.match(/const\s+meta\s*(?::\s*[\w\s<>|]+)?\s*=\s*({[\s\S]*?})(?=;|\s|\n|export|$)/)
   if (metaMatch) {
     try {
       // Dùng hàm Function để eval an toàn chuỗi JSON-like object
@@ -40,7 +41,7 @@ function parseMetaFromTs(source) {
   }
 
   // Dự phòng cho trường hợp export default trực tiếp
-  const defaultExportMatch = stripped.match(/export\s+default\s+({[\s\S]*?})(?=;|\n|$)/)
+  const defaultExportMatch = stripped.match(/export\s+default\s+({[\s\S]*?})(?=;|\s|\n|$)/)
   if (defaultExportMatch) {
     try {
       return new Function(`return ${defaultExportMatch[1]}`)()

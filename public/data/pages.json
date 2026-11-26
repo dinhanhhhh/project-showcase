@@ -11,15 +11,39 @@
     "slug": "color-game",
     "path": "/color-game",
     "name": "Color Game",
-    "description": "Tro choi doan mau sac don gian",
+    "description": "Thử thách thị giác nhận diện mã màu RGB & HEX với 3 cấp độ khó (4, 6, 9 ô), phân tích kênh màu và chuỗi Streak.",
     "category": "game",
     "author": "Vibe Team"
+  },
+  {
+    "slug": "co-tuong",
+    "path": "/co-tuong",
+    "name": "Cờ Tướng Master",
+    "description": "Game Cờ Tướng (Xiangqi) chuẩn luật quốc tế với AI Minimax Alpha-Beta 3 cấp độ, chơi 2 người tại chỗ và lưu ván tự động.",
+    "category": "game",
+    "author": "Truong Dinh Anh"
+  },
+  {
+    "slug": "saigon-tycoon",
+    "path": "/saigon-tycoon",
+    "name": "Cờ Tỷ Phú Sài Gòn",
+    "description": "Saigon Tycoon — 40 ô phố Sài Gòn hoài cổ, chuẩn luật quốc tế (đấu giá, thế chấp, giao dịch, xây nhà), Bot AI & Đài Radio Lo-Fi.",
+    "category": "game",
+    "author": "Truong Dinh Anh"
+  },
+  {
+    "slug": "hom-nay-an-gi",
+    "path": "/hom-nay-an-gi",
+    "name": "Hôm Nay Ăn Gì",
+    "description": "Quay ngẫu nhiên gợi ý món ăn Việt Nam, lọc theo nhóm món, lưu món yêu thích và tự thêm thực đơn cá nhân.",
+    "category": "tool",
+    "author": "Truong Dinh Anh"
   },
   {
     "slug": "mini-piano",
     "path": "/mini-piano",
     "name": "Mini Piano",
-    "description": "Choi piano tren trinh duyet",
+    "description": "Đàn Synthesizer Piano 13 phím (trắng & đen), hỗ trợ gõ phím máy tính, 4 âm sắc nhạc cụ và bản nhạc mẫu tự động.",
     "category": "creative",
     "author": "Vibe Team"
   },
@@ -46,5 +70,21 @@
     "description": "Game mô phỏng cuộc đời, nơi mỗi lựa chọn định hình tương lai của bạn.",
     "category": "game",
     "author": "Vibe Team"
+  },
+  {
+    "slug": "anime-farm",
+    "path": "/anime-farm",
+    "name": "Nông Trại Anime 2.5D",
+    "description": "Game mô phỏng nông trại Isometric 2.5D phong cách Anime: gieo hạt kéo thả, tưới nước tăng tốc, nhà kho & đơn hàng thị trấn.",
+    "category": "game",
+    "author": "Truong Dinh Anh"
+  },
+  {
+    "slug": "oop-flashcards",
+    "path": "/oop-flashcards",
+    "name": "OOP Flashcards",
+    "description": "Ôn tập 21 câu hỏi phỏng vấn OOP & SOLID với thẻ lật 3D, ví dụ code có highlight, phím tắt và lưu tiến trình học.",
+    "category": "education",
+    "author": "Truong Dinh Anh"
   }
 ]

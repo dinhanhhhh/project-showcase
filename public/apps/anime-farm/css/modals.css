@@ -1,0 +1,828 @@
+/* ================================================= */
+/* Modal Dialogs (Shop, Barn, Orders, LevelUp)       */
+/* ================================================= */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: modalFadeIn 0.2s ease;
+}
+
+@keyframes modalFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.modal-card {
+  background: #ffffff;
+  border-radius: 28px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  animation: modalScaleUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalScaleUp {
+  0% { transform: scale(0.92); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Modal Header */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-header-icon {
+  font-size: 1.6rem;
+}
+
+.modal-title-group h3 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.modal-close {
+  background: #e2e8f0;
+  color: #64748b;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.modal-close:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+/* Modal Body */
+.modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Modal Footer */
+.modal-footer {
+  padding: 14px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ------------------------------------------------- */
+/* Cửa hàng hạt giống (Shop Cards)                   */
+/* ------------------------------------------------- */
+.shop-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 18px;
+  transition: all 0.15s ease;
+}
+
+.shop-item-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.shop-item-card.locked {
+  background: #f8fafc;
+  opacity: 0.7;
+}
+
+.shop-item-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shop-item-icon {
+  font-size: 2.2rem;
+  background: #f1f5f9;
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+}
+
+.shop-item-meta h4 {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.shop-item-desc {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.shop-item-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.shop-item-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.gold-text {
+  color: #b45309;
+}
+
+.shop-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-buy {
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid #fde68a;
+  transition: all 0.15s ease;
+}
+
+.btn-buy:hover {
+  background: #fde68a;
+}
+
+.btn-buy-pack {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+
+.btn-buy-pack:hover {
+  background: #bfdbfe;
+}
+
+.lock-tag {
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 10px;
+}
+
+/* ------------------------------------------------- */
+/* Nhà kho (Barn Cards)                              */
+/* ------------------------------------------------- */
+.barn-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f5f3ff;
+  padding: 12px 18px;
+  border-radius: 16px;
+  border: 1px solid #ddd6fe;
+  font-size: 0.9rem;
+  color: #5b21b6;
+  font-weight: 700;
+}
+
+.barn-item-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #fff;
+  border: 2px solid #f1f5f9;
+  border-radius: 16px;
+}
+
+.barn-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.barn-item-icon {
+  font-size: 2rem;
+}
+
+.barn-item-left h4 {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.barn-qty {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.barn-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.barn-price {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.barn-btn-group {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-sell-single, .btn-sell-bulk {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #334155;
+  transition: all 0.15s ease;
+}
+
+.btn-sell-bulk {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.btn-sell-single:hover {
+  background: #e2e8f0;
+}
+
+.btn-sell-bulk:hover {
+  background: #bbf7d0;
+}
+
+.btn-action-primary {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 10px 18px;
+  border-radius: 14px;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+}
+
+.btn-action-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 10px 16px;
+  border-radius: 14px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #64748b;
+}
+
+.empty-state span {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 10px;
+}
+
+/* ------------------------------------------------- */
+/* Bảng Đơn Hàng (Order Board Cards)                 */
+/* ------------------------------------------------- */
+.order-card {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.order-card.ready {
+  border-color: #86efac;
+  background: #f0fdf4;
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.15);
+}
+
+.order-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.customer-avatar {
+  font-size: 2.2rem;
+  background: #f8fafc;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid #e2e8f0;
+}
+
+.customer-meta h4 {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.order-dialog {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.order-requirements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px dashed #cbd5e1;
+}
+
+.order-item-req {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 10px;
+}
+
+.order-item-req.enough {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.order-item-req.lacking {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.order-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+}
+
+.order-rewards {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.reward-gold {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #b45309;
+}
+
+.reward-exp {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #0284c7;
+}
+
+.order-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-discard-order {
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
+.btn-deliver-order {
+  background: #cbd5e1;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: 12px;
+}
+
+.btn-deliver-order.highlight-btn {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35);
+  animation: pulseButton 1.5s infinite alternate ease-in-out;
+}
+
+@keyframes pulseButton {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.04); }
+}
+
+/* ------------------------------------------------- */
+/* Modal Chúc Mừng Thăng Cấp (Level Up Modal)        */
+/* ------------------------------------------------- */
+.levelup-content {
+  text-align: center;
+  padding: 30px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.levelup-stars {
+  font-size: 3.5rem;
+  animation: starRotate 4s infinite linear;
+}
+
+@keyframes starRotate {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.15); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.levelup-title {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #0284c7;
+}
+
+.levelup-badge-large {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #fff;
+  font-size: 2.2rem;
+  font-weight: 900;
+  width: 75px;
+  height: 75px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+}
+
+.levelup-note-box {
+  background: #f0fdf4;
+  border: 2px dashed #86efac;
+  border-radius: 16px;
+  padding: 12px 18px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.btn-levelup-claim {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  padding: 12px 36px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35);
+  margin-top: 10px;
+}
+
+/* ================================================= */
+/* MODAL THÔNG TIN NÔNG TRẠI & CẤP ĐỘ               */
+/* ================================================= */
+.profile-modal-card {
+  max-width: 520px;
+}
+
+.profile-modal-body {
+  padding: 16px 20px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  max-height: 75vh;
+}
+
+/* 1. Hero Profile Card */
+.profile-hero-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef08a 100%);
+  padding: 14px 18px;
+  border-radius: 20px;
+  border: 1.5px solid #fde047;
+  box-shadow: 0 4px 12px rgba(234, 179, 8, 0.15);
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  border: 3px solid #f59e0b;
+  overflow: visible;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  background: #fff;
+}
+
+.profile-avatar-large {
+  width: 100%;
+  height: 100%;
+  border-radius: 17px;
+  object-fit: cover;
+}
+
+.profile-level-badge {
+  position: absolute;
+  bottom: -6px;
+  right: -8px;
+  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+  color: #fff;
+  font-weight: 900;
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+}
+
+.profile-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-farm-name {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #78350f;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge-verified {
+  background: #10b981;
+  color: #fff;
+  font-size: 0.65rem;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-farm-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #b45309;
+}
+
+.profile-tag-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.profile-pill-tag {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #854d0e;
+}
+
+/* 2. Khung Tiến trình EXP */
+.profile-exp-card {
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+.exp-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.exp-card-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #475569;
+  letter-spacing: 0.5px;
+}
+
+.exp-card-percent {
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: #d97706;
+}
+
+.profile-exp-bar-track {
+  width: 100%;
+  height: 14px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 10px;
+}
+
+.profile-exp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #facc15 0%, #f59e0b 100%);
+  border-radius: 10px;
+  transition: width 0.5s ease;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.exp-details-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exp-stat-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.exp-stat-item .stat-value {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.exp-stat-item .highlight-need {
+  color: #d97706;
+  font-weight: 800;
+}
+
+/* 3. Phần thưởng cấp tiếp theo */
+.profile-next-reward-card {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1.5px solid #86efac;
+  border-radius: 18px;
+  padding: 12px 16px;
+}
+
+.next-reward-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.next-level-tag {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #166534;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.reward-gold-tag {
+  background: #fef08a;
+  color: #854d0e;
+  font-weight: 900;
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #facc15;
+}
+
+.next-reward-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reward-bullet-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.84rem;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.profile-max-level-card {
+  background: #ecfdf5;
+  border: 1.5px dashed #10b981;
+  border-radius: 16px;
+  padding: 12px 16px;
+  text-align: center;
+  color: #065f46;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+/* 4. Thống kê 4 ô */
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.profile-stat-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stat-box-icon {
+  font-size: 1.5rem;
+}
+
+.stat-box-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-box-num {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #1e293b;
+}
+
+.stat-box-name {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* 5. Tip box */
+.profile-tip-box {
+  background: #eff6ff;
+  border: 1px dashed #93c5fd;
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #1e40af;
+  line-height: 1.4;
+}

@@ -42,4 +42,30 @@ describe('generate pages registry', () => {
     const written = JSON.parse(await readFile(outputPath, 'utf8'))
     expect(written).toEqual(pages)
   })
+
+  it('parses meta.ts files saved with Windows CRLF line endings', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'vibe-registry-crlf-'))
+    const viewsDir = path.join(root, 'src/views')
+    await mkdir(path.join(viewsDir, 'crlf-game'), { recursive: true })
+
+    const crlfMeta = [
+      "import type { PageMeta } from '@/types/page'",
+      '',
+      'const meta: PageMeta = {',
+      "  name: 'CRLF Game',",
+      "  description: 'Game saved with Windows CRLF',",
+      "  category: 'game',",
+      '}',
+      '',
+      'export default meta',
+    ].join('\r\n')
+
+    await writeFile(path.join(viewsDir, 'crlf-game', 'meta.ts'), crlfMeta, 'utf8')
+    await writeFile(path.join(viewsDir, 'crlf-game', 'index.vue'), '<template />\n', 'utf8')
+
+    const pages = await collectPagesRegistry(viewsDir)
+    expect(pages).toHaveLength(1)
+    expect(pages[0].slug).toBe('crlf-game')
+    expect(pages[0].name).toBe('CRLF Game')
+  })
 })

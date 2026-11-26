@@ -1,0 +1,529 @@
+﻿/* eslint-disable */
+import { GAME_CONSTANTS, formatVND } from "./constants.js";
+import { SAIGON_BOARD_DATA } from "./data/board-data.js";
+
+/**
+ * rules.js - Bộ quy tắc tính toán tiền thuê, bộ màu, xây nhà và tài chính
+ */
+
+export const GameRules = {
+  /**
+   * Kiểm tra người chơi có sở hữu trọn bộ màu đất không
+   */
+  hasFullColorSet(group, ownerId, propertiesState) {
+    if (!group || ownerId == null || !propertiesState) {
+      return false;
+    }
+    const groupTiles = SAIGON_BOARD_DATA.filter((t) => t.group === group);
+    if (groupTiles.length === 0) return false;
+
+    return groupTiles.every((t) => {
+      const prop = propertiesState[t.id];
+      return prop && prop.owner === ownerId;
+    });
+  },
+
+  /**
+   * Kiểm tra xem người chơi có được phép xây nhà/khách sạn trên ô này không
+   * @param {Object} tile - Dữ liệu ô đất
+   * @param {Object} player - Người chơi
+   * @param {Object} propertiesState - Trạng thái tất cả các ô đất
+   */
+  canBuildHouse(
+    tile,
+    player,
+    propertiesState,
+    bank = GAME_CONSTANTS.BANK_LIMITS,
+  ) {
+    if (!tile || tile.type !== "property") {
+      return {
+        canBuild: false,
+        reason: "Chỉ có đất mặt tiền đường phố mới được phép xây nhà.",
+      };
+    }
+
+    const prop = propertiesState[tile.id];
+    if (!prop || prop.owner !== player.id) {
+      return {
+        canBuild: false,
+        reason: "Bạn không phải chủ sở hữu ô đất này.",
+      };
+    }
+
+    if (prop.isMortgaged) {
+      return {
+        canBuild: false,
+        reason: "Ô đất đang bị thế chấp, không thể xây nhà.",
+      };
+    }
+
+    // 1. Phải gom đủ trọn bộ màu
+    if (!GameRules.hasFullColorSet(tile.group, player.id, propertiesState)) {
+      return {
+        canBuild: false,
+        reason: "Phải sở hữu trọn bộ các ô cùng nhóm màu mới được xây nhà.",
+      };
+    }
+
+    // 2. Kiểm tra ô đất trong cùng nhóm có ô nào đang thế chấp không
+    const groupTiles = SAIGON_BOARD_DATA.filter((t) => t.group === tile.group);
+    const anyMortgaged = groupTiles.some(
+      (t) => propertiesState[t.id]?.isMortgaged,
+    );
+    if (anyMortgaged) {
+      return {
+        canBuild: false,
+        reason:
+          "Có ô đất cùng nhóm màu đang bị thế chấp. Phải chuộc lại trước.",
+      };
+    }
+
+    // 3. Tối đa 5 cấp (4 nhà xanh + 1 khách sạn đỏ)
+    const currentHouses = prop.houses || 0;
+    if (currentHouses >= 5) {
+      return {
+        canBuild: false,
+        reason: "Đã xây tối đa Khách Sạn Đỏ trên ô đất này.",
+      };
+    }
+
+    // 3b. Kiểm tra kho vật phẩm ngân hàng (null = vô hạn; giải đấu: { houses: 32, hotels: 12 })
+    const isHotel = currentHouses === 4;
+    const stock = isHotel ? bank?.hotels : bank?.houses;
+    if (stock !== null && stock !== undefined && stock <= 0) {
+      return {
+        canBuild: false,
+        code: "NO_STOCK",
+        reason: "Kho ngân hàng đã hết nhà/khách sạn để xây.",
+      };
+    }
+
+    // 4. LUẬT XÂY ĐỀU TAY: Không được chênh quá 1 nhà so với các ô khác trong nhóm
+    const otherHouses = groupTiles
+      .filter((t) => t.id !== tile.id)
+      .map((t) => propertiesState[t.id]?.houses || 0);
+    const minOtherHouses = Math.min(...otherHouses);
+
+    if (currentHouses > minOtherHouses) {
+      return {
+        canBuild: false,
+        reason:
+          "Luật xây đều tay: Bạn phải nâng cấp các ô đất cùng màu khác trước.",
+      };
+    }
+
+    // 5. Kiểm tra tiền
+    if (player.money < tile.houseCost) {
+      return {
+        canBuild: false,
+        reason: `Không đủ tiền xây (${formatVND(tile.houseCost)}).`,
+      };
+    }
+
+    return {
+      canBuild: true,
+      isHotel,
+      cost: tile.houseCost,
+      nextLevel: currentHouses + 1,
+    };
+  },
+
+  /**
+   * Lấy trạng thái kinh tế và bậc thang Sudden Death theo vòng đấu hiện tại
+   * @param {number} round - Vòng đấu hiện tại (bắt đầu từ 1)
+   * @param {number} [maxRounds] - Số vòng tối đa của ván đấu
+   */
+  getPhase(round, maxRounds = GAME_CONSTANTS.MAX_ROUNDS) {
+    const r = Math.max(1, Number(round) || 1);
+    if (!maxRounds || maxRounds === Infinity) {
+      return {
+        round: r,
+        maxRounds: null,
+        salary: GAME_CONSTANTS.GO_REWARD,
+        rentMult: 1,
+        taxToBank: false,
+        phaseName: "Kinh điển",
+        nextRound: null,
+        roundsToNext: null,
+        isNearPhase: false,
+        isGameOver: false,
+      };
+    }
+    const steps = GAME_CONSTANTS.SUDDEN_DEATH;
+    // Bậc hiện tại là bậc có step.round <= r với round lớn nhất
+    const cur = [...steps].reverse().find((s) => r >= s.round) || {
+      round: 1,
+      salary: GAME_CONSTANTS.GO_REWARD,
+      rentMult: 1,
+      taxToBank: false,
+      name: "Khởi nghiệp",
+    };
+
+    const next = steps.find((s) => s.round > r) ?? null;
+    const isGameOver = r > maxRounds;
+
+    return {
+      round: r,
+      maxRounds,
+      salary: cur.salary !== undefined ? cur.salary : GAME_CONSTANTS.GO_REWARD,
+      rentMult: cur.rentMult || 1,
+      taxToBank: !!cur.taxToBank,
+      phaseName: cur.name,
+      nextRound: next?.round ?? null,
+      roundsToNext: next ? next.round - r : null,
+      isNearPhase: next ? next.round - r <= 3 : false,
+      isGameOver,
+    };
+  },
+
+  /**
+   * Tính toán tiền thuê đất chuẩn quốc tế (hỗ trợ hệ số lạm phát rentMult của Sudden Death)
+   */
+  calculateRent(tile, owner, propertiesState, diceTotal = 7, rentMult = 1, bonusOptions = {}) {
+    if (!tile || !owner) return 0;
+
+    const propState = propertiesState[tile.id];
+    if (!propState || propState.isMortgaged) return 0;
+
+    let baseRent = 0;
+
+    if (tile.type === "property") {
+      const houses = propState.houses || 0;
+
+      if (houses === 0) {
+        const ownsFullSet = GameRules.hasFullColorSet(
+          tile.group,
+          owner.id,
+          propertiesState,
+        );
+        baseRent = ownsFullSet ? tile.rent[0] * 2 : tile.rent[0];
+      } else {
+        baseRent = tile.rent[houses] || tile.rent[0];
+      }
+    } else if (tile.type === "railroad") {
+      const railroadTiles = SAIGON_BOARD_DATA.filter(
+        (t) => t.type === "railroad",
+      );
+      const ownedCount = railroadTiles.filter((t) => {
+        const p = propertiesState[t.id];
+        return p && p.owner === owner.id && !p.isMortgaged;
+      }).length;
+
+      if (ownedCount === 0) return 0;
+      const rentIndex = Math.min(ownedCount, 4) - 1;
+      baseRent = GAME_CONSTANTS.RAILROAD_RENTS[rentIndex] || 250_000;
+      if (bonusOptions.doubleRent) {
+        baseRent *= 2;
+      }
+    } else if (tile.type === "utility") {
+      const utilityTiles = SAIGON_BOARD_DATA.filter(
+        (t) => t.type === "utility",
+      );
+      const ownedCount = utilityTiles.filter((t) => {
+        const p = propertiesState[t.id];
+        return p && p.owner === owner.id && !p.isMortgaged;
+      }).length;
+
+      if (ownedCount === 0) return 0;
+      const multiplier = bonusOptions.utility10x
+        ? 10
+        : ownedCount >= 2
+          ? GAME_CONSTANTS.UTILITY_MULTIPLIERS[1]
+          : GAME_CONSTANTS.UTILITY_MULTIPLIERS[0];
+      // Tỷ lệ chuẩn: Hệ số x Xúc xắc x 10.000đ (Điện Lực / Cấp Nước)
+      baseRent = multiplier * diceTotal * 10_000;
+    }
+
+    const mult = Number(rentMult) > 0 ? Number(rentMult) : 1;
+    return Math.round(baseRent * mult);
+  },
+
+  /**
+   * Tính toán tổng tài sản ròng chuẩn:
+   * - Tiền mặt
+   * - Đất chưa thế chấp: 100% giá in
+   * - Đất đang thế chấp: Giá in - (Tiền vay + 10% phí chuộc)
+   * - Nhà/Khách sạn: 100% chi phí xây dựng đã đầu tư
+   */
+  calculateNetWorth(player, propertiesState) {
+    if (!player) return 0;
+    let total = player.money || 0;
+    SAIGON_BOARD_DATA.forEach((tile) => {
+      const p = propertiesState[tile.id];
+      if (p && p.owner === player.id) {
+        const price = tile.price || 0;
+        const loan = tile.mortgage || Math.round(price * 0.5);
+        if (p.isMortgaged) {
+          total += Math.max(0, price - Math.round(loan * 1.1));
+        } else {
+          total += price;
+        }
+
+        if (p.houses > 0 && tile.houseCost) {
+          total += p.houses * tile.houseCost;
+        }
+      }
+    });
+    return total;
+  },
+
+  /**
+   * So sánh thứ hạng 2 người chơi theo tài sản ròng (hoà điểm thì so tiền mặt)
+   */
+  comparePlayersNetWorth(a, b, propertiesState) {
+    if (a.isBankrupt && !b.isBankrupt) return 1;
+    if (!a.isBankrupt && b.isBankrupt) return -1;
+    const nwA = GameRules.calculateNetWorth(a, propertiesState);
+    const nwB = GameRules.calculateNetWorth(b, propertiesState);
+    if (nwB !== nwA) return nwB - nwA;
+    return (b.money || 0) - (a.money || 0);
+  },
+
+  /**
+   * Tính toán tối đa số tiền mặt người chơi có thể huy động ngay lập tức
+   * bằng cách bán toàn bộ nhà (50% giá xây) và thế chấp toàn bộ đất (50% giá đất)
+   */
+  calculateMaxLiquidation(player, propertiesState) {
+    if (!player) return 0;
+    let total = 0;
+    SAIGON_BOARD_DATA.forEach((tile) => {
+      const p = propertiesState[tile.id];
+      if (p && p.owner === player.id) {
+        // 1. Tiền thu được từ bán nhà (50% chi phí xây)
+        if (p.houses > 0 && tile.houseCost) {
+          total += p.houses * Math.round(tile.houseCost * 0.5);
+        }
+        // 2. Tiền thu được từ thế chấp ô đất (nếu ô đó chưa bị thế chấp)
+        if (!p.isMortgaged) {
+          total += tile.mortgage || Math.round((tile.price || 0) * 0.5);
+        }
+      }
+    });
+    return total;
+  },
+
+  /**
+   * Kiểm tra xem ô đất có thể thế chấp (cầm cố) được không
+   */
+  canMortgage(tile, player, propertiesState) {
+    if (!tile || !["property", "railroad", "utility"].includes(tile.type)) {
+      return {
+        canMortgage: false,
+        reason: "Chỉ có bất động sản mới được thế chấp.",
+      };
+    }
+    const prop = propertiesState[tile.id];
+    if (!prop || prop.owner !== player.id) {
+      return {
+        canMortgage: false,
+        reason: "Bạn không phải chủ sở hữu ô đất này.",
+      };
+    }
+    if (prop.isMortgaged) {
+      return {
+        canMortgage: false,
+        reason: "Ô đất này đã đang bị thế chấp rồi.",
+      };
+    }
+    // Luật: Không được thế chấp đất khi trong cùng nhóm màu còn nhà/khách sạn
+    if (tile.type === "property" && tile.group) {
+      const groupTiles = SAIGON_BOARD_DATA.filter(
+        (t) => t.group === tile.group,
+      );
+      const anyHouses = groupTiles.some(
+        (t) => (propertiesState[t.id]?.houses || 0) > 0,
+      );
+      if (anyHouses) {
+        return {
+          canMortgage: false,
+          reason:
+            "Phải bán toàn bộ nhà trong cùng nhóm màu trước khi thế chấp.",
+        };
+      }
+    }
+    const mortgageValue = tile.mortgage || Math.round((tile.price || 0) * 0.5);
+    return {
+      canMortgage: true,
+      mortgageValue,
+    };
+  },
+
+  /**
+   * Kiểm tra xem ô đất có thể chuộc lại (unmortgage) không
+   */
+  canUnmortgage(tile, player, propertiesState) {
+    if (!tile || !["property", "railroad", "utility"].includes(tile.type)) {
+      return { canUnmortgage: false, reason: "Bất động sản không hợp lệ." };
+    }
+    const prop = propertiesState[tile.id];
+    if (!prop || prop.owner !== player.id) {
+      return {
+        canUnmortgage: false,
+        reason: "Bạn không phải chủ sở hữu ô đất này.",
+      };
+    }
+    if (!prop.isMortgaged) {
+      return {
+        canUnmortgage: false,
+        reason: "Ô đất này không trong trạng thái thế chấp.",
+      };
+    }
+    const mortgageVal = tile.mortgage || Math.round((tile.price || 0) * 0.5);
+    const unmortgageCost = Math.round(mortgageVal * 1.1); // Phí gốc + 10% lãi
+    if (player.money < unmortgageCost) {
+      return {
+        canUnmortgage: false,
+        reason: `Không đủ tiền chuộc sổ đỏ (Cần ${formatVND(unmortgageCost)}, bao gồm 10% lãi).`,
+        unmortgageCost,
+      };
+    }
+    return {
+      canUnmortgage: true,
+      unmortgageCost,
+    };
+  },
+
+  /**
+   * Kiểm tra xem có thể bán bớt nhà trên ô đất không
+   */
+  canSellHouse(tile, player, propertiesState) {
+    if (!tile || tile.type !== "property") {
+      return {
+        canSell: false,
+        reason: "Chỉ có nhà trên đường phố mới có thể bán.",
+      };
+    }
+    const prop = propertiesState[tile.id];
+    if (!prop || prop.owner !== player.id) {
+      return { canSell: false, reason: "Bạn không phải chủ sở hữu ô đất này." };
+    }
+    const currentHouses = prop.houses || 0;
+    if (currentHouses <= 0) {
+      return { canSell: false, reason: "Ô đất này chưa có nhà nào để bán." };
+    }
+    // Luật bán đều tay: Không được bán ô có ít nhà hơn các ô khác trong nhóm
+    const groupTiles = SAIGON_BOARD_DATA.filter((t) => t.group === tile.group);
+    const otherHouses = groupTiles
+      .filter((t) => t.id !== tile.id)
+      .map((t) => propertiesState[t.id]?.houses || 0);
+    const maxOtherHouses = Math.max(...otherHouses);
+
+    if (currentHouses < maxOtherHouses) {
+      return {
+        canSell: false,
+        reason: "Luật bán đều tay: Phải bán ở ô có nhiều nhà hơn trước.",
+      };
+    }
+    const refund = Math.round((tile.houseCost || 0) * 0.5);
+    return {
+      canSell: true,
+      refund,
+      nextHouses: currentHouses - 1,
+    };
+  },
+
+  /**
+   * Kiểm tra ô đất có thể đem ra giao dịch (Trade) không
+   * (Nghiêm cấm giao dịch đất khi trong nhóm màu còn nhà)
+   */
+  canTradeProperty(tile, propertiesState, ownerId = null) {
+    if (!tile) return { canTrade: false, reason: "Ô đất không hợp lệ." };
+    const prop = propertiesState[tile.id];
+    if (!prop || prop.owner == null)
+      return { canTrade: false, reason: "Chưa có chủ sở hữu." };
+    if (ownerId != null && prop.owner !== ownerId) {
+      return { canTrade: false, reason: "Người chơi không sở hữu ô đất này." };
+    }
+
+    if (tile.type === "property" && tile.group) {
+      const groupTiles = SAIGON_BOARD_DATA.filter(
+        (t) => t.group === tile.group,
+      );
+      const anyHouses = groupTiles.some(
+        (t) => (propertiesState[t.id]?.houses || 0) > 0,
+      );
+      if (anyHouses) {
+        return {
+          canTrade: false,
+          reason: "Phải bán hết nhà trên toàn bộ nhóm màu trước khi giao dịch.",
+        };
+      }
+    }
+    return { canTrade: true };
+  },
+
+  /**
+   * Lập kế hoạch thanh lý tài sản tối ưu 3 giai đoạn để trả khoản nợ amountOwed
+   * Thứ tự chiến lược chuẩn:
+   * 1. Thế chấp các ô đất lẻ / tiện ích / bến xe trước (không thuộc bộ màu chủ lực).
+   * 2. Bán nhà/khách sạn theo luật bán đều tay (bộ màu rẻ trước).
+   * 3. Cuối cùng mới thế chấp đến các ô đất thuộc bộ màu chủ lực.
+   * @param {Object} player - Người chơi cần thanh lý
+   * @param {number} amountOwed - Tổng số tiền nợ cần thanh toán
+   * @param {Object} propertiesState - Trạng thái các ô đất
+   * @returns {Object} { sells: Array<number>, mortgages: Array<number>, cash: number, enough: boolean }
+   */
+  getLiquidationPlan(player, amountOwed, propertiesState) {
+    if (!player) return { sells: [], mortgages: [], cash: 0, enough: false };
+
+    // Sao chép trạng thái để mô phỏng
+    const props = {};
+    Object.keys(propertiesState).forEach((id) => {
+      props[id] = { ...propertiesState[id] };
+    });
+
+    const plan = {
+      sells: [], // Danh sách tileId cần bán 1 cấp nhà
+      mortgages: [], // Danh sách tileId cần thế chấp
+      cash: player.money || 0,
+    };
+
+    const mine = () =>
+      SAIGON_BOARD_DATA.filter((t) => props[t.id]?.owner === player.id);
+    const done = () => plan.cash >= amountOwed;
+    const byPrice = (a, b) => (a.t.price || 0) - (b.t.price || 0);
+    const isCore = (t) =>
+      t.type === "property" &&
+      GameRules.hasFullColorSet(t.group, player.id, props);
+
+    const mortgageWhere = (pick) => {
+      const options = mine()
+        .filter(pick)
+        .map((t) => ({ t, c: GameRules.canMortgage(t, player, props) }))
+        .filter((o) => o.c.canMortgage)
+        .sort(byPrice);
+
+      for (const { t, c } of options) {
+        if (done()) return;
+        props[t.id].isMortgaged = true;
+        plan.mortgages.push(t.id);
+        plan.cash += c.mortgageValue;
+      }
+    };
+
+    // 1. Ô lẻ, nhà ga, tiện ích (không thuộc bộ màu chủ lực)
+    mortgageWhere((t) => !isCore(t));
+
+    // 2. Bán nhà từng bước (bộ màu rẻ hơn trước theo luật bán đều tay)
+    let loopGuard = 0;
+    while (!done() && loopGuard < 50) {
+      loopGuard++;
+      const options = mine()
+        .map((t) => ({ t, c: GameRules.canSellHouse(t, player, props) }))
+        .filter((o) => o.c.canSell)
+        .sort(byPrice);
+      if (!options.length) break;
+
+      const { t, c } = options[0];
+      props[t.id].houses -= 1;
+      plan.sells.push(t.id);
+      plan.cash += c.refund;
+    }
+
+    // 3. Cuối cùng mới thế chấp đến các ô thuộc bộ màu chủ lực
+    mortgageWhere(isCore);
+
+    return { ...plan, enough: done() };
+  },
+};
+

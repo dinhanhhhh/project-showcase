@@ -1,0 +1,636 @@
+/* ================================================= */
+/* PHONG CÁCH CÁNH ĐỒNG ISOMETRIC 2.5D CHUẨN ẢNH MẪU */
+/* TỐI ƯU CỰC NHẠY: TỌA ĐỘ ĐẲNG CỰ 2:1 KHÍT CẠNH 100%*/
+/* ================================================= */
+
+.farm-viewport {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  padding: 10px;
+  padding-bottom: 70px;
+  width: 100%;
+}
+
+.farm-island-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 1. NỀN ĐỒNG: HOÀN TOÀN TRONG SUỐT ĐỂ LỘ NỀN ĐẢO CỎ TỰ NHIÊN CHUẨN ẢNH 1 */
+.farm-lawn-plateau {
+  position: relative;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scale(1.15) translate(110px, 70px);
+  transform-origin: center center;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* Ẩn các trang trí hoa và rào gỗ thừa đè lên tranh nền đảo anime */
+.lawn-decorations,
+.fence-garland,
+.frog-mascot-canal {
+  display: none !important;
+}
+
+/* LƯỚI ĐẤT ISOMETRIC 2.5D CHUẨN: 4 Cột x 3 Hàng TỌA ĐỘ TUYỆT ĐỐI */
+.farm-grid {
+  position: relative;
+  width: 406px;
+  height: 204px;
+  z-index: 2;
+}
+
+@media (max-width: 768px) {
+  .farm-lawn-plateau {
+    transform: scale(1.0) translate(20px, 0px);
+  }
+}
+
+@media (max-width: 480px) {
+  .farm-lawn-plateau {
+    transform: scale(0.88) translate(0px, 0px);
+  }
+}
+
+/* TỪNG Ô ĐẤT ISOMETRIC: KHÍT CẠNH 100%, RÃNH CỎ TỰ NHIÊN 4-5PX CHUẨN ẢNH 1 */
+.farm-plot {
+  position: absolute;
+  width: 116px;
+  height: 58px;
+  cursor: pointer;
+  touch-action: none;
+  pointer-events: auto !important;
+  transition: transform 0.1s ease;
+}
+
+.farm-plot:active {
+  transform: scale(0.97);
+}
+
+.plot-tile-wrapper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.plot-diamond-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.farm-plot:hover .plot-diamond-svg {
+  filter: brightness(1.08);
+  transform: translateY(-1.5px);
+}
+
+/* ========================================================= */
+/* 2. LUỐNG ĐẤT NỔI 2.5D (RAISED BED) BO TRÒN 4 GÓC CHUẨN ẢNH 1 */
+/* ========================================================= */
+
+/* BỜ LUỐNG NỔI (RIDGE) - Màu nâu đất xới, bo góc tròn, bóng đổ 3D xuống cỏ */
+.plot-ridge {
+  fill: url(#soilRidgeTilled);
+  stroke: url(#soilRidgeTilled);
+  stroke-linejoin: round;
+  stroke-width: 6;
+  filter: drop-shadow(0 3.5px 3.5px rgba(35, 18, 6, 0.35));
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+/* LÒNG LUỐNG ĐẤT TRŨNG (TROUGH) - Thụt sâu vào 6px, lòng chảo đất sẫm mịn */
+.plot-trough {
+  fill: url(#soilTroughTilled);
+  stroke: #542c0f;
+  stroke-linejoin: round;
+  stroke-width: 3.5;
+  transition: fill 0.2s ease, stroke 0.2s ease;
+}
+
+/* Đường rãnh chìm viền lòng luống */
+.plot-trough-groove {
+  stroke: rgba(35, 15, 4, 0.35);
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+/* KHI ĐƯỢC TƯỚI NƯỚC (WATERED / GROWING / MATURE) - Đất ẩm mượt sẫm màu */
+.farm-plot.is-watered .plot-ridge,
+.farm-plot.status-planted_watered .plot-ridge,
+.farm-plot.status-mature .plot-ridge {
+  fill: url(#soilRidgeWatered);
+  stroke: url(#soilRidgeWatered);
+  filter: drop-shadow(0 3.5px 3.5px rgba(20, 10, 3, 0.45));
+}
+
+.farm-plot.is-watered .plot-trough,
+.farm-plot.status-planted_watered .plot-trough,
+.farm-plot.status-mature .plot-trough {
+  fill: url(#soilTroughWatered);
+  stroke: #2c1203;
+}
+
+.farm-plot.is-watered .plot-trough-groove,
+.farm-plot.status-planted_watered .plot-trough-groove,
+.farm-plot.status-mature .plot-trough-groove {
+  stroke: rgba(15, 6, 2, 0.45);
+}
+
+/* ========================================================= */
+/* 3. Ô CỎ CHƯA MỞ KHÓA (LOCKED) - GÒ CỎ XANH NON BO GÓC CHUẨN ẢNH 1 */
+/* ========================================================= */
+.farm-plot.status-locked .plot-ridge {
+  fill: url(#lockedRidgeGrass);
+  stroke: #7fbe19;
+  stroke-linejoin: round;
+  stroke-width: 6;
+  filter: drop-shadow(0 3px 3.5px rgba(35, 65, 12, 0.25));
+}
+
+.farm-plot.status-locked .plot-trough {
+  fill: url(#lockedTroughGrass);
+  stroke: #8ece22;
+  stroke-linejoin: round;
+  stroke-width: 3.5;
+}
+
+.farm-plot.status-locked .plot-trough-groove {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+/* Ô CỎ HOANG (RAW) */
+.farm-plot.status-raw .plot-ridge {
+  fill: url(#lockedRidgeGrass);
+  stroke: #77b515;
+  stroke-linejoin: round;
+  stroke-width: 6;
+  filter: drop-shadow(0 3px 3.5px rgba(35, 65, 12, 0.25));
+}
+
+.farm-plot.status-raw .plot-trough {
+  fill: url(#lockedTroughGrass);
+  stroke: #86c41e;
+  stroke-linejoin: round;
+  stroke-width: 3.5;
+}
+
+.farm-plot.status-raw .plot-trough-groove {
+  stroke: rgba(255, 255, 255, 0.22);
+}
+
+/* BIỂN CẮM TRÊN Ô CHƯA MỞ KHÓA (CHUẨN ẢNH 1) */
+.plot-lock-sign {
+  position: absolute;
+  left: 50%;
+  bottom: 0px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, #fff3e0 0%, #fed7aa 100%);
+  border: 1.5px solid #d97706;
+  border-radius: 12px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.22);
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #92400e;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  animation: signFloat 2.5s infinite ease-in-out;
+}
+
+.plot-lock-sign::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 3.5px;
+  height: 6px;
+  background: #b45309;
+  border-radius: 1px;
+}
+
+@keyframes signFloat {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-2px); }
+}
+
+/* CÂY TRỒNG ĐỨNG THẲNG TỰ NHIÊN TẠI TÂM HÌNH THOI (58px, 29px) */
+.plot-billboard-container {
+  position: absolute;
+  left: 50%;
+  bottom: 26px; /* Tâm hình thoi chuẩn */
+  width: 0;
+  height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  pointer-events: none !important;
+}
+
+.plot-content {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none !important;
+}
+
+.plant-billboard {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  transform: translate(-50%, 0);
+  pointer-events: none !important;
+}
+
+/* 4. Vệt bóng mờ ngay dưới gốc cây/mầm non để bám chặt vào đất */
+.plant-billboard::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 42px;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 50%;
+  filter: blur(3px);
+  transform: translateX(-50%);
+  pointer-events: none !important;
+  z-index: 0;
+}
+
+.plot-wild-grass::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 32px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 50%;
+  filter: blur(2.5px);
+  transform: translateX(-50%);
+  pointer-events: none !important;
+}
+
+/* KÍCH THƯỚC CÂY TRỒNG VỪA VẶN, NẰM GỌN TRONG Ô ĐẤT */
+.plant-svg {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  overflow: visible;
+  display: block;
+}
+
+.plant-eggplant,
+.plant-cucumber,
+.plant-pepper {
+  width: 68px !important;
+  height: 92px !important;
+}
+
+.stage-growing {
+  width: 58px !important;
+  height: 74px !important;
+}
+
+.stage-sprout {
+  width: 44px !important;
+  height: 52px !important;
+}
+
+/* Cây chín lắc lư nhẹ */
+/* CÂY ĐANG LỚN: HÀO QUANG VÀNG NHẠT NHẤP NHÁY NHẸ NHÀNG */
+.plant-growing-glow .plant-svg {
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.45));
+    opacity: 0.88;
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.95)) drop-shadow(0 0 20px rgba(253, 224, 71, 0.6));
+    opacity: 1;
+  }
+}
+
+/* CÂY CHÍN: LẮC LƯ NHẸ + PARTICLE ÁNH SÁNG & HOA BAY LƠ LỬNG */
+.crop-ready-bounce .plant-svg {
+  animation: plantDance 2s infinite ease-in-out;
+  transform-origin: 50% 92%;
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.7));
+}
+
+@keyframes plantDance {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-2.5deg) scale(1.03); }
+  75% { transform: rotate(2.5deg) scale(1.03); }
+}
+
+/* Particle ánh sáng & hoa lơ lửng cho cây chín */
+.plant-sparkles-cluster {
+  position: absolute;
+  inset: 0;
+  pointer-events: none !important;
+}
+
+.sparkle {
+  position: absolute;
+  font-size: 0.85rem;
+  line-height: 1;
+  opacity: 0;
+  animation: float-up 2.2s infinite ease-in-out;
+  pointer-events: none !important;
+  filter: drop-shadow(0 0 6px gold);
+}
+
+.sparkle.s1 { left: -10px; bottom: 30px; animation-delay: 0s; }
+.sparkle.s2 { right: -12px; bottom: 48px; animation-delay: 0.6s; font-size: 0.75rem; }
+.sparkle.s3 { left: 4px; bottom: 70px; animation-delay: 1.1s; }
+.sparkle.s4 { right: 8px; bottom: 20px; animation-delay: 1.7s; font-size: 0.7rem; }
+
+@keyframes float-up {
+  0% { transform: translateY(6px) scale(0.5); opacity: 0; }
+  25% { opacity: 0.95; }
+  75% { opacity: 0.9; }
+  100% { transform: translateY(-28px) scale(1.1); opacity: 0; }
+}
+
+/* Huy hiệu Thu Hoạch */
+.iso-harvest-badge {
+  position: absolute;
+  top: -22px;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.5);
+  border: 1.8px solid #ffffff;
+  white-space: nowrap;
+  animation: floatBubble 2s infinite ease-in-out;
+  z-index: 15;
+  pointer-events: none;
+}
+
+/* Cảnh báo Cần tưới - Bong bóng tròn màu cam phong cách Anime đặt ở góc trên-phải của cây */
+.iso-water-alert {
+  position: absolute;
+  top: -24px;
+  right: -30px; /* Đặt chếch hẳn về góc trên-phải để hoàn toàn tách biệt với thanh giây đếm ngược ở giữa */
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.55), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: floatBubbleRight 2s infinite ease-in-out;
+  cursor: pointer;
+  z-index: 22;
+}
+
+.iso-water-alert .water-alert-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+
+@keyframes floatBubbleRight {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+/* BIỂN "CHƯA ĐƯỢC CANH TÁC LV.X" NỔI CHUẨN 1:1 KHI CHẠM VÀO */
+.iso-signpost {
+  position: absolute;
+  left: 0;
+  bottom: 24px;
+  transform: translate(-50%, 0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+  z-index: 25;
+  animation: signpostPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none !important;
+}
+
+.iso-signpost.fade-out {
+  opacity: 0;
+  transform: translate(-50%, -10px) scale(0.9);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+@keyframes signpostPop {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(0.85); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+.signpost-board {
+  background: #fff5f7;
+  border: 2px solid #7c2d37;
+  border-radius: 12px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  white-space: nowrap;
+  pointer-events: none !important;
+}
+
+.sign-crest {
+  background: #6b21a8;
+  color: #fde047;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  border: 1.5px solid #fde047;
+  flex-shrink: 0;
+  pointer-events: none !important;
+}
+
+.sign-text-col {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+  text-align: left;
+  pointer-events: none !important;
+}
+
+.sign-line1 {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #4a1d24;
+  white-space: nowrap;
+  pointer-events: none !important;
+}
+
+.sign-line2 {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #4a1d24;
+  white-space: nowrap;
+  pointer-events: none !important;
+}
+
+.signpost-arrow {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #7c2d37;
+  margin-top: -1px;
+  pointer-events: none !important;
+}
+
+/* Ẩn icon khóa mặc định trên các ô đất chưa mở để giao diện thoáng sạch */
+.iso-lock-pill {
+  display: none !important;
+}
+
+/* HOA DẠI & ĐỐM SÁNG TRANG TRÍ QUANH THẢM CỎ */
+.lawn-decorations {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wild-flower {
+  position: absolute;
+  font-size: 1rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  animation: flowerSway 3.2s infinite ease-in-out;
+}
+
+.wild-flower:nth-child(even) {
+  animation-duration: 4.1s;
+  animation-delay: 0.9s;
+}
+
+@keyframes flowerSway {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(10deg) scale(1.1); }
+}
+
+.lawn-sparkle {
+  position: absolute;
+  font-size: 0.8rem;
+  color: #fef08a;
+  opacity: 0.75;
+  animation: sparkleGlint 2.6s infinite ease-in-out;
+}
+
+.lawn-sparkle:nth-child(even) {
+  animation-delay: 1.3s;
+}
+
+@keyframes sparkleGlint {
+  0%, 100% { transform: scale(0.65); opacity: 0.25; }
+  50% { transform: scale(1.25); opacity: 0.95; }
+}
+
+/* CHÚ ẾCH MASCOT XANH */
+.frog-mascot-canal {
+  position: absolute;
+  bottom: -15px;
+  right: 15px;
+  z-index: 8;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  pointer-events: auto !important;
+}
+
+.frog-bubble {
+  background: #4ade80;
+  border: 2.5px solid #166534;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.frog-mascot-canal:hover {
+  transform: scale(1.2) rotate(-8deg);
+}
+
+/* ĐỒNG HỒ ĐẾM NGƯỢC GIÂY TRỰC QUAN TRÊN TỪNG CÂY TRỒNG (GỌN GÀNG, CHUẨN ANIME) */
+.plot-timer-badge {
+  position: absolute;
+  left: 0;
+  bottom: 56px;
+  transform: translate(-50%, 0);
+  background: linear-gradient(135deg, rgba(28, 14, 8, 0.9) 0%, rgba(16, 8, 4, 0.95) 100%);
+  color: #fde047;
+  padding: 2px 7px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45), 0 0 6px rgba(245, 158, 11, 0.25);
+  border: 1.2px solid #f59e0b;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 18;
+}
+
+.plot-timer-badge.hidden {
+  display: none !important;
+}
+
+.timer-text {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #fde047;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.timer-progress {
+  display: none; /* Giữ badge dạng viên thuốc siêu gọn gàng, chỉ hiện số giây rõ ràng */
+}

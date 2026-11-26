@@ -18,9 +18,10 @@ Logic lõi của Game Engine được bảo vệ nghiêm ngặt bởi bộ Unit 
 *Trước khi sửa `engine.ts` hoặc `game-data.ts`, AI phải đối chiếu với các nguyên tắc này và đảm bảo 6/6 test cases đều Pass.*
 - ⚡ **Tự động định tuyến (Auto-routing):** Sử dụng `import.meta.glob` kết hợp công cụ sinh tệp cấu hình tự động. Không cần cấu hình Router thủ công.
 - ⚙️ **Settings & Customization:** Tích hợp Modal cài đặt để tùy chỉnh Tên người dùng, Vai trò và cấu hình hiệu năng hệ thống (Particles Background).
-- 🎮 **Launcher tiện lợi:** 
-  - Giao diện Dashboard đẹp mắt (Digital Curator style) quản lý toàn bộ hệ sinh thái.
-  - Tìm kiếm và Lọc (Filter) ứng dụng theo danh mục (Category).
+- 🎮 **Launcher tiện lợi (Digital Curator v2.0):** 
+  - Giao diện Dashboard hiện đại với khu vực **Tâm điểm nổi bật (Featured Spotlight)**, thẻ chỉ số nhanh (Telemetry KPI) và thanh điều hướng riêng cho Mobile.
+  - Mỗi ứng dụng có **Icon Emoji, màu nhấn (Accent) và bộ Tag tính năng riêng biệt**.
+  - Tìm kiếm tức thì (phím tắt `/`) và dải **Category Filter Pills** trực quan đếm số lượng từng danh mục.
   - Ghim "Yêu thích" (Favorites) và lịch sử "Hoạt động gần đây" được lưu trữ an toàn bằng **Pinia Persistedstate**.
 - 🛠️ **Scaffolding Tool:** 1 câu lệnh CLI `pnpm create:page` sinh ra bộ khung tạo sẵn (`index.vue`, `meta.ts`, `README.md` logic).
 
@@ -42,15 +43,31 @@ Dự án được xây dựng với những công nghệ FE hiện đại nhất
 ## 📂 Các Mini-App Hiện Có 
 
 1. **🏠 Home (Bộ định tuyến chính)**: 
-   - Nơi hiển thị tất cả ứng dụng. Giao diện phi hành gia (Digital Curator) hiện đại với lưới thẻ ứng dụng.
+   - Nơi hiển thị tất cả ứng dụng. Giao diện phi hành gia (Digital Curator) hiện đại với lưới thẻ ứng dụng, lọc theo danh mục (`Trò chơi`, `Sáng tạo`, `Công cụ`, `Học tập`, `Tâm linh`).
 2. **🕹️ Ngã Rẽ Cuộc Đời (`ngare`)**: 
-   - Một game nhập vai mô phỏng giả lập cuộc đời với hệ thống Chỉ số (Stats), Nghề nghiệp (Careers), Sự kiện (Events random), Cửa hàng (Shop), và Hệ thống kỹ năng (Skills).
-3. **🎹 Mini Piano (`mini-piano`)**: 
-   - Đàn Piano ảo hoạt động trực tiếp trên trình duyệt web.
-4. **🎨 Color Game (`color-game`)**: 
-   - Trò chơi rèn luyện phản xạ màu sắc.
+   - Game nhập vai mô phỏng cuộc đời với hệ thống Chỉ số (Stats), Nghề nghiệp (Careers), Sự kiện (Events), Cửa hàng (Shop), và Kỹ năng (Skills).
+3. **♟️ Cờ Tướng Master (`co-tuong`)** *(Native Vue 3)*:
+   - Game Cờ Tướng (Xiangqi) chuẩn luật quốc tế với AI Minimax Alpha-Beta 3 cấp độ, chơi 2 người tại chỗ, biên bản ký hiệu tiếng Việt, âm thanh Web Audio và lưu ván tự động bằng Pinia.
+4. **🎴 OOP Flashcards (`oop-flashcards`)** *(Native Vue 3)*:
+   - Ứng dụng ôn tập 21 câu hỏi phỏng vấn OOP & SOLID với thẻ lật 3D, syntax highlighting an toàn, phím tắt và lưu tiến trình qua Pinia.
+5. **🍜 Hôm Nay Ăn Gì (`hom-nay-an-gi`)** *(Native Vue 3)*:
+   - Công cụ quay gợi ý món ăn Việt Nam ngẫu nhiên, lọc theo nhóm món, lưu món yêu thích & tự thêm thực đơn cá nhân qua Pinia.
+6. **🌾 Nông Trại Anime 2.5D (`anime-farm`)** *(Static Embed)*:
+   - Game mô phỏng nông trại Isometric 2.5D phong cách Anime (gieo hạt kéo thả, tưới nước, nhà kho, đơn hàng) nhúng qua `AppEmbedFrame`.
+7. **🎲 Cờ Tỷ Phú Sài Gòn (`saigon-tycoon`)** *(Static Embed)*:
+   - Saigon Tycoon 40 ô phố Sài Gòn hoài cổ chuẩn luật quốc tế (đấu giá, thế chấp, giao dịch, xây nhà), Bot AI & Đài Radio Lo-Fi nhúng qua `AppEmbedFrame`.
+8. **🔮 Bói Bài Oracle (`oracle-tarot`)**:
+   - Lắng nghe thông điệp từ những lá bài Tarot kỹ thuật số.
+9. **⌨️ Neon Typing (`neon-typing`)**:
+   - Thử thách gõ phím tốc độ cao với hiệu ứng Neon và WPM thời gian thực.
+10. **🏦 Monopoly (`monopoly`)**:
+    - Phiên bản cờ tỉ phú Neo-Monopoly chơi nhanh với AI.
+11. **🎹 Mini Piano (`mini-piano`)**: 
+    - Đàn Synthesizer Piano 13 phím (trắng & đen), hỗ trợ gõ phím máy tính, 4 âm sắc nhạc cụ và 3 bản nhạc mẫu tự động.
+12. **🎨 Color Game (`color-game`)**: 
+    - Trò chơi phản xạ thị giác nhận diện mã màu RGB & HEX với 3 cấp độ khó (4/6/9 ô), thanh phân tích kênh màu và chuỗi Streak.
 
-*(Các mini-app nằm tại thư mục `src/views/`)*
+*(Các mini-app nằm tại thư mục `src/views/` và các app nhúng tĩnh nằm tại `public/apps/`)*
 
 ---
 

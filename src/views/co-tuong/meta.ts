@@ -1,0 +1,10 @@
+import type { PageMeta } from '@/types/page'
+
+const meta: PageMeta = {
+  name: 'Cờ Tướng Master',
+  description: 'Game Cờ Tướng (Xiangqi) chuẩn luật quốc tế với AI Minimax Alpha-Beta 3 cấp độ, chơi 2 người tại chỗ và lưu ván tự động.',
+  category: 'game',
+  author: 'Truong Dinh Anh',
+}
+
+export default meta

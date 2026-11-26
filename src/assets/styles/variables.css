@@ -1,32 +1,45 @@
 :root {
-  /* Core Colors */
+  /* Core Surfaces */
   --bg: #060e20;
   --bg-sidebar: #091328;
-  --bg-card: #141f38;
-  --bg-modal: #091328;
-  --bg-input: #141f38;
-  
-  /* Brand Colors */
+  --bg-card: #121d35;
+  --bg-card-hover: #172544;
+  --bg-elevated: #1b2b4f;
+  --bg-modal: #0b162e;
+  --bg-input: #0f1a30;
+  --surface-glass: rgba(18, 29, 53, 0.76);
+
+  /* Brand & Accent Colors */
   --primary: #6dddff;
-  --primary-glow: rgba(109, 221, 255, 0.4);
+  --primary-glow: rgba(109, 221, 255, 0.38);
+  --primary-soft: rgba(109, 221, 255, 0.12);
   --accent: #d277ff;
+  --accent-glow: rgba(210, 119, 255, 0.32);
+  --accent-soft: rgba(210, 119, 255, 0.14);
+
+  /* Semantic & Category Colors */
   --property-group-a: #8bc34a;
   --property-group-b: #03a9f4;
   --property-group-c: #dd2c00;
   --property-group-d: #ffb300;
+  --success: #34d399;
+  --warning: #fbbf24;
   --danger: #ff5555;
-  --danger-bg: rgba(255, 60, 60, 0.1);
-  --danger-border: rgba(255, 60, 60, 0.3);
+  --danger-bg: rgba(255, 60, 60, 0.12);
+  --danger-border: rgba(255, 60, 60, 0.32);
 
-  /* Text Colors */
-  --text: #dee5ff;
-  --text-dim: #a3aac4;
+  /* Text Hierarchy */
+  --text: #eef2ff;
+  --text-dim: #9aa5c4;
+  --text-muted: #697596;
   --text-inverse: #060e20;
 
-  /* Borders & Outlines */
-  --outline: rgba(109, 117, 140, 0.2);
+  /* Borders & Shadows */
+  --outline: rgba(132, 146, 184, 0.18);
+  --outline-strong: rgba(109, 221, 255, 0.38);
+  --shadow-card: 0 18px 42px -12px rgba(2, 6, 18, 0.65);
 
   /* Transitions */
-  --transition-fast: 0.2s ease;
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
