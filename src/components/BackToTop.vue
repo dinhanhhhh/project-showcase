@@ -1,22 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 
 const isVisible = ref(false)
 
-const checkScroll = () => {
-  // Hiện nút khi cuộn quá 400px
-  isVisible.value = window.scrollY > 400
+function checkScroll() {
+  isVisible.value = window.scrollY > 360
 }
 
-const scrollToTop = () => {
+function scrollToTop() {
   window.scrollTo({
     top: 0,
-    behavior: 'smooth'
+    behavior: 'smooth',
   })
 }
 
 onMounted(() => {
-  window.addEventListener('scroll', checkScroll)
+  window.addEventListener('scroll', checkScroll, { passive: true })
 })
 
 onUnmounted(() => {
@@ -26,10 +25,12 @@ onUnmounted(() => {
 
 <template>
   <transition name="fade">
-    <button 
-      v-if="isVisible" 
-      class="back-to-top glow-box" 
+    <button
+      v-if="isVisible"
+      type="button"
+      class="back-to-top"
       aria-label="Cuộn về đầu trang"
+      title="Về đầu trang"
       @click="scrollToTop"
     >
       <span class="icon">↑</span>
@@ -40,43 +41,43 @@ onUnmounted(() => {
 <style scoped>
 .back-to-top {
   position: fixed;
-  bottom: 2rem;
-  right: 2rem;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background: rgba(20, 31, 56, 0.6);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--primary);
+  bottom: 1.75rem;
+  right: 1.75rem;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--surface-glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--outline-strong);
   color: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 99;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0 15px var(--primary-glow);
+  transition: var(--transition-normal);
+  box-shadow: 0 8px 24px var(--primary-glow);
 }
 
 .back-to-top:hover {
-  transform: translateY(-5px);
+  transform: translateY(-4px);
   background: var(--primary);
-  color: #000;
-  box-shadow: 0 0 30px var(--primary-glow);
+  color: var(--text-inverse);
 }
 
 .icon {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 800;
 }
 
-/* Animations */
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.3s, transform 0.3s;
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
-.fade-enter-from, .fade-leave-to {
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
-  transform: translateY(20px) scale(0.8);
+  transform: translateY(16px) scale(0.88);
 }
 </style>

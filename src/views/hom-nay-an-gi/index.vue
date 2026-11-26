@@ -26,6 +26,33 @@ let successTimer: ReturnType<typeof setTimeout> | null = null
 const FILTER_ORDER: FoodFilter[] = ['all', 'nuoc', 'kho', 'an-vat', 'favorite', 'custom']
 const EMOJI_OPTIONS = ['🍽️', '🍜', '🍛', '🍕', '🍔', '🍣', '🥗', '🧋', '🍰', '🍗']
 
+interface MealSlotPreset {
+  id: 'morning' | 'lunch' | 'afternoon' | 'night'
+  label: string
+  hint: string
+  targetFilter: FoodFilter
+}
+
+const MEAL_PRESETS: readonly MealSlotPreset[] = [
+  { id: 'morning', label: '🌅 Sáng', hint: 'Món nước nhẹ bụng', targetFilter: 'nuoc' },
+  { id: 'lunch', label: '☀️ Trưa', hint: 'Chắc bụng đầy năng lượng', targetFilter: 'kho' },
+  { id: 'afternoon', label: '🌇 Chiều', hint: 'Ăn vặt xế chiều', targetFilter: 'an-vat' },
+  { id: 'night', label: '🌙 Đêm', hint: 'Ấm bụng đêm khuya', targetFilter: 'nuoc' },
+]
+
+const currentMealId = computed<MealSlotPreset['id']>(() => {
+  const hour = new Date().getHours()
+  if (hour < 10) return 'morning'
+  if (hour < 14) return 'lunch'
+  if (hour < 18) return 'afternoon'
+  return 'night'
+})
+
+function applyMealPreset(preset: MealSlotPreset) {
+  selectFilter(preset.targetFilter)
+  rollRandomFood()
+}
+
 const allFoods = computed<FoodItem[]>(() => [...store.customFoods, ...SAMPLE_FOODS])
 
 const filteredFoods = computed<FoodItem[]>(() =>
@@ -163,6 +190,24 @@ onUnmounted(() => {
         </div>
       </header>
 
+      <section class="meal-time-bar">
+        <span class="meal-label">⏰ Gợi ý nhanh theo khung giờ:</span>
+        <div class="meal-pills">
+          <button
+            v-for="preset in MEAL_PRESETS"
+            :key="preset.id"
+            type="button"
+            class="meal-pill"
+            :class="{ current: currentMealId === preset.id }"
+            :title="preset.hint"
+            @click="applyMealPreset(preset)"
+          >
+            <strong>{{ preset.label }}</strong>
+            <small>{{ preset.hint }}</small>
+          </button>
+        </div>
+      </section>
+
       <section class="filter-bar">
         <button
           v-for="filter in FILTER_ORDER"
@@ -178,6 +223,20 @@ onUnmounted(() => {
 
       <div class="main-grid">
         <section class="spotlight-card">
+          <div
+            v-if="isRolling"
+            class="slot-reel"
+            aria-hidden="true"
+          >
+            <div class="reel-track">
+              <span
+                v-for="(em, idx) in [...EMOJI_OPTIONS, ...EMOJI_OPTIONS]"
+                :key="`reel-${idx}`"
+                class="reel-item"
+              >{{ em }}</span>
+            </div>
+          </div>
+
           <div
             v-if="currentFood"
             class="dish-showcase"
@@ -442,6 +501,83 @@ onUnmounted(() => {
   color: var(--primary);
   font-weight: 700;
   font-size: 0.85rem;
+}
+
+.meal-time-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+}
+
+.meal-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.meal-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.meal-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 11px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.meal-pill small {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+}
+
+.meal-pill.current {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.meal-pill:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+}
+
+.slot-reel {
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline-strong);
+  padding: 0.4rem 0;
+}
+
+.reel-track {
+  display: flex;
+  gap: 1rem;
+  animation: reelScroll 0.65s linear infinite;
+  width: max-content;
+}
+
+.reel-item {
+  font-size: 1.5rem;
+}
+
+@keyframes reelScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
 
 .filter-bar {

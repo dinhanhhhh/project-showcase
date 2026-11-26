@@ -24,8 +24,10 @@ const { playSound } = useCoTuongAudio()
 
 const selectedPiece = ref<Piece | null>(null)
 const legalMoves = ref<Position[]>([])
+const hintMove = ref<{ from: Position; to: Position; notation: string } | null>(null)
 const isBotThinking = ref(false)
 const manualFlipped = ref(false)
+const isVictoryModalOpen = ref(false)
 
 let botTimer: ReturnType<typeof setTimeout> | null = null
 let gameOverSoundTimer: ReturnType<typeof setTimeout> | null = null
@@ -120,6 +122,7 @@ function executeMove(piece: Piece, to: Position) {
   store.gameStatus = nextStatus
   selectedPiece.value = null
   legalMoves.value = []
+  hintMove.value = null
 
   if (nextStatus === 'check' || nextStatus === 'checkmate') {
     playSound('check', store.soundEnabled)
@@ -130,6 +133,7 @@ function executeMove(piece: Piece, to: Position) {
   }
 
   if (nextStatus === 'checkmate' || nextStatus === 'stalemate' || nextStatus === 'draw') {
+    isVictoryModalOpen.value = true
     if (store.gameMode === 'vs_bot') {
       if (nextStatus === 'checkmate') {
         const winner = getOppositeSide(nextPlayer)
@@ -142,6 +146,21 @@ function executeMove(piece: Piece, to: Position) {
       playSound('gameover', store.soundEnabled)
     }, 350)
   }
+}
+
+function requestHint() {
+  if (isGameOver.value || isBotThinking.value) return
+  if (store.gameMode === 'vs_bot' && store.currentPlayer !== store.humanSide) return
+  const suggested = findBestMove(store.boardState, store.currentPlayer, 'medium')
+  if (!suggested) return
+
+  hintMove.value = {
+    from: { ...suggested.piece.position },
+    to: { ...suggested.to },
+    notation: formatNotation(suggested.piece, suggested.piece.position, suggested.to),
+  }
+  selectedPiece.value = suggested.piece
+  legalMoves.value = getLegalMovesForPiece(suggested.piece, store.boardState)
 }
 
 function handleSquareClick(pos: Position) {
@@ -170,6 +189,8 @@ function handleNewGame() {
   clearTimers()
   selectedPiece.value = null
   legalMoves.value = []
+  hintMove.value = null
+  isVictoryModalOpen.value = false
   store.resetMatch()
 }
 
@@ -193,6 +214,8 @@ function handleUndo() {
   store.gameStatus = getGameStatus(nextPlayer, nextBoard)
   selectedPiece.value = null
   legalMoves.value = []
+  hintMove.value = null
+  isVictoryModalOpen.value = false
 }
 
 function setMode(mode: GameMode) {
@@ -319,9 +342,17 @@ onUnmounted(() => {
             :selected-piece="selectedPiece"
             :legal-moves="legalMoves"
             :last-move="lastMove"
+            :hint-move="hintMove"
             :flipped="isBoardFlipped"
             @square-click="handleSquareClick"
           />
+
+          <div
+            v-if="hintMove"
+            class="hint-banner"
+          >
+            💡 Gợi ý AI: <strong>{{ hintMove.notation }}</strong> (đã tô sáng tím trên bàn cờ)
+          </div>
 
           <div class="captured-strip">
             <span class="cap-label">Quân Đỏ ăn:</span>
@@ -418,7 +449,16 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div class="action-buttons">
+            <div class="action-buttons three-cols">
+              <button
+                type="button"
+                class="btn-secondary"
+                :disabled="isGameOver || isBotThinking || (store.gameMode === 'vs_bot' && store.currentPlayer !== store.humanSide)"
+                title="AI gợi ý nước đi tối ưu"
+                @click="requestHint"
+              >
+                💡 Gợi ý
+              </button>
               <button
                 type="button"
                 class="btn-secondary"
@@ -490,6 +530,43 @@ onUnmounted(() => {
             </ol>
           </div>
         </aside>
+      </div>
+    </div>
+
+    <!-- Modal Kết thúc ván đấu -->
+    <div
+      v-if="isVictoryModalOpen && isGameOver"
+      class="victory-backdrop"
+      @click.self="isVictoryModalOpen = false"
+    >
+      <div
+        class="victory-dialog glass-card"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="victory-trophy">
+          {{ store.gameStatus === 'checkmate' ? '🏆' : '🤝' }}
+        </div>
+        <h2>{{ statusBanner }}</h2>
+        <p class="victory-meta">
+          Tổng cộng <strong>{{ store.moveHistory.length }}</strong> nước đi · Quân Đỏ ăn {{ capturedByRed.length }} · Quân Đen ăn {{ capturedByBlack.length }}
+        </p>
+        <div class="victory-actions">
+          <button
+            type="button"
+            class="btn-primary"
+            @click="handleNewGame"
+          >
+            🔄 Chơi ván mới
+          </button>
+          <button
+            type="button"
+            class="btn-secondary"
+            @click="isVictoryModalOpen = false"
+          >
+            Xem lại bàn cờ
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -719,8 +796,69 @@ onUnmounted(() => {
 .action-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.6rem;
+  gap: 0.55rem;
   margin-top: 0.25rem;
+}
+
+.action-buttons.three-cols {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.hint-banner {
+  max-width: 548px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0.55rem 0.9rem;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-glow);
+  color: var(--text);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+.victory-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(3, 8, 20, 0.72);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.victory-dialog {
+  width: 100%;
+  max-width: 430px;
+  padding: 2rem 1.6rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.victory-trophy {
+  font-size: 3.6rem;
+}
+
+.victory-dialog h2 {
+  font-family: 'Manrope', sans-serif;
+  font-size: 1.35rem;
+  color: var(--primary);
+}
+
+.victory-meta {
+  font-size: 0.88rem;
+  color: var(--text-dim);
+}
+
+.victory-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
 }
 
 .btn-primary,

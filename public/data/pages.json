@@ -3,7 +3,7 @@
     "slug": "oracle-tarot",
     "path": "/oracle-tarot",
     "name": "Bói Bài Oracle",
-    "description": "Lắng nghe thông điệp huyền bí từ vũ trụ thông qua những lá bài Tarot kỹ thuật số linh ứng.",
+    "description": "Trải bài 1 lá hôm nay hoặc 3 lá Quá khứ · Hiện tại · Tương lai từ bộ 12 lá bài Oracle với hình học thần bí & nhật ký trải bài.",
     "category": "spiritual",
     "author": "Truong Dinh Anh"
   },
@@ -51,7 +51,7 @@
     "slug": "neon-typing",
     "path": "/neon-typing",
     "name": "Neon Typing",
-    "description": "Thử thách gõ phím tốc độ cao với hiệu ứng Neon và WPM thời gian thực.",
+    "description": "Thử thách gõ phím tốc độ cao với highlight từng ký tự thời gian thực, chọn 15s/30s/60s, đếm WPM & Combo Streak.",
     "category": "game",
     "author": "Truong Dinh Anh"
   },

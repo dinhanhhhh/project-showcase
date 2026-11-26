@@ -22,6 +22,7 @@ const sessionKnown = ref(0)
 const sessionNope = ref(0)
 const copiedCardId = ref<string | null>(null)
 const sessionRatings = ref<Array<{ cardId: string; known: boolean }>>([])
+const searchKeyword = ref('')
 
 let touchStartX = 0
 let rateTimer: ReturnType<typeof setTimeout> | null = null
@@ -50,6 +51,13 @@ const progressPercent = computed(() => {
 
 const completionTitle = computed(() => getCompletionTitle(sessionKnown.value, deck.value.length))
 const accuracyPercent = computed(() => getAccuracyPercent(sessionKnown.value, deck.value.length))
+const masteryPercent = computed(() =>
+  getAccuracyPercent(store.masteredIds.length, OOP_FLASHCARDS.length),
+)
+const masteryRingOffset = computed(() => {
+  const circumference = 2 * Math.PI * 18
+  return circumference * (1 - masteryPercent.value / 100)
+})
 
 function countByTopic(topicId: number): number {
   return OOP_FLASHCARDS.filter((c) => c.topicId === topicId).length
@@ -63,7 +71,16 @@ function rebuildDeck(shuffle = isShuffled.value) {
     store.setSelectedTopic('all')
   }
 
-  deck.value = buildDeck(OOP_FLASHCARDS, activeFilter, store.reviewIds, shuffle)
+  const baseDeck = buildDeck(OOP_FLASHCARDS, activeFilter, store.reviewIds, shuffle)
+  const q = searchKeyword.value.trim().toLowerCase()
+  deck.value = q
+    ? baseDeck.filter(
+        (c) =>
+          c.question.toLowerCase().includes(q) ||
+          c.answerTitle.toLowerCase().includes(q) ||
+          c.answerPoints.some((p) => p.toLowerCase().includes(q)),
+      )
+    : baseDeck
   currentIndex.value = 0
   isFlipped.value = false
   sessionKnown.value = 0
@@ -215,12 +232,41 @@ onUnmounted(() => {
         </RouterLink>
 
         <div class="brand-block">
-          <h1 class="brand-title">
-            OOP<span>Cards</span>
-          </h1>
-          <p class="brand-sub">
-            Lý thuyết OOP & SOLID · Đã thuộc {{ store.masteredIds.length }}/{{ OOP_FLASHCARDS.length }}
-          </p>
+          <div class="brand-heading">
+            <div
+              class="mastery-ring"
+              :title="`Đã thông thạo ${masteryPercent}% (${store.masteredIds.length}/${OOP_FLASHCARDS.length} câu)`"
+            >
+              <svg
+                viewBox="0 0 44 44"
+                class="ring-svg"
+                aria-hidden="true"
+              >
+                <circle
+                  cx="22"
+                  cy="22"
+                  r="18"
+                  class="ring-bg"
+                />
+                <circle
+                  cx="22"
+                  cy="22"
+                  r="18"
+                  class="ring-fill"
+                  :style="{ strokeDashoffset: masteryRingOffset }"
+                />
+              </svg>
+              <span class="ring-pct">{{ masteryPercent }}%</span>
+            </div>
+            <div>
+              <h1 class="brand-title">
+                OOP<span>Cards</span>
+              </h1>
+              <p class="brand-sub">
+                Lý thuyết OOP &amp; SOLID · Thuộc {{ store.masteredIds.length }}/{{ OOP_FLASHCARDS.length }}
+              </p>
+            </div>
+          </div>
         </div>
 
         <button
@@ -255,36 +301,47 @@ onUnmounted(() => {
         />
       </div>
 
-      <section class="topic-bar">
-        <button
-          type="button"
-          class="topic-pill"
-          :class="{ active: store.selectedTopic === 'all' }"
-          @click="selectTopic('all')"
-        >
-          Tất cả ({{ OOP_FLASHCARDS.length }})
-        </button>
+      <section class="filter-controls">
+        <div class="card-search">
+          <span>🔍</span>
+          <input
+            v-model="searchKeyword"
+            type="search"
+            placeholder="Lọc nhanh theo từ khóa (vd: SOLID, static, interface)..."
+            @input="rebuildDeck(false)"
+          >
+        </div>
+        <div class="topic-bar">
+          <button
+            type="button"
+            class="topic-pill"
+            :class="{ active: store.selectedTopic === 'all' }"
+            @click="selectTopic('all')"
+          >
+            Tất cả ({{ OOP_FLASHCARDS.length }})
+          </button>
 
-        <button
-          v-if="store.reviewIds.length > 0"
-          type="button"
-          class="topic-pill topic-review"
-          :class="{ active: store.selectedTopic === 'review' }"
-          @click="selectTopic('review')"
-        >
-          ⚡ Cần ôn ({{ store.reviewIds.length }})
-        </button>
+          <button
+            v-if="store.reviewIds.length > 0"
+            type="button"
+            class="topic-pill topic-review"
+            :class="{ active: store.selectedTopic === 'review' }"
+            @click="selectTopic('review')"
+          >
+            ⚡ Cần ôn ({{ store.reviewIds.length }})
+          </button>
 
-        <button
-          v-for="topic in OOP_TOPICS"
-          :key="topic.id"
-          type="button"
-          class="topic-pill"
-          :class="{ active: store.selectedTopic === topic.id }"
-          @click="selectTopic(topic.id)"
-        >
-          {{ topic.title }} ({{ countByTopic(topic.id) }})
-        </button>
+          <button
+            v-for="topic in OOP_TOPICS"
+            :key="topic.id"
+            type="button"
+            class="topic-pill"
+            :class="{ active: store.selectedTopic === topic.id }"
+            @click="selectTopic(topic.id)"
+          >
+            {{ topic.title }} ({{ countByTopic(topic.id) }})
+          </button>
+        </div>
       </section>
 
       <main class="stage">
@@ -341,6 +398,16 @@ onUnmounted(() => {
           @touchstart.passive="handleTouchStart"
           @touchend.passive="handleTouchEnd"
         >
+          <div
+            v-if="remainingCount > 2"
+            class="deck-layer layer-2"
+            aria-hidden="true"
+          />
+          <div
+            v-if="remainingCount > 1"
+            class="deck-layer layer-1"
+            aria-hidden="true"
+          />
           <div
             class="flip-card"
             :class="{ 'is-flipped': isFlipped, 'is-shaking': isShaking }"
@@ -411,6 +478,28 @@ onUnmounted(() => {
               </div>
             </article>
           </div>
+        </div>
+
+        <div
+          v-else
+          class="done-card"
+        >
+          <div class="done-trophy">
+            🔎
+          </div>
+          <h2 class="done-title">
+            Không tìm thấy thẻ khớp "{{ searchKeyword }}"
+          </h2>
+          <p class="done-sub">
+            Thử xóa từ khóa hoặc chuyển về mục Tất cả để tiếp tục học.
+          </p>
+          <button
+            type="button"
+            class="primary-cta"
+            @click="searchKeyword = ''; rebuildDeck(false)"
+          >
+            Xem lại toàn bộ bộ thẻ
+          </button>
         </div>
       </main>
 
@@ -519,8 +608,107 @@ onUnmounted(() => {
 }
 
 .brand-block {
-  text-align: center;
+  text-align: left;
   min-width: 0;
+}
+
+.brand-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.mastery-ring {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring-bg {
+  fill: none;
+  stroke: var(--outline);
+  stroke-width: 3.5;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-dasharray: 113.1;
+  transition: stroke-dashoffset 0.45s ease;
+}
+
+.ring-pct {
+  position: absolute;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.filter-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.card-search {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 12px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+}
+
+.card-search input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.card-scene {
+  position: relative;
+  width: 100%;
+  perspective: 1800px;
+  display: flex;
+  padding-bottom: 14px;
+}
+
+.deck-layer {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 10px;
+  bottom: 0;
+  border-radius: 24px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  pointer-events: none;
+}
+
+.deck-layer.layer-1 {
+  transform: translateY(6px) scale(0.97);
+  opacity: 0.72;
+}
+
+.deck-layer.layer-2 {
+  transform: translateY(12px) scale(0.94);
+  opacity: 0.42;
 }
 
 .brand-title {
@@ -641,12 +829,6 @@ onUnmounted(() => {
   min-height: 360px;
   display: flex;
   align-items: stretch;
-}
-
-.card-scene {
-  width: 100%;
-  perspective: 1800px;
-  display: flex;
 }
 
 .flip-card {

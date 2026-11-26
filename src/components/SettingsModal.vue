@@ -1,17 +1,24 @@
 <script setup lang="ts">
+import { VIBE_THEMES, type VibeThemeId } from '@/composables/useHomeSettings'
+
 interface Props {
   modelValue: boolean
   userName: string
   userRole: string
   enableParticles: boolean
+  theme?: VibeThemeId
 }
 
-defineProps<Props>()
+withDefaults(defineProps<Props>(), {
+  theme: 'cosmos',
+})
+
 const emit = defineEmits<{
   (e: 'update:modelValue', val: boolean): void
   (e: 'update:userName', val: string): void
   (e: 'update:userRole', val: string): void
   (e: 'update:enableParticles', val: boolean): void
+  (e: 'update:theme', val: VibeThemeId): void
   (e: 'clear-data'): void
 }>()
 </script>
@@ -38,7 +45,7 @@ const emit = defineEmits<{
               ⚙️ Cài đặt hệ thống
             </h2>
             <p class="modal-sub">
-              Cá nhân hóa hồ sơ & hiệu năng giao diện Launcher
+              Tùy biến giao diện màu sắc, hồ sơ cá nhân &amp; hiệu năng
             </p>
           </div>
           <button
@@ -50,6 +57,31 @@ const emit = defineEmits<{
             ✕
           </button>
         </header>
+
+        <section class="st-group">
+          <label>🎨 Chủ đề giao diện (Theme)</label>
+          <div class="theme-grid">
+            <button
+              v-for="item in VIBE_THEMES"
+              :key="item.id"
+              type="button"
+              class="theme-card"
+              :class="{ active: theme === item.id }"
+              @click="emit('update:theme', item.id)"
+            >
+              <div class="swatch-row">
+                <span
+                  v-for="(color, idx) in item.swatches"
+                  :key="idx"
+                  class="swatch-dot"
+                  :style="{ backgroundColor: color }"
+                />
+              </div>
+              <strong>{{ item.name }}</strong>
+              <small>{{ item.tagline }}</small>
+            </button>
+          </div>
+        </section>
 
         <section class="st-group">
           <label for="st-user-name">Tên hiển thị</label>
@@ -75,8 +107,8 @@ const emit = defineEmits<{
 
         <section class="st-group st-row">
           <div class="st-info">
-            <label for="ptSwitch">Hiệu ứng hạt tinh vân (Particles)</label>
-            <span class="desc">Tắt nếu muốn tiết kiệm pin hoặc tăng độ mượt trên máy cấu hình thấp.</span>
+            <label for="ptSwitch">Hiệu ứng tinh vân (Constellation Particles)</label>
+            <span class="desc">Tắt nếu muốn tiết kiệm pin hoặc tăng độ mượt trên máy yếu.</span>
           </div>
           <div class="st-switch">
             <input
@@ -133,9 +165,9 @@ const emit = defineEmits<{
   position: relative;
   background: var(--bg-modal);
   border: 1px solid var(--outline-strong);
-  border-radius: 20px;
+  border-radius: 22px;
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   max-height: 90dvh;
   overflow-y: auto;
   padding: 1.75rem;
@@ -148,7 +180,7 @@ const emit = defineEmits<{
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.35rem;
 }
 
 .modal-header h2 {
@@ -182,7 +214,7 @@ const emit = defineEmits<{
 }
 
 .st-group {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.2rem;
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
@@ -192,6 +224,60 @@ const emit = defineEmits<{
   font-size: 0.86rem;
   font-weight: 600;
   color: var(--text);
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
+.theme-card {
+  padding: 0.72rem 0.85rem;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--outline);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  transition: var(--transition-fast);
+}
+
+.theme-card:hover {
+  border-color: var(--outline-strong);
+}
+
+.theme-card.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.swatch-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.2rem;
+}
+
+.swatch-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.theme-card strong {
+  font-family: 'Manrope', sans-serif;
+  font-size: 0.88rem;
+}
+
+.theme-card small {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  line-height: 1.35;
 }
 
 .desc {
@@ -278,7 +364,7 @@ const emit = defineEmits<{
 
 .danger-zone {
   border-top: 1px solid var(--outline);
-  padding-top: 1.25rem;
+  padding-top: 1.2rem;
   margin-bottom: 0;
   flex-direction: row;
   justify-content: space-between;
@@ -302,5 +388,11 @@ const emit = defineEmits<{
 .btn-danger:hover {
   background: rgba(255, 85, 85, 0.22);
   border-color: var(--danger);
+}
+
+@media (max-width: 480px) {
+  .theme-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

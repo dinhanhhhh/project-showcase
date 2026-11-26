@@ -1,14 +1,75 @@
 @import "tailwindcss";
 
 :root {
-  color: #dee5ff;
-  background: #060e20;
+  color: var(--text, #eef2ff);
+  background: var(--bg, #060e20);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.28s ease, color 0.28s ease;
+}
+
+::selection {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+/* Shared Design System Utilities */
+.glass-card {
+  background: var(--surface-glass);
+  border: 1px solid var(--outline);
+  border-radius: 22px;
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-card);
+}
+
+.glow-box {
+  box-shadow: 0 0 24px var(--primary-glow), var(--shadow-card);
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--outline-strong);
+}
+
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

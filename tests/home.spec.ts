@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest'
+import { createApp, nextTick } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import { mount } from '@vue/test-utils'
 import HomeView from '@/views/home/index.vue'
 import { usePagesStore } from '@/stores/usePagesStore'
 
+function setupPinia() {
+  const app = createApp({})
+  const pinia = createPinia()
+  pinia.use(piniaPluginPersistedstate)
+  app.use(pinia)
+  setActivePinia(pinia)
+  return pinia
+}
+
 describe('Home launcher', () => {
-  it('renders page cards from store state', async () => {
-    setActivePinia(createPinia())
+  it('renders page cards with SVG cover arts from store state', () => {
+    const pinia = setupPinia()
     const store = usePagesStore()
 
     store.pages = [
@@ -21,6 +32,7 @@ describe('Home launcher', () => {
 
     const wrapper = mount(HomeView, {
       global: {
+        plugins: [pinia],
         stubs: {
           RouterLink: {
             template: '<a><slot /></a>',
@@ -31,10 +43,11 @@ describe('Home launcher', () => {
 
     expect(wrapper.text()).toContain('Mini Piano')
     expect(wrapper.text()).toContain('Danh sách mini-app')
+    expect(wrapper.find('.cover-art').exists()).toBe(true)
   })
 
-  it('updates search filter and toggles favorite from UI', async () => {
-    setActivePinia(createPinia())
+  it('updates search filter, switches theme, and toggles favorite from UI', async () => {
+    const pinia = setupPinia()
     const store = usePagesStore()
 
     store.pages = [
@@ -56,6 +69,7 @@ describe('Home launcher', () => {
 
     const wrapper = mount(HomeView, {
       global: {
+        plugins: [pinia],
         stubs: {
           RouterLink: {
             template: '<a><slot /></a>',
@@ -64,7 +78,7 @@ describe('Home launcher', () => {
       },
     })
 
-    const input = wrapper.get('input[type=\"search\"]')
+    const input = wrapper.get('input[type="search"]')
     await input.setValue('color')
     expect(wrapper.text()).toContain('Color Game')
     expect(wrapper.text()).not.toContain('Mini Piano')
@@ -76,8 +90,19 @@ describe('Home launcher', () => {
 
     expect(favoriteButton).toBeDefined()
     await favoriteButton!.trigger('click')
+    await nextTick()
 
-    expect(store.favoriteSlugs.length).toBe(1)
-    expect(JSON.parse(localStorage.getItem('vibe:favorites') || '[]')).toHaveLength(1)
+    expect(store.favoriteSlugs).toHaveLength(1)
+    const persisted = JSON.parse(localStorage.getItem('vibe:pages-store') || '{}') as {
+      favoriteSlugs?: string[]
+    }
+    expect(persisted.favoriteSlugs).toHaveLength(1)
+
+    // Kiểm tra chuyển nhanh chủ đề màu
+    const themeBtns = wrapper.findAll('.theme-dot-btn')
+    expect(themeBtns.length).toBeGreaterThanOrEqual(4)
+    await themeBtns[1].trigger('click')
+    await nextTick()
+    expect(document.documentElement.getAttribute('data-theme')).toBe('emerald')
   })
 })

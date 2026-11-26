@@ -18,6 +18,7 @@ const containerRef = ref<HTMLElement | null>(null)
 const iframeKey = ref(0)
 const isLoaded = ref(false)
 const isFullscreen = ref(false)
+const isTheaterMode = ref(false)
 
 function handleReload() {
   isLoaded.value = false
@@ -26,6 +27,10 @@ function handleReload() {
 
 function handleLoad() {
   isLoaded.value = true
+}
+
+function openQuickSwitcher() {
+  window.dispatchEvent(new CustomEvent('vibe:open-palette'))
 }
 
 async function toggleFullscreen() {
@@ -60,8 +65,12 @@ onUnmounted(() => {
   <div
     ref="containerRef"
     class="embed-shell"
+    :class="{ theater: isTheaterMode }"
   >
-    <header class="embed-topbar">
+    <header
+      v-if="!isTheaterMode"
+      class="embed-topbar"
+    >
       <div class="topbar-left">
         <RouterLink
           to="/"
@@ -84,6 +93,22 @@ onUnmounted(() => {
       </div>
 
       <div class="topbar-actions">
+        <button
+          type="button"
+          class="tool-btn"
+          title="Chuyển nhanh ứng dụng (Ctrl+K)"
+          @click="openQuickSwitcher"
+        >
+          ⌘ <span class="btn-label">Chuyển app</span>
+        </button>
+        <button
+          type="button"
+          class="tool-btn"
+          title="Ẩn thanh trên để chơi rộng hơn"
+          @click="isTheaterMode = true"
+        >
+          🎬 <span class="btn-label">Rộng khung</span>
+        </button>
         <button
           type="button"
           class="tool-btn"
@@ -114,6 +139,16 @@ onUnmounted(() => {
     </header>
 
     <div class="embed-stage">
+      <button
+        v-if="isTheaterMode"
+        type="button"
+        class="exit-theater-pill"
+        title="Hiện lại thanh điều khiển"
+        @click="isTheaterMode = false"
+      >
+        ↓ Hiện thanh điều khiển
+      </button>
+
       <div
         v-if="!isLoaded"
         class="embed-loader"
@@ -147,7 +182,7 @@ onUnmounted(() => {
 }
 
 .embed-topbar {
-  height: 52px;
+  height: 54px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -171,14 +206,14 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.38rem 0.8rem;
+  padding: 0.4rem 0.85rem;
   border-radius: 10px;
   background: var(--bg-card);
   border: 1px solid var(--outline);
   color: var(--primary);
   text-decoration: none;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.84rem;
+  font-weight: 700;
   transition: var(--transition-fast);
 }
 
@@ -196,7 +231,7 @@ onUnmounted(() => {
 
 .app-title {
   font-family: 'Manrope', sans-serif;
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 800;
   color: var(--text);
   white-space: nowrap;
@@ -205,7 +240,7 @@ onUnmounted(() => {
 }
 
 .app-subtitle {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
@@ -216,32 +251,32 @@ onUnmounted(() => {
   flex-shrink: 0;
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--accent);
-  background: rgba(210, 119, 255, 0.12);
-  border: 1px solid rgba(210, 119, 255, 0.28);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-glow);
 }
 
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.4rem;
   flex-shrink: 0;
 }
 
 .tool-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.38rem 0.7rem;
+  gap: 0.32rem;
+  padding: 0.38rem 0.68rem;
   border-radius: 10px;
   background: var(--bg-card);
   border: 1px solid var(--outline);
   color: var(--text);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
@@ -259,6 +294,30 @@ onUnmounted(() => {
   min-height: 0;
   width: 100%;
   background: var(--bg);
+}
+
+.exit-theater-pill {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  background: var(--surface-glass);
+  border: 1px solid var(--outline-strong);
+  color: var(--primary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.exit-theater-pill:hover {
+  opacity: 1;
+  transform: translateX(-50%) translateY(2px);
 }
 
 .embed-iframe {
@@ -297,12 +356,7 @@ onUnmounted(() => {
   }
 }
 
-@media (max-width: 768px) {
-  .embed-topbar {
-    padding: 0 0.6rem;
-    gap: 0.4rem;
-  }
-
+@media (max-width: 900px) {
   .app-subtitle,
   .embed-badge,
   .btn-label {

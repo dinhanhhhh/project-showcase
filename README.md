@@ -17,11 +17,13 @@ Logic lõi của Game Engine được bảo vệ nghiêm ngặt bởi bộ Unit 
 ---
 *Trước khi sửa `engine.ts` hoặc `game-data.ts`, AI phải đối chiếu với các nguyên tắc này và đảm bảo 6/6 test cases đều Pass.*
 - ⚡ **Tự động định tuyến (Auto-routing):** Sử dụng `import.meta.glob` kết hợp công cụ sinh tệp cấu hình tự động. Không cần cấu hình Router thủ công.
-- ⚙️ **Settings & Customization:** Tích hợp Modal cài đặt để tùy chỉnh Tên người dùng, Vai trò và cấu hình hiệu năng hệ thống (Particles Background).
-- 🎮 **Launcher tiện lợi (Digital Curator v2.0):** 
-  - Giao diện Dashboard hiện đại với khu vực **Tâm điểm nổi bật (Featured Spotlight)**, thẻ chỉ số nhanh (Telemetry KPI) và thanh điều hướng riêng cho Mobile.
-  - Mỗi ứng dụng có **Icon Emoji, màu nhấn (Accent) và bộ Tag tính năng riêng biệt**.
-  - Tìm kiếm tức thì (phím tắt `/`) và dải **Category Filter Pills** trực quan đếm số lượng từng danh mục.
+- ⚙️ **Settings & Multi-Theme Engine (4 Chủ đề màu):**
+  - Chuyển đổi tức thì giữa **Deep Cosmos**, **Emerald Synth**, **Sunset Noir** và **Arctic Light** (giao diện sáng tương phản cao) ngay từ Hero hoặc Modal cài đặt.
+  - Hỗ trợ **Command Palette toàn cục (`Ctrl+K` / `⌘K`)**, hiệu ứng **Constellation Particles** tối ưu, **Route Transition** mượt mà và tôn trọng `prefers-reduced-motion`.
+- 🎮 **Launcher Storefront (Digital Curator v3.0):** 
+  - 10 banner minh họa **SVG Vector Cover Art** riêng cho từng ứng dụng, hiệu ứng **Cursor Spotlight** theo chuột, chế độ xem **Lưới / Danh sách**, sắp xếp **Nổi bật / A–Z / Gần đây** và thẻ **Tiếp tục trải nghiệm**.
+  - Khu vực **Tâm điểm nổi bật (Featured Spotlight)**, thẻ chỉ số nhanh (Telemetry KPI) và thanh điều hướng riêng cho Mobile.
+  - Tìm kiếm tức thì (phím tắt `/` hoặc `Ctrl+K`) và dải **Category Filter Pills** trực quan đếm số lượng từng danh mục.
   - Ghim "Yêu thích" (Favorites) và lịch sử "Hoạt động gần đây" được lưu trữ an toàn bằng **Pinia Persistedstate**.
 - 🛠️ **Scaffolding Tool:** 1 câu lệnh CLI `pnpm create:page` sinh ra bộ khung tạo sẵn (`index.vue`, `meta.ts`, `README.md` logic).
 

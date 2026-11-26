@@ -1,45 +1,133 @@
 export interface OracleCard {
   id: string
+  roman: string
   name: string
+  element: string
+  keyword: string
   message: string
-  image: string // URL giả lập hoặc icon
+  image: string
   advice: string
 }
 
 export const ORACLE_CARDS: OracleCard[] = [
   {
     id: 'balance',
+    roman: 'I',
     name: 'Tìm lại sự Cân bằng',
-    message: 'Cuộc sống là một điệu nhảy giữa nỗ lực và buông bỏ.',
-    advice: 'Hôm nay, hãy dành 5 phút để thở sâu. Đừng ép bản thân phải hoàn hảo.',
-    image: '⚖️'
+    element: 'Khí · Hòa điệu',
+    keyword: 'Tĩnh tại',
+    message: 'Cuộc sống là một điệu nhảy giữa nỗ lực hết mình và nghệ thuật buông bỏ đúng lúc.',
+    advice: 'Hôm nay hãy dành 5 phút hít thở sâu và tách mình khỏi màn hình. Đừng ép bản thân hoàn hảo ngay lập tức.',
+    image: '⚖️',
   },
   {
     id: 'growth',
-    name: 'Sự Phát triển Phía sau',
-    message: 'Ngay cả khi bạn không thấy, hạt mầm vẫn đang nảy nở dưới lòng đất.',
-    advice: 'Kiên nhẫn là chìa khóa. Những gì bạn gieo trồng đang sắp đến ngày hái quả.',
-    image: '🌱'
+    roman: 'II',
+    name: 'Mầm Xanh Ẩn Mình',
+    element: 'Đất · Sinh trưởng',
+    keyword: 'Kiên nhẫn',
+    message: 'Ngay cả khi bề mặt trông tĩnh lặng, hạt mầm bạn gieo vẫn đang âm thầm bén rễ sâu.',
+    advice: 'Giữ nhịp độ đều đặn mỗi ngày. Thành quả lớn luôn đến từ những bước nhỏ bền bỉ.',
+    image: '🌱',
   },
   {
     id: 'clarity',
-    name: 'Ánh sáng Minh triết',
-    message: 'Sương mù sẽ tan biến khi bạn ngừng chạy trốn chính mình.',
-    advice: 'Hãy đối mặt với sự thật mà bạn đang lẩn tránh. Câu trả lời nằm ở đó.',
-    image: '✨'
+    roman: 'III',
+    name: 'Ánh Sáng Minh Triết',
+    element: 'Ánh sáng · Trí tuệ',
+    keyword: 'Sáng tỏ',
+    message: 'Sương mù sẽ tan biến ngay khoảnh khắc bạn ngừng né tránh câu hỏi quan trọng nhất.',
+    advice: 'Viết ra giấy 3 điều khiến bạn phân vân và chọn 1 hành động cụ thể nhất để giải quyết hôm nay.',
+    image: '✨',
   },
   {
     id: 'courage',
-    name: 'Ngọn lửa Can đảm',
-    message: 'Nỗi sợ chỉ là một ảo ảnh ngăn cản bạn bước tới vinh quang.',
-    advice: 'Làm điều mà bạn sợ nhất ngay hôm nay. Vũ trụ sẽ hỗ trợ bạn.',
-    image: '🔥'
+    roman: 'IV',
+    name: 'Ngọn Lửa Can Đảm',
+    element: 'Lửa · Hành động',
+    keyword: 'Bứt phá',
+    message: 'Nỗi sợ thường chỉ là chiếc bóng phóng đại của vùng an toàn khi bạn sắp trưởng thành.',
+    advice: 'Bắt đầu việc bạn đang trì hoãn nhất trong 15 phút đầu tiên — quán tính sẽ kéo bạn đi tiếp.',
+    image: '🔥',
   },
   {
     id: 'harmony',
-    name: 'Giai điệu Hòa hợp',
-    message: 'Mọi mối quan hệ đều là tấm gương phản chiếu chính tâm hồn bạn.',
-    advice: 'Gửi một lời cảm ơn đến một người đã từng giúp đỡ bạn.',
-    image: '🎶'
-  }
+    roman: 'V',
+    name: 'Giai Điệu Hòa Hợp',
+    element: 'Nước · Kết nối',
+    keyword: 'Tri ân',
+    message: 'Mọi mối quan hệ chân thành đều là tấm gương phản chiếu phần tốt đẹp nhất trong tâm hồn bạn.',
+    advice: 'Nhắn một lời cảm ơn hoặc hỏi thăm chân thành đến người đã từng hỗ trợ bạn.',
+    image: '🎶',
+  },
+  {
+    id: 'compass',
+    roman: 'VI',
+    name: 'La Bàn Định Mệnh',
+    element: 'Khí · Phương hướng',
+    keyword: 'Dẫn lối',
+    message: 'Không phải con đường nào đông người đi cũng là con đường dẫn tới nơi bạn thuộc về.',
+    advice: 'Tin vào trực giác đã được tôi luyện bằng trải nghiệm của chính mình.',
+    image: '🧭',
+  },
+  {
+    id: 'phoenix',
+    roman: 'VII',
+    name: 'Phượng Hoàng Tái Sinh',
+    element: 'Lửa · Chuyển hóa',
+    keyword: 'Đổi mới',
+    message: 'Một chương cũ khép lại không phải thất bại, mà là khoảng trống cần thiết để điều mới mẻ nảy sinh.',
+    advice: 'Dọn dẹp một thói quen hoặc một kế hoạch cũ không còn phù hợp với phiên bản hiện tại của bạn.',
+    image: '🦅',
+  },
+  {
+    id: 'ocean',
+    roman: 'VIII',
+    name: 'Biển Lặng Chiều Sâu',
+    element: 'Nước · Nội tâm',
+    keyword: 'Thấu cảm',
+    message: 'Sức mạnh bền bỉ nhất không nằm ở cơn sóng ồn ào, mà ở dòng hải lưu trầm tĩnh bên dưới.',
+    advice: 'Lắng nghe nhiều hơn một nhịp trước khi phản hồi trong cuộc trò chuyện quan trọng sắp tới.',
+    image: '🌊',
+  },
+  {
+    id: 'starlight',
+    roman: 'IX',
+    name: 'Ngôi Sao Hy Vọng',
+    element: 'Tinh tú · Cảm hứng',
+    keyword: 'Niềm tin',
+    message: 'Chỉ cần còn một tia sáng định hướng, màn đêm dày nhất cũng không thể làm bạn lạc lối.',
+    advice: 'Giữ lại một ý tưởng sáng tạo táo bạo và phác thảo nó ra ngay hôm nay.',
+    image: '🌟',
+  },
+  {
+    id: 'fortress',
+    roman: 'X',
+    name: 'Thành Trì Kỷ Luật',
+    element: 'Đất · Vững vàng',
+    keyword: 'Bản lĩnh',
+    message: 'Cảm hứng giúp bạn khởi đầu, nhưng kỷ luật tử tế mới là đôi cánh đưa bạn tới đích.',
+    advice: 'Bảo vệ 1 khung giờ tập trung sâu không bị làm phiền trong ngày hôm nay.',
+    image: '🏛️',
+  },
+  {
+    id: 'key',
+    roman: 'XI',
+    name: 'Chiếc Chìa Khóa Bạc',
+    element: 'Kim · Cơ hội',
+    keyword: 'Mở khóa',
+    message: 'Cánh cửa bạn đang tìm kiếm đã mở hé; điều còn thiếu chỉ là cái gõ cửa chủ động từ phía bạn.',
+    advice: 'Chủ động đề xuất, hỏi thăm hoặc chia sẻ sản phẩm của bạn ra thế giới.',
+    image: '🗝️',
+  },
+  {
+    id: 'eclipse',
+    roman: 'XII',
+    name: 'Nhật Thực Tĩnh Lặng',
+    element: 'Tinh tú · Chiêm nghiệm',
+    keyword: 'Nghỉ ngơi',
+    message: 'Nghỉ ngơi đúng lúc là một phần không thể tách rời của những chặng đường dài.',
+    advice: 'Tối nay hãy ngủ sớm hơn 30 phút để tái tạo năng lượng cho ngày mai.',
+    image: '🌙',
+  },
 ]

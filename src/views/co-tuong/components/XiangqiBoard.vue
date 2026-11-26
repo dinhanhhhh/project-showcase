@@ -10,10 +10,13 @@ interface Props {
   selectedPiece: Piece | null
   legalMoves: Position[]
   lastMove: { from: Position; to: Position } | null
+  hintMove?: { from: Position; to: Position } | null
   flipped: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  hintMove: null,
+})
 
 const emit = defineEmits<{
   (e: 'square-click', pos: Position): void
@@ -61,6 +64,14 @@ function toPercentStyle(pos: Position): Record<string, string> {
   }
 }
 
+const topFileLabels = computed(() =>
+  props.flipped ? ['9', '8', '7', '6', '5', '4', '3', '2', '1'] : ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+)
+
+const bottomFileLabels = computed(() =>
+  props.flipped ? ['1', '2', '3', '4', '5', '6', '7', '8', '9'] : ['9', '8', '7', '6', '5', '4', '3', '2', '1'],
+)
+
 function hasPieceAt(pos: Position): boolean {
   return props.boardState.pieces.some((p) => isSamePosition(p.position, pos))
 }
@@ -73,6 +84,16 @@ function isCheckedGeneral(piece: Piece): boolean {
 
 <template>
   <div class="board-outer">
+    <div
+      class="file-coords top-coords"
+      aria-hidden="true"
+    >
+      <span
+        v-for="n in topFileLabels"
+        :key="`t-${n}`"
+      >{{ n }}</span>
+    </div>
+
     <div class="board-canvas">
       <!-- Lưới đường kẻ bàn cờ SVG 9x10 -->
       <svg
@@ -207,6 +228,18 @@ function isCheckedGeneral(piece: Piece): boolean {
         />
       </template>
 
+      <!-- Highlight gợi ý nước đi từ AI -->
+      <template v-if="props.hintMove">
+        <div
+          class="hint-ring hint-from"
+          :style="toPercentStyle(props.hintMove.from)"
+        />
+        <div
+          class="hint-ring hint-to"
+          :style="toPercentStyle(props.hintMove.to)"
+        />
+      </template>
+
       <!-- Giao điểm click -->
       <button
         v-for="cell in intersections"
@@ -254,28 +287,50 @@ function isCheckedGeneral(piece: Piece): boolean {
         </span>
       </button>
     </div>
+
+    <div
+      class="file-coords bottom-coords"
+      aria-hidden="true"
+    >
+      <span
+        v-for="n in bottomFileLabels"
+        :key="`b-${n}`"
+      >{{ n }}</span>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .board-outer {
   width: 100%;
-  max-width: 540px;
-  aspect-ratio: 9 / 10;
+  max-width: 548px;
   margin: 0 auto;
-  padding: clamp(14px, 3.2%, 24px);
-  border-radius: 18px;
-  background: linear-gradient(145deg, #d6a469, #b87e42);
+  padding: 10px clamp(14px, 3.2%, 24px);
+  border-radius: 20px;
+  background: linear-gradient(145deg, #d6a469, #b57a3c);
   border: 3px solid #6b4423;
   box-shadow:
     0 24px 55px rgba(0, 0, 0, 0.5),
     inset 0 0 0 2px rgba(255, 244, 214, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.file-coords {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: rgba(68, 37, 13, 0.8);
+  user-select: none;
+  padding: 0 2px;
 }
 
 .board-canvas {
   position: relative;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 8 / 9;
   background: radial-gradient(circle at center, #f3d6a4 0%, #e4bc7d 100%);
 }
 
@@ -339,6 +394,32 @@ function isCheckedGeneral(piece: Piece): boolean {
 .to-ring {
   background: rgba(139, 195, 74, 0.42);
   box-shadow: 0 0 12px rgba(139, 195, 74, 0.7);
+}
+
+.hint-ring {
+  position: absolute;
+  width: 11.4%;
+  height: 10.3%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 4;
+  animation: hintPulse 1.1s infinite ease-in-out;
+}
+
+.hint-from {
+  border: 3px dashed #9333ea;
+  background: rgba(210, 119, 255, 0.25);
+}
+
+.hint-to {
+  border: 3px solid #9333ea;
+  background: rgba(210, 119, 255, 0.35);
+}
+
+@keyframes hintPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.85; }
+  50% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
 }
 
 .legal-marker {

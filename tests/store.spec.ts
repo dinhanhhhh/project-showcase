@@ -1,64 +1,50 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createApp, nextTick } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import { usePagesStore } from '@/stores/usePagesStore'
-
-const pagesFixture = [
-  {
-    slug: 'mini-piano',
-    path: '/mini-piano',
-    name: 'Mini Piano',
-    description: 'Play piano',
-    category: 'creative',
-  },
-  {
-    slug: 'color-game',
-    path: '/color-game',
-    name: 'Color Game',
-    description: 'Guess colors',
-    category: 'game',
-  },
-]
 
 describe('usePagesStore', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
-    vi.restoreAllMocks()
+    const app = createApp({})
+    const pinia = createPinia()
+    pinia.use(piniaPluginPersistedstate)
+    app.use(pinia)
+    setActivePinia(pinia)
   })
 
-  it('loads pages and supports search + category filter', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => pagesFixture,
-    } as Response)
-
+  it('loads discovered pages dynamically and supports search + category filter', async () => {
     const store = usePagesStore()
     await store.loadPages()
 
-    expect(store.pages).toHaveLength(2)
+    expect(store.pages.length).toBeGreaterThanOrEqual(10)
 
-    store.query = 'mini'
+    store.query = 'piano'
     expect(store.filteredPages.map((page) => page.slug)).toEqual(['mini-piano'])
 
     store.query = ''
-    store.category = 'game'
-    expect(store.filteredPages.map((page) => page.slug)).toEqual(['color-game'])
+    store.category = 'education'
+    expect(store.filteredPages.map((page) => page.slug)).toEqual(['oop-flashcards'])
   })
 
-  it('persists favorites and keeps recently viewed deduplicated', () => {
+  it('persists favorites and keeps recently viewed deduplicated', async () => {
     const store = usePagesStore()
 
     store.toggleFavorite('mini-piano')
     expect(store.isFavorite('mini-piano')).toBe(true)
-    expect(JSON.parse(localStorage.getItem('vibe:favorites') || '[]')).toContain('mini-piano')
 
     store.trackRecentlyViewed('mini-piano')
     store.trackRecentlyViewed('color-game')
     store.trackRecentlyViewed('mini-piano')
+    await nextTick()
 
     expect(store.recentlyViewedSlugs).toEqual(['mini-piano', 'color-game'])
-    expect(JSON.parse(localStorage.getItem('vibe:recently-viewed') || '[]')).toEqual([
-      'mini-piano',
-      'color-game',
-    ])
+
+    const raw = JSON.parse(localStorage.getItem('vibe:pages-store') || '{}') as {
+      favoriteSlugs?: string[]
+      recentlyViewedSlugs?: string[]
+    }
+    expect(raw.favoriteSlugs).toContain('mini-piano')
+    expect(raw.recentlyViewedSlugs).toEqual(['mini-piano', 'color-game'])
   })
 })

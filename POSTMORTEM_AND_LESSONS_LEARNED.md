@@ -28,3 +28,19 @@ Tài liệu ghi nhận các lỗi đã phát hiện, nguyên nhân gốc rễ v�
 - **Giải pháp & Quy tắc phòng ngừa:**
   - Chuẩn hóa trọng số `PIECE_VALUES` (100–10000) đồng bộ với bảng `SOLDIER_ADVANCE_BONUS` (0–66), đảo đúng trục `9 - rank` cho quân Đỏ, sửa dấu điểm `checkmate` theo `isMaximizing`, sửa điều kiện `rankDiff * forwardDir > 0`, và thay `any[]` bằng `readonly MoveRecord[]`.
   - Bảo vệ toàn bộ luật chơi và AI bằng bộ Unit Test tại `tests/co-tuong-engine.spec.ts`.
+
+---
+
+## 3. Lỗi mất style `.glass-card`/`.warning` và rò rỉ Event Listener / Timer ở các view đời đầu
+
+- **Ngày ghi nhận:** 2026-11-26
+- **Triệu chứng:**
+  1. `src/views/neon-typing/index.vue` và `src/views/oracle-tarot/index.vue` gắn class `.glass-card` và `.glow-box` nhưng không định nghĩa ở đâu, khiến khung giao diện trống trơn không nền không viền; selector `.stat-item.warning .value` trong `neon-typing` không khớp DOM nên cảnh báo hết giờ màu đỏ không hoạt động.
+  2. `src/composables/useParticlesBackground.ts` đăng ký `window.addEventListener('resize', resize)` nhưng không gỡ trong `onUnmounted`.
+  3. `src/views/oracle-tarot/index.vue` dùng `setTimeout` lồng nhau nhưng không hủy khi unmount.
+  4. `tests/home.spec.ts` và `tests/store.spec.ts` bị lỗi lệch so với Pinia Persistedstate (`vibe:pages-store`) và gây cảnh báo `HTMLCanvasElement.prototype.getContext` trên JSDOM.
+- **Nguyên nhân gốc rễ:** Thiếu utility class chung ở `src/assets/main.css`, chưa áp dụng kỷ luật cleanup tài nguyên nhất quán, và bộ test cũ chưa được cập nhật sau khi chuyển `usePagesStore` sang `pinia-plugin-persistedstate`.
+- **Giải pháp & Quy tắc phòng ngừa:**
+  - Tập trung `.glass-card`, `.glow-box`, `:focus-visible`, và `@media (prefers-reduced-motion: reduce)` vào `src/assets/main.css`.
+  - Luôn lưu tham chiếu handler/timer và hủy sạch trong `onUnmounted` (áp dụng cho `useParticlesBackground`, `oracle-tarot`, `neon-typing`, `BackToTop`, `CommandPalette`).
+  - Mock `HTMLCanvasElement.prototype.getContext` trong `tests/setup.ts` và đăng ký `piniaPluginPersistedstate` trong test để toàn bộ `pnpm test` đạt 100% Pass không nhiễu log.
