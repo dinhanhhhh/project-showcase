@@ -837,3 +837,33 @@
   color: #1e40af;
   line-height: 1.4;
 }
+
+@media (max-width: 560px) {
+  .shop-item-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .shop-item-body {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px dashed #e3d0ab;
+  }
+
+  .shop-item-stats {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  .shop-item-stats span,
+  .shop-item-stats strong {
+    white-space: nowrap;
+  }
+}

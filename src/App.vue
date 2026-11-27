@@ -59,4 +59,17 @@ body {
   opacity: 0;
   transform: translateY(-6px);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-enter-active,
+  .page-transition-leave-active {
+    transition: none;
+  }
+
+  .page-transition-enter-from,
+  .page-transition-leave-to {
+    opacity: 1;
+    transform: none;
+  }
+}
 </style>

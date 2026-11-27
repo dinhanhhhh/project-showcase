@@ -89,8 +89,9 @@ function isCheckedGeneral(piece: Piece): boolean {
       aria-hidden="true"
     >
       <span
-        v-for="n in topFileLabels"
-        :key="`t-${n}`"
+        v-for="(n, idx) in topFileLabels"
+        :key="`t-${idx}-${n}`"
+        :style="{ left: `${(idx / 8) * 100}%` }"
       >{{ n }}</span>
     </div>
 
@@ -293,8 +294,9 @@ function isCheckedGeneral(piece: Piece): boolean {
       aria-hidden="true"
     >
       <span
-        v-for="n in bottomFileLabels"
-        :key="`b-${n}`"
+        v-for="(n, idx) in bottomFileLabels"
+        :key="`b-${idx}-${n}`"
+        :style="{ left: `${(idx / 8) * 100}%` }"
       >{{ n }}</span>
     </div>
   </div>
@@ -302,15 +304,16 @@ function isCheckedGeneral(piece: Piece): boolean {
 
 <style scoped>
 .board-outer {
+  container-type: inline-size;
   width: 100%;
-  max-width: 548px;
+  max-width: var(--board-w, 525px);
   margin: 0 auto;
-  padding: 8px clamp(16px, 4%, 26px);
-  border-radius: 20px;
+  padding: 6px clamp(20px, 5.8cqi, 30px);
+  border-radius: 18px;
   background: linear-gradient(145deg, #d6a469, #b57a3c);
   border: 3px solid #6b4423;
   box-shadow:
-    0 24px 55px rgba(0, 0, 0, 0.5),
+    0 20px 45px rgba(0, 0, 0, 0.45),
     inset 0 0 0 2px rgba(255, 244, 214, 0.3);
   display: flex;
   flex-direction: column;
@@ -318,22 +321,28 @@ function isCheckedGeneral(piece: Piece): boolean {
 }
 
 .file-coords {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.72rem;
+  position: relative;
+  height: 14px;
+  width: 100%;
+  font-size: clamp(0.65rem, 2.2cqi, 0.76rem);
   font-weight: 800;
-  color: rgba(68, 37, 13, 0.9);
+  color: rgba(68, 37, 13, 0.92);
   user-select: none;
-  padding: 0 2px;
-  line-height: 1.2;
+}
+
+.file-coords span {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  line-height: 1;
 }
 
 .board-canvas {
   position: relative;
   width: 100%;
-  aspect-ratio: 8 / 9;
-  margin: 5.5% 0;
-  background: radial-gradient(circle at center, #f3d6a4 0%, #e4bc7d 100%);
+  aspect-ratio: 1 / 0.94;
+  margin: 4.5% 0;
+  background: radial-gradient(circle at center, #f4d8a8 0%, #e4bc7d 100%);
 }
 
 .board-svg {
@@ -355,9 +364,9 @@ function isCheckedGeneral(piece: Piece): boolean {
   justify-content: space-between;
   padding: 0 10%;
   font-family: 'Noto Serif TC', 'KaiTi', 'STKaiti', serif;
-  font-size: clamp(1rem, 3.5vw, 1.75rem);
+  font-size: clamp(0.95rem, 4.6cqi, 1.55rem);
   font-weight: 700;
-  color: rgba(92, 58, 30, 0.72);
+  color: rgba(92, 58, 30, 0.74);
   pointer-events: none;
   user-select: none;
 }
@@ -369,7 +378,8 @@ function isCheckedGeneral(piece: Piece): boolean {
 .intersection-hit {
   position: absolute;
   width: 11%;
-  height: 10%;
+  aspect-ratio: 1;
+  height: auto;
   transform: translate(-50%, -50%);
   background: transparent;
   border: none;
@@ -381,7 +391,8 @@ function isCheckedGeneral(piece: Piece): boolean {
 .last-move-ring {
   position: absolute;
   width: 10.6%;
-  height: 9.6%;
+  aspect-ratio: 1;
+  height: auto;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   pointer-events: none;
@@ -401,7 +412,8 @@ function isCheckedGeneral(piece: Piece): boolean {
 .hint-ring {
   position: absolute;
   width: 11.4%;
-  height: 10.3%;
+  aspect-ratio: 1;
+  height: auto;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   pointer-events: none;
@@ -427,7 +439,8 @@ function isCheckedGeneral(piece: Piece): boolean {
 .legal-marker {
   position: absolute;
   width: 3.4%;
-  height: 3.1%;
+  aspect-ratio: 1;
+  height: auto;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: rgba(16, 185, 129, 0.85);
@@ -437,8 +450,9 @@ function isCheckedGeneral(piece: Piece): boolean {
 }
 
 .legal-marker.is-capture {
-  width: 11.4%;
-  height: 10.3%;
+  width: 11.2%;
+  aspect-ratio: 1;
+  height: auto;
   background: transparent;
   border: 3px solid #ef4444;
   box-shadow: 0 0 14px rgba(239, 68, 68, 0.75);
@@ -446,16 +460,17 @@ function isCheckedGeneral(piece: Piece): boolean {
 
 .xiangqi-piece {
   position: absolute;
-  width: 10.4%;
-  height: 9.36%;
+  width: 10.2%;
+  aspect-ratio: 1;
+  height: auto;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   padding: 2px;
   background: radial-gradient(circle at 30% 30%, #fff8e7, #e6c999 70%, #b58d52);
   border: 2px solid #8a6230;
   box-shadow:
-    0 4px 8px rgba(0, 0, 0, 0.38),
-    inset 0 1px 2px rgba(255, 255, 255, 0.7);
+    0 3px 7px rgba(0, 0, 0, 0.36),
+    inset 0 1px 2px rgba(255, 255, 255, 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -465,7 +480,7 @@ function isCheckedGeneral(piece: Piece): boolean {
 }
 
 .xiangqi-piece:hover {
-  transform: translate(-50%, -54%) scale(1.07);
+  transform: translate(-50%, -54%) scale(1.06);
 }
 
 .piece-inner {
@@ -477,7 +492,7 @@ function isCheckedGeneral(piece: Piece): boolean {
   align-items: center;
   justify-content: center;
   font-family: 'Noto Serif TC', 'KaiTi', 'STKaiti', serif;
-  font-size: clamp(0.95rem, 3.2vw, 1.65rem);
+  font-size: clamp(0.8rem, 5.1cqi, 1.55rem);
   font-weight: 800;
   line-height: 1;
   user-select: none;
@@ -492,7 +507,7 @@ function isCheckedGeneral(piece: Piece): boolean {
 }
 
 .xiangqi-piece.is-selected {
-  transform: translate(-50%, -56%) scale(1.12);
+  transform: translate(-50%, -55%) scale(1.1);
   box-shadow:
     0 0 0 3px var(--primary),
     0 10px 20px rgba(0, 0, 0, 0.5);

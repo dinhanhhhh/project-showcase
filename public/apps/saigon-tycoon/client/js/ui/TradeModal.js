@@ -57,7 +57,12 @@ export class TradeModal {
     );
 
     if (otherPlayers.length === 0) {
-      alert("Không có người chơi nào khác để giao dịch!");
+      const toast = document.getElementById("game-toast");
+      if (toast) {
+        toast.textContent = "Không có người chơi nào khác để giao dịch!";
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2600);
+      }
       this.isOpen = false;
       return;
     }

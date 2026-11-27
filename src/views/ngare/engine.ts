@@ -538,3 +538,48 @@ export class GameEngine {
     return result
   }
 }
+
+export interface LifeRecap {
+  totalScore: number
+  yearsLived: number
+  milestonesCount: number
+  strongestStat: { key: keyof Stats; value: number }
+  weakestStat: { key: keyof Stats; value: number }
+}
+
+const POSITIVE_STAT_KEYS: ReadonlyArray<keyof Stats> = [
+  'money',
+  'skill',
+  'happiness',
+  'health',
+  'relationships',
+]
+
+export function computeLifeRecap(state: GameState): LifeRecap {
+  const s = state.stats
+  const totalScore = s.money + s.skill + s.happiness + s.health + s.relationships - s.stress
+  let strongestKey: keyof Stats = POSITIVE_STAT_KEYS[0]
+  let weakestKey: keyof Stats = POSITIVE_STAT_KEYS[0]
+  let maxVal = s[strongestKey]
+  let minVal = s[weakestKey]
+
+  for (const key of POSITIVE_STAT_KEYS) {
+    const val = s[key]
+    if (val > maxVal) {
+      maxVal = val
+      strongestKey = key
+    }
+    if (val < minVal) {
+      minVal = val
+      weakestKey = key
+    }
+  }
+
+  return {
+    totalScore,
+    yearsLived: Math.max(0, state.age - 22),
+    milestonesCount: state.achievements?.length ?? 0,
+    strongestStat: { key: strongestKey, value: maxVal },
+    weakestStat: { key: weakestKey, value: minVal },
+  }
+}

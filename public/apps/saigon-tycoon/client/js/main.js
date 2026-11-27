@@ -870,6 +870,40 @@ function initGameApp() {
         }
       });
 
+      document.addEventListener("keydown", (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const tag = e.target?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        const hasVisibleModal = Array.from(
+          document.querySelectorAll(".modal-overlay, .modal-backdrop, #setup-modal"),
+        ).some((el) => {
+          const st = getComputedStyle(el);
+          return st.display !== "none" && st.visibility !== "hidden" && !el.classList.contains("hidden");
+        });
+        if (hasVisibleModal) return;
+
+        const key = e.key.toLowerCase();
+        if (e.code === "Space" || key === "r") {
+          if (btnRoll && !btnRoll.disabled) {
+            e.preventDefault();
+            btnRoll.click();
+          }
+        } else if (key === "b") {
+          if (btnBuy && !btnBuy.disabled) {
+            e.preventDefault();
+            btnBuy.click();
+          }
+        } else if (key === "p") {
+          if (btnPass && !btnPass.disabled) {
+            e.preventDefault();
+            btnPass.click();
+          }
+        } else if (key === "m") {
+          e.preventDefault();
+          if (vintageRadio) vintageRadio.toggleOpen();
+        }
+      });
+
       const menuItemRulebook = document.getElementById("menu-item-rulebook");
       if (menuItemRulebook) {
         menuItemRulebook.onclick = () => {
@@ -964,28 +998,33 @@ function initGameApp() {
 
     updateDeckCounts();
 
-    // Nạp module công cụ Dev & Test nếu file tồn tại ở Local (Được .gitignore bảo vệ, không bao giờ lên GitHub)
-    import("./dev/dev-tools.js")
-      .then((devModule) => {
-        devModule.setupDevTools({
-          getEngine: () => engine,
-          hud,
-          boardRenderer,
-          tokenRenderer,
-          sound,
-          showToast,
-          addGameLog,
-          autoSaveGame,
-          resolveLanding,
-          showJailOptions,
-          showGameOverModal,
-          auctionModal,
-          triggerPlayerEmote,
+    // Nạp module công cụ Dev & Test chỉ khi bật chế độ ?dev=1 hoặc saigon_dev_mode=1
+    const isDevMode =
+      window.location.search.includes("dev=1") ||
+      localStorage.getItem("saigon_dev_mode") === "1";
+    if (isDevMode) {
+      import("./dev/dev-tools.js")
+        .then((devModule) => {
+          devModule.setupDevTools({
+            getEngine: () => engine,
+            hud,
+            boardRenderer,
+            tokenRenderer,
+            sound,
+            showToast,
+            addGameLog,
+            autoSaveGame,
+            resolveLanding,
+            showJailOptions,
+            showGameOverModal,
+            auctionModal,
+            triggerPlayerEmote,
+          });
+        })
+        .catch(() => {
+          // Môi trường Production / GitHub: Không có thư mục dev/, bỏ qua an toàn tuyệt đối
         });
-      })
-      .catch(() => {
-        // Môi trường Production / GitHub: Không có thư mục dev/, bỏ qua an toàn tuyệt đối
-      });
+    }
   }
 
   /**

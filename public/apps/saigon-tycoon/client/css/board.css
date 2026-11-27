@@ -51,23 +51,45 @@
     border-radius: 8px;
   }
 
-  /* Tối ưu typography ô đất trên mobile để không tràn hay đè chữ */
+  /* Tối ưu typography ô đất trên mobile để không tràn hay gãy giữa từ */
   .tile-name {
-    font-size: clamp(5.6px, 10.5cqw, 7.6px);
-    line-height: 1.02;
-    letter-spacing: -0.15px;
+    font-size: clamp(4.8px, 8.6cqw, 6.8px);
+    line-height: 1.04;
+    letter-spacing: -0.2px;
     padding: 0 1px;
     word-break: normal;
-    overflow-wrap: break-word;
+    overflow-wrap: normal;
   }
 
   .edge-left .tile-name,
   .edge-right .tile-name {
-    font-size: clamp(5.4px, 9.5cqw, 7.2px);
-    line-height: 0.98;
+    font-size: clamp(4.6px, 8cqw, 6.4px);
+    line-height: 1.02;
     padding: 0;
     word-break: normal;
-    overflow-wrap: break-word;
+    overflow-wrap: normal;
+  }
+
+  .go-corner-layout {
+    gap: 1px;
+  }
+
+  .go-arrow-box {
+    margin-bottom: 0;
+  }
+
+  .go-arrow-box svg {
+    width: clamp(14px, 24cqw, 22px);
+  }
+
+  .go-title {
+    font-size: clamp(6.8px, 11.5cqw, 8.8px);
+    line-height: 1.02;
+  }
+
+  .go-reward {
+    font-size: clamp(5.8px, 9.5cqw, 7.6px);
+    margin-top: 0;
   }
 
   .tile-price {
@@ -1051,12 +1073,55 @@
   transform: translateX(-50%);
 }
 
-/* Với ô đặc biệt không có dải màu (ga tàu, tiện ích) */
+/* Với ô đặc biệt không có dải màu (ga tàu, tiện ích): đặt ở góc trên-phải để không đè giá THUÊ ở đáy */
 .tile-special .tile-owner-token-badge {
-  bottom: 3px;
-  right: 3px;
-  top: auto;
+  top: 2px;
+  right: 2px;
+  bottom: auto;
   left: auto;
+}
+
+@media (max-width: 600px) {
+  .tile-corner-go,
+  #tile-0 {
+    padding: 1px !important;
+  }
+
+  .go-corner-layout {
+    gap: 1px;
+    justify-content: center;
+  }
+
+  .go-arrow-box {
+    margin-bottom: 0;
+  }
+
+  .go-arrow-box svg {
+    width: 12px !important;
+    height: auto;
+  }
+
+  .go-title {
+    font-size: 6.4px !important;
+    line-height: 1.02 !important;
+  }
+
+  .go-reward {
+    font-size: 5.4px !important;
+    line-height: 1.02 !important;
+    margin-top: 0 !important;
+  }
+
+  .tile-owner-token-badge {
+    width: 8px;
+    height: 8px;
+  }
+
+  .tile-price.tile-rent-active .rent-val,
+  .edge-left .tile-price.tile-rent-active .rent-val,
+  .edge-right .tile-price.tile-rent-active .rent-val {
+    font-size: 6.8px !important;
+  }
 }
 
 /* ================= HIỆU ỨNG HOVER PANEL NGƯỜI CHƠI ================= */

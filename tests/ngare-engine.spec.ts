@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { GameEngine } from '../src/views/ngare/engine'
+import { GameEngine, computeLifeRecap } from '../src/views/ngare/engine'
 import type { Choice } from '../src/views/ngare/types'
 
 // Mock localStorage
@@ -156,5 +156,137 @@ describe('GameEngine - Ngã Rẽ Cuộc Đời', () => {
     
     // Skill = startSkill + 2 (item) + 0 (choice)
     expect(engine.state?.stats.skill).toBe(startSkill + 2)
+  })
+
+  it('returns null when initializing with an unknown career id', async () => {
+    const state = await engine.newGame('Unknown', 'astronaut_invalid')
+    expect(state).toBeNull()
+  })
+
+  it('triggers gameOver on burnout (stress >= 100) and zero-salary bankruptcy', async () => {
+    await engine.newGame('Stress Test', 'programmer')
+    await engine.applyChoice({
+      text: 'OT xuyên màn đêm',
+      effects: { stress: 120 },
+      result: 'Kiệt sức',
+    })
+    expect(engine.state?.gameOver).toBe(true)
+    expect(engine.state?.gameOverInfo?.reason).toBe('burnout')
+
+    await engine.newGame('Broke Test', 'programmer')
+    engine.state!.careerId = 'unemployed'
+    engine.state!.salary = 0
+    await engine.applyChoice({
+      text: 'Mất trắng vốn',
+      effects: { money: -100 },
+      result: 'Trắng tay',
+    })
+    expect(engine.state?.gameOver).toBe(true)
+    expect(engine.state?.gameOverInfo?.reason).toBe('money')
+    const ending = engine.calculateEnding()
+    expect(ending.id).toBe('pha_san')
+  })
+
+  it('completes career upon reaching MAX_AGE retirement and computes an ending', async () => {
+    await engine.newGame('Retire Test', 'programmer')
+    engine.state!.age = 59
+    await engine.applyChoice({
+      text: 'Cống hiến năm cuối',
+      effects: { skill: 5, happiness: 10 },
+      result: 'Nghỉ hưu',
+    })
+
+    expect(engine.state?.age).toBe(60)
+    expect(engine.state?.gameOver).toBe(true)
+    const ending = engine.calculateEnding()
+    expect(ending).not.toBeNull()
+    expect(ending.title.length).toBeGreaterThan(0)
+  })
+
+  it('triggers instant gameOver from choice isGameOver flag', async () => {
+    await engine.newGame('Instant End', 'programmer')
+    await engine.applyChoice({
+      text: 'Bước ngoặt định mệnh',
+      effects: {},
+      result: 'Kết thúc bất ngờ',
+      isGameOver: true,
+      gameOverReason: {
+        type: 'scandal',
+        message: 'Ngã rẽ bất ngờ',
+        icon: '⚡',
+      },
+    })
+
+    expect(engine.state?.gameOver).toBe(true)
+    expect(engine.state?.gameOverInfo?.reason).toBe('event')
+    expect(engine.state?.gameOverInfo?.message).toContain('Ngã rẽ bất ngờ')
+  })
+
+  it('handles buyItem with sufficient funds, duplicate prevention, and insufficient money', async () => {
+    await engine.newGame('Shopper', 'programmer')
+    // Start money = 45
+    const failExpensive = await engine.buyItem('wedding_ring') // cost 50
+    expect(failExpensive.success).toBe(false)
+
+    const ok = await engine.buyItem('meditation_app') // cost 15
+    expect(ok.success).toBe(true)
+    expect(engine.state?.stats.money).toBe(30)
+    expect(engine.state?.inventory).toContain('meditation_app')
+
+    const dup = await engine.buyItem('meditation_app')
+    expect(dup.success).toBe(false)
+  })
+
+  it('supports buying and activating Oracle Preview & Time Rewind skills with cooldowns', async () => {
+    await engine.newGame('Strategist', 'programmer')
+    engine.state!.stats.money = 100
+
+    const boughtOracle = await engine.buySkill('skill_oracle')
+    expect(boughtOracle.success).toBe(true)
+    const usedOracle = await engine.useSkill('skill_oracle')
+    expect(usedOracle.success).toBe(true)
+    expect(usedOracle.isPreview).toBe(true)
+
+    const cooldownBlock = await engine.useSkill('skill_oracle')
+    expect(cooldownBlock.success).toBe(false)
+
+    const boughtRewind = await engine.buySkill('skill_time_rewind')
+    expect(boughtRewind.success).toBe(true)
+    const ageBefore = engine.state!.age
+    await engine.applyChoice({
+      text: 'Thử nghiệm rủi ro',
+      effects: { happiness: -20 },
+      result: 'Sai lầm',
+    })
+    expect(engine.state!.age).toBe(ageBefore + 1)
+
+    const rewound = await engine.useSkill('skill_time_rewind')
+    expect(rewound.success).toBe(true)
+    expect(engine.state!.age).toBe(ageBefore)
+  })
+
+  it('computes accurate LifeRecap summary with strongest and weakest positive stats', async () => {
+    const state = await engine.newGame('Recap Test', 'programmer')
+    expect(state).not.toBeNull()
+    state!.age = 42
+    state!.stats = {
+      money: 80,
+      happiness: 65,
+      skill: 95,
+      health: 40,
+      relationships: 55,
+      stress: 20,
+    }
+    state!.achievements = [
+      { age: 30, text: 'Milestone 1' },
+      { age: 38, text: 'Milestone 2' },
+    ]
+
+    const recap = computeLifeRecap(state!)
+    expect(recap.yearsLived).toBe(20)
+    expect(recap.totalScore).toBe(80 + 95 + 65 + 40 + 55 - 20)
+    expect(recap.milestonesCount).toBe(2)
+    expect(recap.strongestStat).toEqual({ key: 'skill', value: 95 })
+    expect(recap.weakestStat).toEqual({ key: 'health', value: 40 })
   })
 })

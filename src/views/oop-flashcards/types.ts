@@ -15,7 +15,32 @@ export interface Topic {
   title: string
 }
 
-export type TopicFilter = number | 'all' | 'review'
+export type TopicFilter = number | 'all' | 'review' | 'unmastered'
+export type StudyMode = 'flashcard' | 'quiz'
+
+export interface KnowledgeGroupProgress {
+  id: 'oop-core' | 'oop-pillars' | 'solid-patterns'
+  title: string
+  mastered: number
+  total: number
+  percent: number
+}
+
+export interface QuizOption {
+  id: string
+  text: string
+  isCorrect: boolean
+}
+
+export interface QuizQuestion {
+  cardId: string
+  topicId: number
+  difficulty: Difficulty
+  question: string
+  answerTitle: string
+  explanation: string[]
+  options: QuizOption[]
+}
 
 export type CodeTokenKind = 'plain' | 'comment' | 'string' | 'keyword' | 'func'
 

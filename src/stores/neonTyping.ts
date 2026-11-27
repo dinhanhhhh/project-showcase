@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import type { WordPackId } from '@/views/neon-typing/types'
+import { calculateTypingRank } from '@/views/neon-typing/engine'
+import type { TypingRunRecord, WordPackId } from '@/views/neon-typing/types'
 
 interface NeonTypingState {
   bestWpm: number
@@ -7,6 +8,7 @@ interface NeonTypingState {
   totalGamesPlayed: number
   soundEnabled: boolean
   preferredPack: WordPackId
+  history: TypingRunRecord[]
 }
 
 export const useNeonTypingStore = defineStore('neon-typing', {
@@ -16,17 +18,38 @@ export const useNeonTypingStore = defineStore('neon-typing', {
     totalGamesPlayed: 0,
     soundEnabled: true,
     preferredPack: 'dev',
+    history: [],
   }),
 
   actions: {
-    recordTimedResult(wpm: number) {
+    recordTimedResult(wpm: number, accuracy = 100, pack?: WordPackId) {
       this.totalGamesPlayed += 1
       if (wpm > this.bestWpm) {
         this.bestWpm = wpm
       }
+      this.history = [
+        {
+          id: `run-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          wpm,
+          accuracy,
+          rank: calculateTypingRank(wpm, accuracy),
+          mode: 'timed' as const,
+          pack: pack ?? this.preferredPack,
+          timestamp: new Date().toLocaleTimeString('vi-VN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        },
+        ...(this.history ?? []),
+      ].slice(0, 10)
     },
 
-    recordSuddenDeathResult(correctWords: number, wpm: number) {
+    recordSuddenDeathResult(
+      correctWords: number,
+      wpm: number,
+      accuracy = 100,
+      pack?: WordPackId,
+    ) {
       this.totalGamesPlayed += 1
       if (correctWords > this.bestSuddenDeathWords) {
         this.bestSuddenDeathWords = correctWords
@@ -34,6 +57,25 @@ export const useNeonTypingStore = defineStore('neon-typing', {
       if (wpm > this.bestWpm) {
         this.bestWpm = wpm
       }
+      this.history = [
+        {
+          id: `run-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          wpm,
+          accuracy,
+          rank: calculateTypingRank(wpm, accuracy),
+          mode: 'sudden_death' as const,
+          pack: pack ?? this.preferredPack,
+          timestamp: new Date().toLocaleTimeString('vi-VN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        },
+        ...(this.history ?? []),
+      ].slice(0, 10)
+    },
+
+    clearHistory() {
+      this.history = []
     },
 
     toggleSound() {
@@ -48,5 +90,13 @@ export const useNeonTypingStore = defineStore('neon-typing', {
   persist: {
     key: 'vibe_neon_typing',
     storage: localStorage,
+    pick: [
+      'bestWpm',
+      'bestSuddenDeathWords',
+      'totalGamesPlayed',
+      'soundEnabled',
+      'preferredPack',
+      'history',
+    ],
   },
 })

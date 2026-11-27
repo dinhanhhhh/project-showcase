@@ -1,10 +1,16 @@
+import { createApp, nextTick } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import { describe, expect, it } from 'vitest'
+import { useMiniPianoStore } from '@/stores/miniPiano'
 import {
   SONG_PRESETS,
   calculateChallengeAccuracy,
+  formatMelodyDuration,
   formatPitchForOctave,
   getKeysForOctave,
   getOctaveMultiplier,
+  getSynthReleaseSeconds,
   scoreChallengeHit,
 } from '@/views/mini-piano/engine'
 
@@ -52,5 +58,46 @@ describe('Mini Piano Engine', () => {
     expect(scoreChallengeHit(1)).toBe(115)
     expect(scoreChallengeHit(10)).toBe(250)
     expect(scoreChallengeHit(20)).toBe(250) // capped bonus at combo 10
+  })
+
+  it('computes sustain release times and melody durations cleanly', () => {
+    expect(getSynthReleaseSeconds(false)).toBe(0.92)
+    expect(getSynthReleaseSeconds(true)).toBe(1.85)
+    expect(formatMelodyDuration([])).toBe('0.0s')
+    expect(
+      formatMelodyDuration([
+        { pitchClass: 'C', octave: 4, offsetMs: 0 },
+        { pitchClass: 'E', octave: 4, offsetMs: 1450 },
+      ]),
+    ).toBe('1.5s')
+  })
+
+  it('persists synth settings, best song scores, and caps saved melodies at 5 via Pinia store', async () => {
+    localStorage.clear()
+    const pinia = createPinia()
+    pinia.use(piniaPluginPersistedstate)
+    createApp({}).use(pinia)
+    setActivePinia(pinia)
+
+    const store = useMiniPianoStore()
+    store.setOctave(5)
+    store.setWaveform('sawtooth')
+    store.toggleSustain()
+    store.recordSongScore('twinkle', 1200)
+    store.recordSongScore('twinkle', 900) // keeps higher record
+    for (let i = 1; i <= 7; i++) {
+      store.saveMelody(`M${i}`, [{ pitchClass: 'C', octave: 4, offsetMs: i * 100 }])
+    }
+    await nextTick()
+
+    expect(store.octave).toBe(5)
+    expect(store.waveform).toBe('sawtooth')
+    expect(store.sustainEnabled).toBe(true)
+    expect(store.bestScoreBySong.twinkle).toBe(1200)
+    expect(store.savedMelodies).toHaveLength(5)
+    expect(store.savedMelodies[0].name).toBe('M7')
+
+    store.deleteMelody(store.savedMelodies[0].id)
+    expect(store.savedMelodies).toHaveLength(4)
   })
 })

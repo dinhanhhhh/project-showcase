@@ -169,6 +169,44 @@ export const XIANGQI_PUZZLES: readonly XiangqiPuzzle[] = [
       ],
     },
   },
+  {
+    id: 'thiet-mon-thoan',
+    title: 'Thế 5: Thiết Môn Thoan',
+    difficulty: 'Trung bình',
+    description: 'Đỏ đi trước — Dùng Pháo đầu ghim chặt đôi Sĩ và đưa Xe khóa chốt trung lộ chiếu bí trong 1 nước!',
+    hint: 'Đưa Xe cánh phải từ (7,1) vào tâm cung (4,1) — Tướng Đen không ăn được Xe vì có Pháo (1,1) bắn cách quân Tốt (3,1), còn đôi Sĩ thì bị Pháo (4,5) ghim!',
+    boardState: {
+      pieces: [
+        createPiece('p5_b_gen', 'black', 'general', 4, 0),
+        createPiece('p5_b_adv1', 'black', 'advisor', 3, 0),
+        createPiece('p5_b_adv2', 'black', 'advisor', 5, 0),
+        createPiece('p5_b_ele', 'black', 'elephant', 2, 0),
+        createPiece('p5_b_sol', 'black', 'soldier', 3, 1),
+        createPiece('p5_r_gen', 'red', 'general', 5, 9),
+        createPiece('p5_r_cannon_mid', 'red', 'cannon', 4, 5),
+        createPiece('p5_r_cannon_guard', 'red', 'cannon', 1, 1),
+        createPiece('p5_r_chariot', 'red', 'chariot', 7, 1),
+      ],
+    },
+  },
+  {
+    id: 'muon-tuong-sat',
+    title: 'Thế 6: Mượn Tướng Sát',
+    difficulty: 'Cao thủ',
+    description: 'Đỏ đi trước — Tận dụng luật Mặt Tướng ghim chặt Sĩ Đen ở trục giữa để Xe chiếu bí 1 nước!',
+    hint: 'Đẩy Xe lên hàng đáy (5,0) có Tốt (5,1) yểm trợ — Sĩ (4,1) không thể ăn Xe vì lộ mặt Tướng.',
+    boardState: {
+      pieces: [
+        createPiece('p6_b_gen', 'black', 'general', 4, 0),
+        createPiece('p6_b_adv1', 'black', 'advisor', 3, 0),
+        createPiece('p6_b_adv2', 'black', 'advisor', 4, 1),
+        createPiece('p6_b_ele', 'black', 'elephant', 6, 2),
+        createPiece('p6_r_gen', 'red', 'general', 4, 9),
+        createPiece('p6_r_chariot', 'red', 'chariot', 5, 4),
+        createPiece('p6_r_soldier', 'red', 'soldier', 5, 1),
+      ],
+    },
+  },
 ]
 
 export function cloneBoardState(board: BoardState): BoardState {

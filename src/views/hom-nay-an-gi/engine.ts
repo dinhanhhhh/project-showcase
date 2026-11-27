@@ -1,4 +1,17 @@
-import type { FoodFilter, FoodItem, FoodValidationResult } from './types'
+import type {
+  FoodFilter,
+  FoodItem,
+  FoodValidationResult,
+  MealTimeFilter,
+  PriceTierFilter,
+} from './types'
+
+export interface FoodAdvancedFilterOptions {
+  category: FoodFilter
+  mealTime: MealTimeFilter
+  priceTier: PriceTierFilter
+  favoriteIds: readonly string[]
+}
 
 export function filterFoods(
   foods: readonly FoodItem[],
@@ -14,6 +27,43 @@ export function filterFoods(
     return foods.filter((f) => f.isCustom || f.category === 'custom')
   }
   return foods.filter((f) => f.category === filter)
+}
+
+export function filterFoodsAdvanced(
+  foods: readonly FoodItem[],
+  options: FoodAdvancedFilterOptions,
+): FoodItem[] {
+  let pool = filterFoods(foods, options.category, options.favoriteIds)
+
+  if (options.mealTime !== 'all') {
+    pool = pool.filter((item) => {
+      if (item.mealTimes && item.mealTimes.length > 0) {
+        return item.mealTimes.includes(options.mealTime as Exclude<MealTimeFilter, 'all'>)
+      }
+      if (item.isCustom) return true
+      return options.mealTime === 'an-vat' && item.category === 'an-vat'
+    })
+  }
+
+  if (options.priceTier !== 'all') {
+    pool = pool.filter((item) => {
+      if (item.priceTier) return item.priceTier === options.priceTier
+      return Boolean(item.isCustom)
+    })
+  }
+
+  return pool
+}
+
+export function getSpinDelays(totalSteps = 14): number[] {
+  if (totalSteps <= 0) return []
+  if (totalSteps === 1) return [80]
+  const delays: number[] = []
+  for (let i = 0; i < totalSteps; i++) {
+    const progress = i / (totalSteps - 1)
+    delays.push(Math.round(45 + Math.pow(progress, 2) * 195))
+  }
+  return delays
 }
 
 export function pickRandomFood(
@@ -90,5 +140,44 @@ export function validateFoodInput(
     valid: true,
     sanitizedName,
     sanitizedImage,
+  }
+}
+
+export interface DailyMealPlan {
+  sang: FoodItem | null
+  trua: FoodItem | null
+  toi: FoodItem | null
+  anVat: FoodItem | null
+}
+
+/**
+ * Gợi ý trọn bộ thực đơn 4 bữa trong ngày (Sáng · Trưa · Tối · Ăn vặt),
+ * ưu tiên không trùng món giữa các bữa nếu danh sách đủ phong phú.
+ */
+export function generateDailyMealPlan(
+  foods: readonly FoodItem[],
+  rng: () => number = Math.random,
+): DailyMealPlan {
+  const usedIds = new Set<string>()
+  const pickFor = (mealTime: Exclude<MealTimeFilter, 'all'>): FoodItem | null => {
+    const candidates = filterFoodsAdvanced(foods, {
+      category: 'all',
+      mealTime,
+      priceTier: 'all',
+      favoriteIds: [],
+    })
+    if (candidates.length === 0) return null
+    const fresh = candidates.filter((item) => !usedIds.has(item.id))
+    const pool = fresh.length > 0 ? fresh : candidates
+    const chosen = pickRandomFood(pool, null, rng)
+    if (chosen) usedIds.add(chosen.id)
+    return chosen
+  }
+
+  return {
+    sang: pickFor('sang'),
+    trua: pickFor('trua'),
+    toi: pickFor('toi'),
+    anVat: pickFor('an-vat'),
   }
 }

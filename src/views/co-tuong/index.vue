@@ -9,6 +9,7 @@ import {
   applyMove,
   calculateRedAdvantagePercent,
   evaluateBoard,
+  exportMoveNotationText,
   findBestMove,
   formatNotation,
   getGameStatus,
@@ -38,6 +39,7 @@ const hintMove = ref<{ from: Position; to: Position; notation: string } | null>(
 const isBotThinking = ref(false)
 const manualFlipped = ref(false)
 const isVictoryModalOpen = ref(false)
+const copiedNotation = ref(false)
 
 // Cờ Thế (Endgame Puzzles)
 const activePuzzleIndex = ref(0)
@@ -51,7 +53,83 @@ const resignedSide = ref<Side | null>(null)
 
 let botTimer: ReturnType<typeof setTimeout> | null = null
 let gameOverSoundTimer: ReturnType<typeof setTimeout> | null = null
+let copyNotationTimer: ReturnType<typeof setTimeout> | null = null
 let clockInterval: ReturnType<typeof setInterval> | null = null
+
+function fallbackCopyText(text: string): boolean {
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'fixed'
+    textarea.style.top = '-9999px'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+async function copyMoveNotation() {
+  const text = exportMoveNotationText(store.moveHistory)
+  if (!text) return
+  copiedNotation.value = true
+  if (copyNotationTimer) clearTimeout(copyNotationTimer)
+  copyNotationTimer = setTimeout(() => {
+    copiedNotation.value = false
+  }, 2000)
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await Promise.race([
+        navigator.clipboard.writeText(text),
+        new Promise<void>((resolve) => setTimeout(resolve, 350)),
+      ])
+    } else {
+      fallbackCopyText(text)
+    }
+  } catch {
+    fallbackCopyText(text)
+  }
+}
+
+function handleChessKeydown(e: KeyboardEvent) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+  const activeDialogs = document.querySelectorAll('[role="dialog"]')
+  const hasExternalDialog = Array.from(activeDialogs).some(
+    (el) => !el.classList.contains('victory-dialog'),
+  )
+  if (hasExternalDialog) return
+
+  if (e.key === 'Escape') {
+    if (isVictoryModalOpen.value) {
+      isVictoryModalOpen.value = false
+      e.preventDefault()
+    } else if (selectedPiece.value) {
+      selectedPiece.value = null
+      legalMoves.value = []
+      e.preventDefault()
+    }
+    return
+  }
+
+  const lower = e.key.toLowerCase()
+  if (lower === 'h') {
+    e.preventDefault()
+    requestHint()
+  } else if (lower === 'u') {
+    e.preventDefault()
+    handleUndo()
+  } else if (lower === 'f') {
+    e.preventDefault()
+    manualFlipped.value = !manualFlipped.value
+  }
+}
 
 const activePuzzle = computed(() => XIANGQI_PUZZLES[activePuzzleIndex.value] ?? XIANGQI_PUZZLES[0])
 
@@ -471,10 +549,16 @@ onMounted(() => {
   } else {
     resetClocks()
   }
+  window.addEventListener('keydown', handleChessKeydown)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleChessKeydown)
   clearTimers()
+  if (copyNotationTimer) {
+    clearTimeout(copyNotationTimer)
+    copyNotationTimer = null
+  }
 })
 </script>
 
@@ -815,6 +899,10 @@ onUnmounted(() => {
               </button>
             </div>
 
+            <p class="chess-kbd-hint">
+              Phím tắt: <kbd>H</kbd> Gợi ý · <kbd>U</kbd> Đi lại · <kbd>F</kbd> Xoay bàn · <kbd>Esc</kbd> Bỏ chọn
+            </p>
+
             <button
               v-if="store.gameMode !== 'puzzle' && !isGameOver && store.moveHistory.length > 0"
               type="button"
@@ -844,7 +932,17 @@ onUnmounted(() => {
           </div>
 
           <div class="panel-card history-card">
-            <h2>📜 Biên bản ván đấu</h2>
+            <div class="history-header-row">
+              <h2>📜 Biên bản ván đấu</h2>
+              <button
+                v-if="store.moveHistory.length > 0"
+                type="button"
+                class="copy-notation-btn"
+                @click="copyMoveNotation"
+              >
+                {{ copiedNotation ? '✅ Đã chép' : '📋 Chép biên bản' }}
+              </button>
+            </div>
             <div
               v-if="store.moveHistory.length === 0"
               class="empty-history"
@@ -931,19 +1029,20 @@ onUnmounted(() => {
 
 <style scoped>
 .chess-page {
+  --board-w: clamp(460px, min(535px, calc((100dvh - 175px) * 0.95)), 535px);
   min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
-  padding: 1rem;
+  padding: 0.35rem 1.25rem;
   font-family: 'Inter', sans-serif;
 }
 
 .chess-shell {
-  max-width: 1120px;
+  max-width: 1140px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 0.35rem;
 }
 
 .chess-header {
@@ -956,13 +1055,13 @@ onUnmounted(() => {
 
 .back-btn,
 .icon-btn {
-  padding: 0.48rem 0.9rem;
-  border-radius: 12px;
+  padding: 0.34rem 0.85rem;
+  border-radius: 11px;
   background: var(--bg-card);
   border: 1px solid var(--outline);
   color: var(--primary);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -984,18 +1083,20 @@ onUnmounted(() => {
 
 .title-block h1 {
   font-family: 'Manrope', sans-serif;
-  font-size: clamp(1.35rem, 2.8vw, 1.85rem);
+  font-size: clamp(1.15rem, 1.9vw, 1.45rem);
   font-weight: 800;
+  line-height: 1.15;
 }
 
 .title-block p {
   color: var(--text-dim);
-  font-size: 0.84rem;
+  font-size: 0.74rem;
+  line-height: 1.15;
 }
 
 .header-tools {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
 
 .status-banner {
@@ -1003,12 +1104,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.72rem 1.15rem;
-  border-radius: 14px;
+  padding: 0.36rem 1rem;
+  border-radius: 12px;
   background: var(--bg-card);
   border: 1px solid var(--outline);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.86rem;
 }
 
 .status-banner.is-check {
@@ -1024,7 +1125,7 @@ onUnmounted(() => {
 }
 
 .turn-counter {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -1033,19 +1134,19 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.85rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 
 .clock-chip {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.45rem 0.95rem;
-  border-radius: 12px;
+  gap: 0.6rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 11px;
   background: var(--bg-card);
   border: 1.5px solid var(--outline);
-  min-width: 140px;
+  min-width: 130px;
   justify-content: space-between;
   transition: var(--transition-fast);
 }
@@ -1067,19 +1168,19 @@ onUnmounted(() => {
 }
 
 .clock-label {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--text-dim);
 }
 
 .clock-time {
   font-family: 'JetBrains Mono', 'Manrope', monospace;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 800;
 }
 
 .clock-vs {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 1px;
   color: var(--text-dim);
@@ -1087,31 +1188,31 @@ onUnmounted(() => {
 
 .chess-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+  grid-template-columns: minmax(0, 1.12fr) minmax(350px, 0.88fr);
   gap: 1.25rem;
-  align-items: start;
+  align-items: stretch;
 }
 
 .board-column {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.32rem;
 }
 
 .eval-widget {
-  max-width: 540px;
+  max-width: var(--board-w);
   width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.18rem;
 }
 
 .eval-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   color: var(--text-dim);
 }
 
@@ -1121,7 +1222,7 @@ onUnmounted(() => {
 }
 
 .eval-track {
-  height: 8px;
+  height: 6px;
   border-radius: 99px;
   background: #1e293b;
   border: 1px solid var(--outline);
@@ -1135,21 +1236,21 @@ onUnmounted(() => {
 }
 
 .captured-strip {
-  max-width: 540px;
+  max-width: var(--board-w);
   width: 100%;
   margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.45rem 0.85rem;
-  border-radius: 12px;
+  gap: 0.5rem;
+  padding: 0.24rem 0.75rem;
+  border-radius: 11px;
   background: var(--bg-card);
   border: 1px solid var(--outline);
-  min-height: 40px;
+  min-height: 30px;
 }
 
 .cap-label {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-dim);
   white-space: nowrap;
 }
@@ -1157,18 +1258,18 @@ onUnmounted(() => {
 .cap-pieces {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
+  gap: 0.26rem;
 }
 
 .cap-chip {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: #f3d6a4;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 800;
 }
 
@@ -1176,7 +1277,7 @@ onUnmounted(() => {
 .cap-chip.black { color: #111827; }
 
 .cap-empty {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-dim);
   font-style: italic;
 }
@@ -1184,57 +1285,65 @@ onUnmounted(() => {
 .control-column {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.55rem;
+  max-height: calc(var(--board-w) * 0.97 + 94px);
+  min-height: 0;
 }
 
 .panel-card {
   background: var(--bg-card);
   border: 1px solid var(--outline);
-  border-radius: 18px;
-  padding: 1.1rem;
+  border-radius: 16px;
+  padding: 0.82rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.5rem;
 }
 
 .panel-card h2 {
   font-family: 'Manrope', sans-serif;
-  font-size: 1rem;
+  font-size: 0.96rem;
   font-weight: 800;
 }
 
 .setting-group {
   display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
 }
 
 .setting-label {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--text-dim);
   font-weight: 600;
+  min-width: 88px;
+  white-space: nowrap;
 }
 
 .segmented {
+  flex: 1;
   display: flex;
-  gap: 0.35rem;
+  gap: 0.28rem;
   background: var(--bg-sidebar);
-  padding: 0.25rem;
-  border-radius: 12px;
+  padding: 0.2rem;
+  border-radius: 11px;
   border: 1px solid var(--outline);
 }
 
 .segmented button {
   flex: 1;
-  padding: 0.46rem 0.4rem;
-  border-radius: 9px;
+  padding: 0.38rem 0.35rem;
+  border-radius: 8px;
   border: none;
   background: transparent;
   color: var(--text-dim);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
   transition: var(--transition-fast);
+  white-space: nowrap;
 }
 
 .segmented button.active {
@@ -1245,7 +1354,7 @@ onUnmounted(() => {
 .puzzle-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.35rem;
 }
 
 .puzzle-header-row {
@@ -1255,7 +1364,7 @@ onUnmounted(() => {
 }
 
 .puzzle-progress {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   color: var(--success);
 }
@@ -1263,7 +1372,9 @@ onUnmounted(() => {
 .puzzle-list {
   display: flex;
   flex-direction: column;
-  gap: 0.38rem;
+  gap: 0.25rem;
+  max-height: 120px;
+  overflow-y: auto;
 }
 
 .puzzle-btn {
@@ -1271,12 +1382,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.52rem 0.7rem;
-  border-radius: 10px;
+  padding: 0.36rem 0.55rem;
+  border-radius: 8px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
@@ -1294,44 +1405,44 @@ onUnmounted(() => {
 }
 
 .pz-diff {
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   color: var(--text-dim);
   white-space: nowrap;
 }
 
 .puzzle-desc {
-  font-size: 0.82rem;
-  line-height: 1.5;
+  font-size: 0.74rem;
+  line-height: 1.4;
   color: var(--text-dim);
 }
 
 .puzzle-clue-btn {
   align-self: flex-start;
-  padding: 0.36rem 0.7rem;
-  border-radius: 8px;
+  padding: 0.26rem 0.55rem;
+  border-radius: 7px;
   background: var(--accent-soft);
   border: 1px solid var(--accent-glow);
   color: var(--accent);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
 }
 
 .puzzle-clue-box {
-  padding: 0.55rem 0.75rem;
-  border-radius: 10px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
   background: var(--bg-sidebar);
   border: 1px dashed var(--accent);
-  font-size: 0.8rem;
-  line-height: 1.5;
+  font-size: 0.74rem;
+  line-height: 1.4;
   color: var(--text);
 }
 
 .action-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.55rem;
-  margin-top: 0.25rem;
+  gap: 0.4rem;
+  margin-top: 0.1rem;
 }
 
 .action-buttons.three-cols {
@@ -1340,26 +1451,26 @@ onUnmounted(() => {
 
 .btn-resign {
   width: 100%;
-  padding: 0.55rem;
-  border-radius: 10px;
+  padding: 0.36rem;
+  border-radius: 8px;
   background: var(--danger-bg);
   border: 1px solid var(--danger-border);
   color: var(--danger);
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
 }
 
 .hint-banner {
-  max-width: 548px;
+  max-width: var(--board-w);
   width: 100%;
   margin: 0 auto;
-  padding: 0.55rem 0.9rem;
+  padding: 0.42rem 0.8rem;
   border-radius: 12px;
   background: var(--accent-soft);
   border: 1px solid var(--accent-glow);
   color: var(--text);
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   text-align: center;
 }
 
@@ -1409,11 +1520,11 @@ onUnmounted(() => {
 
 .btn-primary,
 .btn-secondary {
-  padding: 0.7rem 0.5rem;
-  border-radius: 12px;
+  padding: 0.45rem 0.4rem;
+  border-radius: 9px;
   font-family: 'Manrope', sans-serif;
   font-weight: 800;
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   cursor: pointer;
   border: 1px solid var(--outline);
 }
@@ -1438,23 +1549,24 @@ onUnmounted(() => {
   flex-direction: row;
   justify-content: space-around;
   text-align: center;
+  padding: 0.42rem 0.75rem;
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.05rem;
 }
 
 .stat-item span {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   color: var(--text-dim);
   text-transform: uppercase;
 }
 
 .stat-item strong {
   font-family: 'Manrope', sans-serif;
-  font-size: 1.3rem;
+  font-size: 1.02rem;
 }
 
 .stat-win { color: var(--property-group-a); }
@@ -1462,11 +1574,13 @@ onUnmounted(() => {
 .stat-loss { color: var(--danger); }
 
 .history-card {
-  max-height: 310px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .empty-history {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--text-dim);
   font-style: italic;
 }
@@ -1474,32 +1588,34 @@ onUnmounted(() => {
 .move-list {
   list-style: none;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding-right: 0.25rem;
+  gap: 0.25rem;
+  padding-right: 0.2rem;
 }
 
 .move-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  border-radius: 9px;
+  gap: 0.4rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 7px;
   background: var(--bg-sidebar);
-  font-size: 0.84rem;
+  font-size: 0.76rem;
 }
 
 .move-idx {
   color: var(--text-dim);
-  font-size: 0.75rem;
-  min-width: 28px;
+  font-size: 0.7rem;
+  min-width: 24px;
 }
 
 .move-side {
-  padding: 0.12rem 0.42rem;
-  border-radius: 6px;
-  font-size: 0.72rem;
+  padding: 0.08rem 0.36rem;
+  border-radius: 5px;
+  font-size: 0.68rem;
   font-weight: 700;
 }
 
@@ -1519,7 +1635,7 @@ onUnmounted(() => {
 
 .move-cap {
   margin-left: auto;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: var(--accent);
 }
 
@@ -1532,9 +1648,57 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 
+  .control-column {
+    max-height: none;
+  }
+
+  .history-card {
+    max-height: 220px;
+  }
+
   .title-block {
     order: 3;
     flex-basis: 100%;
   }
+}
+
+.chess-kbd-hint {
+  margin-top: 0.1rem;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.chess-kbd-hint kbd {
+  padding: 0.04rem 0.28rem;
+  border-radius: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  font-size: 0.65rem;
+  font-family: monospace;
+}
+
+.history-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.copy-notation-btn {
+  padding: 0.2rem 0.55rem;
+  border-radius: 7px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.copy-notation-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 </style>

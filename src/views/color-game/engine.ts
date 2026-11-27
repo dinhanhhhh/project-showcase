@@ -134,3 +134,8 @@ export function getRoundPoints(gridSize: GridSize, nextStreak: number): number {
   const base = gridSize === 9 ? 3 : gridSize === 6 ? 2 : 1
   return base * getComboMultiplier(nextStreak)
 }
+
+export function getFormatAccuracy(hits: number, attempts: number): number {
+  if (attempts <= 0) return 0
+  return Math.round((hits / attempts) * 100)
+}

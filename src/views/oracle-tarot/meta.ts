@@ -2,7 +2,7 @@ import type { PageMeta } from '@/types/page'
 
 const meta: PageMeta = {
   name: 'Bói Bài Oracle',
-  description: 'Trải bài 1 lá hôm nay hoặc 3 lá Quá khứ · Hiện tại · Tương lai từ bộ 12 lá bài Oracle với hình học thần bí & nhật ký trải bài.',
+  description: 'Trải bài 1 lá hôm nay hoặc 3 lá Quá khứ · Hiện tại · Tương lai từ 18 lá Oracle (hỗ trợ Xuôi/Ngược, chép lời giải & nhật ký 10 lần bói lưu qua Pinia).',
   author: 'Truong Dinh Anh',
   category: 'spiritual',
 }

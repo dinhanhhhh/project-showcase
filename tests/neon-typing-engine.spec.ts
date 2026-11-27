@@ -9,6 +9,7 @@ import {
   calculateAccuracy,
   calculateTypingRank,
   calculateWPM,
+  computeAverageWpm,
   createInitialState,
   getRandomWords,
 } from '@/views/neon-typing/engine'
@@ -22,12 +23,13 @@ describe('Neon Typing Engine & Store', () => {
     setActivePinia(pinia)
   })
 
-  it('provides 4 themed word packs with 140+ total words', () => {
-    expect(WORD_PACK_LIST).toHaveLength(4)
+  it('provides 5 themed word packs with 175+ total words including accented Vietnamese', () => {
+    expect(WORD_PACK_LIST).toHaveLength(5)
     const totalWords = WORD_PACK_LIST.reduce((acc, p) => acc + p.words.length, 0)
-    expect(totalWords).toBeGreaterThanOrEqual(140)
+    expect(totalWords).toBeGreaterThanOrEqual(175)
     expect(WORD_PACKS.dev.words.length).toBeGreaterThanOrEqual(30)
     expect(WORD_PACKS.vietnamese.words.length).toBeGreaterThanOrEqual(30)
+    expect(WORD_PACKS.quotes_vn.words.length).toBeGreaterThanOrEqual(30)
   })
 
   it('generates requested word count without immediate consecutive duplicates', () => {
@@ -73,5 +75,25 @@ describe('Neon Typing Engine & Store', () => {
     expect(raw).toBeTruthy()
     expect(raw).toContain('"bestWpm":72')
     expect(raw).toContain('"preferredPack":"vietnamese"')
+  })
+
+  it('supports accented Vietnamese pack and caps run history at 10 with average WPM calculation', async () => {
+    const vnAccented = getRandomWords(10, 'quotes_vn', () => 0.25)
+    expect(vnAccented).toHaveLength(10)
+    expect(vnAccented.every((w) => !w.includes(' '))).toBe(true)
+
+    const store = useNeonTypingStore()
+    for (let i = 1; i <= 12; i++) {
+      store.recordTimedResult(40 + i, 96, 'quotes_vn')
+    }
+    await nextTick()
+
+    expect(store.history).toHaveLength(10)
+    expect(store.history[0].wpm).toBe(52)
+    expect(computeAverageWpm(store.history)).toBe(48)
+    expect(computeAverageWpm([])).toBe(0)
+
+    store.clearHistory()
+    expect(store.history).toEqual([])
   })
 })

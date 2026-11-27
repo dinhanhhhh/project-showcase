@@ -9,6 +9,7 @@ import {
   createSwatch,
   formatColorSwatch,
   getComboMultiplier,
+  getFormatAccuracy,
   getRoundPoints,
   rgbToHsl,
 } from '@/views/color-game/engine'
@@ -68,5 +69,22 @@ describe('Color Game Engine & Store', () => {
     const raw = localStorage.getItem('vibe_color_game')
     expect(raw).toBeTruthy()
     expect(raw).toContain('"bestTimeAttackScore":42')
+  })
+
+  it('tracks per-format accuracy percentages across RGB, HEX, and HSL cleanly', async () => {
+    expect(getFormatAccuracy(0, 0)).toBe(0)
+    expect(getFormatAccuracy(3, 4)).toBe(75)
+
+    const store = useColorGameStore()
+    store.recordAttempt('hex', true)
+    store.recordAttempt('hex', true)
+    store.recordAttempt('hex', false)
+    store.recordAttempt('rgb', true)
+    await nextTick()
+
+    expect(store.formatStats.hex).toEqual({ hits: 2, attempts: 3 })
+    expect(getFormatAccuracy(store.formatStats.hex.hits, store.formatStats.hex.attempts)).toBe(67)
+    expect(store.formatStats.rgb).toEqual({ hits: 1, attempts: 1 })
+    expect(store.formatStats.hsl).toEqual({ hits: 0, attempts: 0 })
   })
 })

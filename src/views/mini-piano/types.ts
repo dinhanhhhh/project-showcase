@@ -48,3 +48,10 @@ export interface ChallengeStats {
   score: number
   completed: boolean
 }
+
+export interface SavedMelody {
+  id: string
+  name: string
+  createdAt: string
+  notes: RecordedNoteEvent[]
+}

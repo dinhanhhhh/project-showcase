@@ -1,4 +1,4 @@
-import type { NotePitchClass, OctaveNumber, PianoKey, SongPreset } from './types'
+import type { NotePitchClass, OctaveNumber, PianoKey, RecordedNoteEvent, SongPreset } from './types'
 
 interface BaseKeyDef {
   pitchClass: NotePitchClass
@@ -120,4 +120,14 @@ export function calculateChallengeAccuracy(hits: number, misses: number): number
 
 export function scoreChallengeHit(nextCombo: number): number {
   return 100 + Math.min(nextCombo, 10) * 15
+}
+
+export function getSynthReleaseSeconds(sustainEnabled: boolean): number {
+  return sustainEnabled ? 1.85 : 0.92
+}
+
+export function formatMelodyDuration(notes: readonly RecordedNoteEvent[]): string {
+  if (notes.length === 0) return '0.0s'
+  const lastOffset = notes[notes.length - 1]?.offsetMs ?? 0
+  return `${Math.max(0.1, Math.round(lastOffset / 100) / 10).toFixed(1)}s`
 }

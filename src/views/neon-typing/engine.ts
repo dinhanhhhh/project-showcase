@@ -1,4 +1,4 @@
-import type { GameState, TypingRank, WordPackId, WordPackMeta } from './types'
+import type { GameState, TypingRank, TypingRunRecord, WordPackId, WordPackMeta } from './types'
 
 export const WORD_PACKS: Record<WordPackId, WordPackMeta> = {
   dev: {
@@ -18,7 +18,7 @@ export const WORD_PACKS: Record<WordPackId, WordPackMeta> = {
   },
   vietnamese: {
     id: 'vietnamese',
-    label: 'Tiếng Việt',
+    label: 'Tiếng Việt (Telex)',
     icon: '🇻🇳',
     words: [
       'saigon', 'hanoi', 'danang', 'congnghe', 'sangtao',
@@ -29,6 +29,19 @@ export const WORD_PACKS: Record<WordPackId, WordPackMeta> = {
       'ketnoi', 'tritue', 'khoinghiep', 'chuyengia', 'tinhhoa',
       'dongdoi', 'banchat', 'giatri', 'benvung', 'vuonlen',
       'tuduy',
+    ],
+  },
+  quotes_vn: {
+    id: 'quotes_vn',
+    label: 'Việt Có Dấu',
+    icon: '💬',
+    words: [
+      'công', 'nghệ', 'sáng', 'tạo', 'bền', 'vững',
+      'khám', 'phá', 'tuyệt', 'vời', 'tương', 'lai',
+      'đam', 'mê', 'nỗ', 'lực', 'phát', 'triển',
+      'đồng', 'đội', 'niềm', 'tin', 'ước', 'mơ',
+      'tinh', 'hoa', 'khát', 'vọng', 'hành', 'trình',
+      'nhiệt', 'huyết', 'tri', 'thức', 'vững', 'bước',
     ],
   },
   syntax: {
@@ -66,6 +79,7 @@ export const WORD_PACKS: Record<WordPackId, WordPackMeta> = {
 export const WORD_PACK_LIST: readonly WordPackMeta[] = [
   WORD_PACKS.dev,
   WORD_PACKS.vietnamese,
+  WORD_PACKS.quotes_vn,
   WORD_PACKS.syntax,
   WORD_PACKS.english,
 ]
@@ -130,4 +144,10 @@ export function createInitialState(
       totalTyped: 0,
     },
   }
+}
+
+export function computeAverageWpm(runs: readonly TypingRunRecord[]): number {
+  if (runs.length === 0) return 0
+  const total = runs.reduce((acc, run) => acc + run.wpm, 0)
+  return Math.round(total / runs.length)
 }

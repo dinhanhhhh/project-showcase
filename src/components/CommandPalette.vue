@@ -68,10 +68,14 @@ const filteredItems = computed<PaletteItem[]>(() => {
   )
 })
 
+let previouslyFocusedEl: HTMLElement | null = null
+
 function openPalette() {
   if (store.pages.length === 0) {
     void store.loadPages()
   }
+  previouslyFocusedEl =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null
   isOpen.value = true
   query.value = ''
   activeIndex.value = 0
@@ -80,9 +84,15 @@ function openPalette() {
 
 function closePalette() {
   isOpen.value = false
+  const prev = previouslyFocusedEl
+  previouslyFocusedEl = null
+  if (prev && prev.isConnected) {
+    void nextTick(() => prev.focus())
+  }
 }
 
 function selectItem(item: PaletteItem) {
+  previouslyFocusedEl = null
   closePalette()
   void router.push(item.path)
 }
@@ -160,11 +170,13 @@ onUnmounted(() => {
               v-model="query"
               type="text"
               placeholder="Gõ tên trò chơi hoặc công cụ để nhảy nhanh..."
+              aria-label="Tìm kiếm ứng dụng"
               autocomplete="off"
             >
             <button
               type="button"
               class="esc-btn"
+              aria-label="Đóng bảng tìm kiếm"
               @click="closePalette"
             >
               ESC
@@ -174,13 +186,17 @@ onUnmounted(() => {
           <div
             v-if="filteredItems.length > 0"
             class="palette-list"
+            role="listbox"
+            aria-label="Danh sách ứng dụng"
           >
             <button
               v-for="(item, idx) in filteredItems"
               :key="item.id"
               type="button"
+              role="option"
               class="palette-item"
               :class="{ active: idx === activeIndex }"
+              :aria-selected="idx === activeIndex"
               @mouseenter="activeIndex = idx"
               @click="selectItem(item)"
             >
@@ -244,6 +260,10 @@ onUnmounted(() => {
   gap: 0.75rem;
   padding: 1rem 1.15rem;
   border-bottom: 1px solid var(--outline);
+}
+
+.palette-search:focus-within {
+  box-shadow: inset 0 -2px 0 var(--primary);
 }
 
 .p-icon {

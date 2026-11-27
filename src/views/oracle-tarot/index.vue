@@ -1,24 +1,31 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import type { OracleCard } from './data'
-import { drawSpread } from './engine'
-
-type SpreadMode = 1 | 3
+import { type OracleReadingRecord, type OracleSpreadMode, useOracleTarotStore } from '@/stores/oracleTarot'
+import { ORACLE_CARDS, type OracleCard } from './data'
+import {
+  drawOracleReading,
+  formatReadingShareText,
+  getCardAdvice,
+  synthesizeSpreadSummary,
+} from './engine'
 
 interface DrawnSlot {
   slotLabel: string
   card: OracleCard
+  reversed: boolean
   flipped: boolean
 }
 
-const THREE_CARD_LABELS = ['Quá Khứ', 'Hiện Tại', 'Tương Lai'] as const
+const store = useOracleTarotStore()
 
-const spreadMode = ref<SpreadMode>(1)
+const spreadMode = ref<OracleSpreadMode>(1)
+const userQuestion = ref('')
 const drawnSlots = ref<DrawnSlot[]>([])
 const activeSlotIndex = ref(0)
 const isShuffling = ref(false)
-const readingHistory = ref<Array<{ time: string; mode: SpreadMode; names: string[] }>>([])
+const viewingSavedId = ref<string | null>(null)
+const copiedReading = ref(false)
 
 const activeTimers = new Set<ReturnType<typeof setTimeout>>()
 
@@ -42,13 +49,27 @@ const activeSlot = computed<DrawnSlot | null>(() => {
   return slot && slot.flipped ? slot : null
 })
 
-function setSpreadMode(mode: SpreadMode) {
+const spreadSummary = computed(() => {
+  const allFlipped = drawnSlots.value.length > 0 && drawnSlots.value.every((s) => s.flipped)
+  if (!allFlipped) return ''
+  return synthesizeSpreadSummary(
+    drawnSlots.value.map((s) => ({ slotLabel: s.slotLabel, card: s.card, reversed: s.reversed })),
+  )
+})
+
+const activeAdvice = computed(() => {
+  if (!activeSlot.value) return ''
+  return getCardAdvice(activeSlot.value.card, activeSlot.value.reversed)
+})
+
+function setSpreadMode(mode: OracleSpreadMode) {
   if (spreadMode.value === mode) return
   clearAllTimers()
   spreadMode.value = mode
   drawnSlots.value = []
   isShuffling.value = false
   activeSlotIndex.value = 0
+  viewingSavedId.value = null
 }
 
 function performDraw() {
@@ -57,35 +78,72 @@ function performDraw() {
   isShuffling.value = true
   drawnSlots.value = []
   activeSlotIndex.value = 0
+  viewingSavedId.value = null
+
+  const prefersReduced =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+  const shuffleDelay = prefersReduced ? 120 : 620
 
   schedule(() => {
-    const cards = drawSpread(spreadMode.value)
-    drawnSlots.value = cards.map((card, idx) => ({
-      slotLabel: spreadMode.value === 1 ? 'Thông Điệp Hôm Nay' : THREE_CARD_LABELS[idx] ?? `Lá ${idx + 1}`,
-      card,
-      flipped: false,
+    const drawn = drawOracleReading(spreadMode.value, store.includeReversed)
+    drawnSlots.value = drawn.map((item) => ({
+      slotLabel: item.slotLabel,
+      card: item.card,
+      reversed: item.reversed,
+      flipped: prefersReduced,
     }))
     isShuffling.value = false
 
-    // Lật lần lượt từng lá tạo cảm giác huyền bí
-    drawnSlots.value.forEach((_, idx) => {
-      schedule(() => {
-        if (drawnSlots.value[idx]) {
-          drawnSlots.value[idx].flipped = true
-          if (idx === 0) activeSlotIndex.value = 0
-        }
-      }, 280 + idx * 340)
-    })
+    if (!prefersReduced) {
+      drawnSlots.value.forEach((_, idx) => {
+        schedule(() => {
+          if (drawnSlots.value[idx]) {
+            drawnSlots.value[idx].flipped = true
+            if (idx === 0) activeSlotIndex.value = 0
+          }
+        }, 260 + idx * 320)
+      })
+    }
 
-    readingHistory.value = [
-      {
-        time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        mode: spreadMode.value,
-        names: cards.map((c) => `${c.image} ${c.name}`),
-      },
-      ...readingHistory.value,
-    ].slice(0, 5)
-  }, 650)
+    const cleanQuestion = userQuestion.value.trim()
+    store.addReading({
+      id: `oracle-${Date.now()}`,
+      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      mode: spreadMode.value,
+      question: cleanQuestion,
+      cards: drawn.map((item) => ({
+        cardId: item.card.id,
+        name: item.card.name,
+        image: item.card.image,
+        slotLabel: item.slotLabel,
+        reversed: item.reversed,
+      })),
+    })
+  }, shuffleDelay)
+}
+
+function restoreReading(entry: OracleReadingRecord) {
+  clearAllTimers()
+  isShuffling.value = false
+  spreadMode.value = entry.mode
+  userQuestion.value = entry.question
+  viewingSavedId.value = entry.id
+  const restored: DrawnSlot[] = []
+  for (const saved of entry.cards) {
+    const found = ORACLE_CARDS.find((c) => c.id === saved.cardId)
+    if (found) {
+      restored.push({
+        slotLabel: saved.slotLabel,
+        card: found,
+        reversed: saved.reversed,
+        flipped: true,
+      })
+    }
+  }
+  drawnSlots.value = restored
+  activeSlotIndex.value = 0
 }
 
 function selectSlot(idx: number) {
@@ -95,11 +153,64 @@ function selectSlot(idx: number) {
   activeSlotIndex.value = idx
 }
 
+function fallbackCopyToClipboard(text: string): boolean {
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', '')
+    textarea.style.position = 'fixed'
+    textarea.style.top = '-9999px'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return ok
+  } catch {
+    return false
+  }
+}
+
+async function copyReadingText() {
+  const flippedSlots = drawnSlots.value.filter((s) => s.flipped)
+  if (flippedSlots.length === 0) return
+  const text = formatReadingShareText(
+    userQuestion.value,
+    flippedSlots.map((s) => ({
+      slotLabel: s.slotLabel,
+      card: s.card,
+      reversed: s.reversed,
+    })),
+    spreadSummary.value,
+  )
+  if (!text) return
+
+  copiedReading.value = true
+  schedule(() => {
+    copiedReading.value = false
+  }, 2200)
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await Promise.race([
+        navigator.clipboard.writeText(text),
+        new Promise<void>((resolve) => schedule(resolve, 350)),
+      ])
+    } else {
+      fallbackCopyToClipboard(text)
+    }
+  } catch {
+    fallbackCopyToClipboard(text)
+  }
+}
+
 function resetReading() {
   clearAllTimers()
   drawnSlots.value = []
   isShuffling.value = false
   activeSlotIndex.value = 0
+  viewingSavedId.value = null
+  copiedReading.value = false
 }
 
 onUnmounted(() => {
@@ -144,6 +255,27 @@ onUnmounted(() => {
           </button>
         </div>
       </header>
+
+      <!-- Câu hỏi tâm niệm & Tùy chọn lá ngược -->
+      <section class="intention-bar glass-card">
+        <input
+          v-model="userQuestion"
+          type="text"
+          maxlength="120"
+          class="question-input"
+          placeholder="Nhập câu hỏi bạn đang trăn trở (tùy chọn)..."
+          aria-label="Câu hỏi khi bói bài"
+        >
+        <button
+          type="button"
+          class="reversed-toggle"
+          :class="{ active: store.includeReversed }"
+          :aria-pressed="store.includeReversed"
+          @click="store.setIncludeReversed(!store.includeReversed)"
+        >
+          ↺ Cho phép Lá Ngược: {{ store.includeReversed ? 'Bật' : 'Tắt' }}
+        </button>
+      </section>
 
       <!-- Sân khấu bài Tarot -->
       <section class="altar-stage">
@@ -239,7 +371,7 @@ onUnmounted(() => {
           >
             <div
               v-for="(slot, idx) in drawnSlots"
-              :key="slot.card.id"
+              :key="`${slot.card.id}-${idx}`"
               class="card-slot"
             >
               <span class="slot-label">{{ slot.slotLabel }}</span>
@@ -248,14 +380,29 @@ onUnmounted(() => {
                 :class="{ flipped: slot.flipped, active: activeSlotIndex === idx }"
                 role="button"
                 tabindex="0"
+                :aria-label="`Xem lá ${slot.slotLabel}: ${slot.card.name}`"
                 @click="selectSlot(idx)"
+                @keydown.enter.prevent="selectSlot(idx)"
+                @keydown.space.prevent="selectSlot(idx)"
               >
                 <div class="face face-back">
                   <span class="center-eye">✦</span>
                 </div>
-                <div class="face face-front">
+                <div
+                  class="face face-front"
+                  :class="{ 'is-reversed': slot.reversed }"
+                >
                   <span class="roman-num">{{ slot.card.roman }}</span>
-                  <div class="card-emoji">
+                  <span
+                    v-if="slot.reversed"
+                    class="reversed-pill"
+                  >
+                    ↺ Ngược
+                  </span>
+                  <div
+                    class="card-emoji"
+                    :class="{ flipped: slot.reversed }"
+                  >
                     {{ slot.card.image }}
                   </div>
                   <strong class="card-title">{{ slot.card.name }}</strong>
@@ -271,7 +418,10 @@ onUnmounted(() => {
               class="reading-panel glass-card"
             >
               <div class="reading-head">
-                <span class="reading-tag">{{ activeSlot.slotLabel }} · {{ activeSlot.card.keyword }}</span>
+                <span class="reading-tag">
+                  {{ activeSlot.slotLabel }} · {{ activeSlot.card.keyword }}
+                  <template v-if="activeSlot.reversed"> · ↺ Lá Ngược</template>
+                </span>
                 <span class="reading-el">{{ activeSlot.card.element }}</span>
               </div>
 
@@ -285,7 +435,15 @@ onUnmounted(() => {
 
               <div class="advice-box">
                 <span class="advice-title">💡 LỜI KHUYÊN HÀNH ĐỘNG</span>
-                <p>{{ activeSlot.card.advice }}</p>
+                <p>{{ activeAdvice }}</p>
+              </div>
+
+              <div
+                v-if="spreadSummary && spreadMode === 3"
+                class="summary-box"
+              >
+                <span class="advice-title">🌌 TỔNG QUAN TRẢI BÀI 3 LÁ</span>
+                <p>{{ spreadSummary }}</p>
               </div>
 
               <div class="reading-actions">
@@ -295,6 +453,13 @@ onUnmounted(() => {
                   @click="performDraw"
                 >
                   🔮 Rút trải bài mới
+                </button>
+                <button
+                  type="button"
+                  class="reset-btn"
+                  @click="copyReadingText"
+                >
+                  {{ copiedReading ? '✅ Đã chép lời giải' : '📋 Chép lời giải' }}
                 </button>
                 <button
                   type="button"
@@ -309,22 +474,41 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <!-- Nhật ký trải bài trong phiên -->
+      <!-- Nhật ký trải bài lưu bền vững qua Pinia (tối đa 10 lần) -->
       <section
-        v-if="readingHistory.length > 0"
+        v-if="store.history.length > 0"
         class="journal-box glass-card"
       >
-        <h3>📜 Nhật ký trải bài phiên này</h3>
-        <div class="journal-list">
-          <div
-            v-for="(entry, idx) in readingHistory"
-            :key="idx"
-            class="journal-row"
+        <div class="journal-head">
+          <h3>📜 Nhật ký trải bài ({{ store.history.length }}/10 lần gần nhất)</h3>
+          <button
+            type="button"
+            class="clear-journal-btn"
+            @click="store.clearHistory()"
           >
-            <span class="j-time">{{ entry.time }}</span>
+            Xóa nhật ký
+          </button>
+        </div>
+        <div class="journal-list">
+          <button
+            v-for="entry in store.history"
+            :key="entry.id"
+            type="button"
+            class="journal-row"
+            :class="{ active: viewingSavedId === entry.id }"
+            @click="restoreReading(entry)"
+          >
+            <span class="j-time">{{ entry.timestamp }}</span>
             <span class="j-mode">{{ entry.mode }} lá</span>
-            <span class="j-cards">{{ entry.names.join('  ·  ') }}</span>
-          </div>
+            <span
+              v-if="entry.question"
+              class="j-question"
+            >“{{ entry.question }}”</span>
+            <span class="j-cards">
+              {{ entry.cards.map((c) => `${c.image} ${c.name}${c.reversed ? ' (Ngược)' : ''}`).join('  ·  ') }}
+            </span>
+            <span class="j-restore">Xem lại →</span>
+          </button>
         </div>
       </section>
     </div>
@@ -411,6 +595,49 @@ onUnmounted(() => {
 .mode-switch button.active {
   background: var(--accent);
   color: var(--text-inverse);
+}
+
+.intention-bar {
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.question-input {
+  flex: 1;
+  min-width: min(100%, 240px);
+  padding: 0.58rem 0.9rem;
+  border-radius: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.question-input:focus {
+  border-color: var(--primary);
+}
+
+.reversed-toggle {
+  padding: 0.55rem 0.95rem;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+}
+
+.reversed-toggle.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .altar-stage {
@@ -585,9 +812,27 @@ onUnmounted(() => {
   gap: 0.65rem;
 }
 
+.face-front.is-reversed {
+  border-color: var(--accent);
+}
+
+.reversed-pill {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 0.14rem 0.48rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-glow);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
 .roman-num {
   position: absolute;
   top: 12px;
+  left: 14px;
   font-family: 'Manrope', sans-serif;
   font-size: 0.78rem;
   font-weight: 800;
@@ -598,6 +843,11 @@ onUnmounted(() => {
 .card-emoji {
   font-size: 3.6rem;
   filter: drop-shadow(0 0 14px var(--primary-glow));
+  transition: transform 0.4s ease;
+}
+
+.card-emoji.flipped {
+  transform: rotate(180deg);
 }
 
 .card-title {
@@ -662,12 +912,18 @@ onUnmounted(() => {
   color: var(--text);
 }
 
-.advice-box {
+.advice-box,
+.summary-box {
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
   border-radius: 14px;
   padding: 1rem 1.15rem;
   text-align: left;
+}
+
+.summary-box {
+  background: var(--primary-soft);
+  border-color: var(--outline-strong);
 }
 
 .advice-title {
@@ -679,7 +935,8 @@ onUnmounted(() => {
   margin-bottom: 0.35rem;
 }
 
-.advice-box p {
+.advice-box p,
+.summary-box p {
   font-size: 0.92rem;
   line-height: 1.55;
   color: var(--text-dim);
@@ -716,9 +973,30 @@ onUnmounted(() => {
   gap: 0.7rem;
 }
 
+.journal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .journal-box h3 {
   font-family: 'Manrope', sans-serif;
   font-size: 0.95rem;
+}
+
+.clear-journal-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clear-journal-btn:hover {
+  color: var(--danger);
 }
 
 .journal-list {
@@ -728,14 +1006,25 @@ onUnmounted(() => {
 }
 
 .journal-row {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 0.65rem;
   font-size: 0.82rem;
-  padding: 0.45rem 0.7rem;
+  padding: 0.55rem 0.75rem;
   border-radius: 10px;
   background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
   flex-wrap: wrap;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  transition: var(--transition-fast);
+}
+
+.journal-row:hover,
+.journal-row.active {
+  border-color: var(--primary);
 }
 
 .j-time {
@@ -752,9 +1041,32 @@ onUnmounted(() => {
   font-size: 0.72rem;
 }
 
+.j-question {
+  color: var(--accent);
+  font-style: italic;
+}
+
 .j-cards {
   color: var(--text);
   font-weight: 500;
+  flex: 1;
+}
+
+.j-restore {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+@media (max-width: 640px) {
+  .oracle-topbar {
+    justify-content: space-between;
+  }
+
+  .header-copy {
+    order: 3;
+    flex-basis: 100%;
+  }
 }
 
 .reveal-up-enter-active {

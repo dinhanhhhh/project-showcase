@@ -9,12 +9,14 @@ import {
   type PassiveItem,
   type ActiveSkill,
 } from './game-data'
+import { computeLifeRecap } from './engine'
 import { useNgareStore } from '@/stores/ngare'
 
 const ngareStore = useNgareStore()
 const currentScreen = ref('intro')
 const gameData = ref<GameDataJson | null>(null)
 const gameState = computed(() => ngareStore.gameState)
+const lifeRecap = computed(() => (gameState.value ? computeLifeRecap(gameState.value) : null))
 const currentEvent = ref<GameEvent | null>(null)
 const charNameInput = ref('')
 const selectedCareerId = ref('')
@@ -31,7 +33,21 @@ const hasSavedGame = ref(false)
 const isSidebarCollapsed = ref(false)
 const isGalleryOpen = ref(false)
 const unlockedEndings = ref<string[]>([])
+const activeTimers = new Set<ReturnType<typeof setTimeout>>()
+const activeParticles = new Set<HTMLElement>()
+const confirmingDeleteSave = ref(false)
+const confirmingRestart = ref(false)
+let stopParticles: (() => void) | null = null
 let animationId = 0
+
+function scheduleTimer(fn: () => void, ms: number): ReturnType<typeof setTimeout> {
+  const id = setTimeout(() => {
+    activeTimers.delete(id)
+    fn()
+  }, ms)
+  activeTimers.add(id)
+  return id
+}
 
 const ALL_ENDINGS = [
   { id: 'vien_man', icon: '🏆', title: 'Cuộc Đời Viên Mãn', condition: 'Điểm tổng kết >= 350' },
@@ -91,9 +107,9 @@ const careerPreview = computed(() => {
 })
 
 function showToast(message: string, type = 'info') {
-  const id = Date.now()
+  const id = Date.now() + Math.random()
   toasts.value.push({ id, message, type })
-  setTimeout(() => {
+  scheduleTimer(() => {
     toasts.value = toasts.value.filter((t) => t.id !== id)
   }, 3000)
 }
@@ -148,7 +164,11 @@ function triggerStatCelebration(stat: string) {
     p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`)
 
     document.body.appendChild(p)
-    setTimeout(() => p.remove(), 1000)
+    activeParticles.add(p)
+    scheduleTimer(() => {
+      activeParticles.delete(p)
+      p.remove()
+    }, 1000)
   }
 
   showToast(`🌟 Tuyệt vời! ${getStatName(stat)} đã đạt mức tối đa!`, 'toast-positive')
@@ -201,7 +221,7 @@ async function handleChoice(choice: Choice) {
 
   if (result.effects && Object.keys(result.effects).length > 0) {
     statChanges.value = result.effects as Record<string, number>
-    setTimeout(() => {
+    scheduleTimer(() => {
       statChanges.value = null
     }, 2000)
   }
@@ -218,7 +238,7 @@ async function handleChoice(choice: Choice) {
       if (!unlocked.includes(endResult.id)) {
         unlocked.push(endResult.id)
         localStorage.setItem('ngare_endings', JSON.stringify(unlocked))
-        setTimeout(() => {
+        scheduleTimer(() => {
           showToast(`🏆 Đã mở khóa cái kết mới: ${endResult.title}`, 'toast-positive')
         }, 1000)
       }
@@ -236,22 +256,38 @@ function saveGame() {
 }
 
 function deleteSaveGame() {
-  if (confirm('Bạn có chắc chắn muốn xóa dữ liệu game đã lưu? Hành động này không thể hoàn tác.')) {
-    ngareStore.resetGame()
-    hasSavedGame.value = false
-    showToast('Đã xóa dữ liệu lưu!', 'toast-info')
+  if (!confirmingDeleteSave.value) {
+    confirmingDeleteSave.value = true
+    showToast('Bấm lại "Xóa Dữ Liệu Lưu" trong 4s để xác nhận', 'toast-info')
+    scheduleTimer(() => {
+      confirmingDeleteSave.value = false
+    }, 4000)
+    return
   }
+
+  confirmingDeleteSave.value = false
+  ngareStore.resetGame()
+  hasSavedGame.value = false
+  showToast('Đã xóa dữ liệu lưu!', 'toast-info')
 }
 
 function restartGame() {
-  if (confirm('Bạn có chắc muốn chơi lại từ đầu?')) {
-    ngareStore.resetGame()
-    currentScreen.value = 'intro'
-    currentEvent.value = null
-    charNameInput.value = ''
-    selectedCareerId.value = ''
-    isMenuOpen.value = false
+  if (currentScreen.value !== 'end' && !confirmingRestart.value) {
+    confirmingRestart.value = true
+    showToast('Bấm lại "Chơi Lại" trong 4s để bắt đầu ván mới', 'toast-info')
+    scheduleTimer(() => {
+      confirmingRestart.value = false
+    }, 4000)
+    return
   }
+
+  confirmingRestart.value = false
+  ngareStore.resetGame()
+  currentScreen.value = 'intro'
+  currentEvent.value = null
+  charNameInput.value = ''
+  selectedCareerId.value = ''
+  isMenuOpen.value = false
 }
 
 async function buyItemFn(item: PassiveItem) {
@@ -412,11 +448,14 @@ function canBuySkill(skill: ActiveSkill): boolean {
   )
 }
 
-function initParticles() {
+function initParticles(): () => void {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return () => {}
+  }
   const canvas = canvasRef.value
-  if (!canvas) return
+  if (!canvas) return () => {}
   const ctx = canvas.getContext('2d')
-  if (!ctx) return
+  if (!ctx) return () => {}
   const particles: Array<{
     x: number
     y: number
@@ -473,10 +512,10 @@ function initParticles() {
     animationId = requestAnimationFrame(animate)
   }
   animate()
-  onUnmounted(() => {
+  return () => {
     window.removeEventListener('resize', resize)
     cancelAnimationFrame(animationId)
-  })
+  }
 }
 
 function goBack() {
@@ -488,6 +527,49 @@ function goBack() {
 }
 
 function handleGlobalKeydown(e: KeyboardEvent) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+  if (document.querySelector('[role="dialog"]')) return
+
+  if (e.key === 'Escape') {
+    if (previewModalEvent.value) {
+      previewModalEvent.value = null
+      e.preventDefault()
+    } else if (isShopOpen.value) {
+      isShopOpen.value = false
+      e.preventDefault()
+    } else if (isInventoryOpen.value) {
+      isInventoryOpen.value = false
+      e.preventDefault()
+    } else if (isGalleryOpen.value) {
+      isGalleryOpen.value = false
+      e.preventDefault()
+    } else if (isMenuOpen.value) {
+      isMenuOpen.value = false
+      e.preventDefault()
+    }
+    return
+  }
+
+  if (
+    currentScreen.value === 'game' &&
+    !isShopOpen.value &&
+    !isInventoryOpen.value &&
+    !isMenuOpen.value &&
+    !isGalleryOpen.value &&
+    !previewModalEvent.value &&
+    e.key >= '1' &&
+    e.key <= '4'
+  ) {
+    const idx = Number(e.key) - 1
+    const choice = currentEvent.value?.choices[idx]
+    if (choice) {
+      e.preventDefault()
+      void handleChoice(choice)
+    }
+    return
+  }
+
   if (e.key === 'Enter') {
     // Ưu tiên không trigger khi đang ở trong các modal
     if (isShopOpen.value || isInventoryOpen.value || isMenuOpen.value || previewModalEvent.value)
@@ -521,13 +603,23 @@ function getMilestoneInfo(text: string) {
 
 onMounted(() => {
   loadGameData().then((d) => (gameData.value = d))
-  initParticles()
+  stopParticles = initParticles()
   hasSavedGame.value = ngareStore.engine.hasSave()
   window.addEventListener('keydown', handleGlobalKeydown)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  stopParticles?.()
+  stopParticles = null
+  for (const timer of activeTimers) {
+    clearTimeout(timer)
+  }
+  activeTimers.clear()
+  for (const el of activeParticles) {
+    el.remove()
+  }
+  activeParticles.clear()
 })
 </script>
 
@@ -654,7 +746,7 @@ onUnmounted(() => {
               class="btn-base btn-danger"
               @click="deleteSaveGame"
             >
-              <span>🗑️ Xóa Dữ Liệu Lưu</span>
+              <span>{{ confirmingDeleteSave ? '⚠️ Bấm lại để xóa save' : '🗑️ Xóa Dữ Liệu Lưu' }}</span>
             </button>
           </div>
         </div>
@@ -900,6 +992,7 @@ onUnmounted(() => {
                     class="choice-btn"
                     @click="handleChoice(choice)"
                   >
+                    <span class="choice-kbd">{{ idx + 1 }}</span>
                     <span class="choice-icon">{{ choice.icon }}</span>
                     <div class="choice-text">
                       {{ choice.text }}
@@ -968,6 +1061,26 @@ onUnmounted(() => {
           <p class="end-subtitle">
             {{ calculateEnding().subtitle }}
           </p>
+        </div>
+        <div
+          v-if="lifeRecap"
+          class="recap-highlights"
+        >
+          <span class="recap-chip">
+            🏅 Điểm: <strong>{{ lifeRecap.totalScore }}</strong>
+          </span>
+          <span class="recap-chip">
+            ⏳ Hành trình: <strong>{{ lifeRecap.yearsLived }} năm</strong>
+          </span>
+          <span class="recap-chip">
+            🏆 Thành tựu: <strong>{{ lifeRecap.milestonesCount }}</strong>
+          </span>
+          <span class="recap-chip best">
+            💪 Mạnh nhất: <strong>{{ getStatName(String(lifeRecap.strongestStat.key)) }} ({{ lifeRecap.strongestStat.value }})</strong>
+          </span>
+          <span class="recap-chip weak">
+            🌱 Cần rèn: <strong>{{ getStatName(String(lifeRecap.weakestStat.key)) }} ({{ lifeRecap.weakestStat.value }})</strong>
+          </span>
         </div>
         <div
           v-if="gameState"
@@ -1236,7 +1349,7 @@ onUnmounted(() => {
           class="modal-btn"
           @click="restartGame"
         >
-          🔄 Chơi Lại
+          {{ confirmingRestart ? '⚠️ Bấm lại để Chơi Lại' : '🔄 Chơi Lại' }}
         </button>
         <RouterLink
           to="/"
@@ -2874,27 +2987,49 @@ onUnmounted(() => {
   }
 
   /* Header Game gọn nhẹ */
+  .game-layout {
+    padding: 0 0.75rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    overflow-x: hidden !important;
+  }
+  .game-main-split,
+  .game-left-column,
+  .event-card {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
   .game-header {
     padding: 0.5rem 0 !important;
-    gap: 0.4rem !important;
+    gap: 0.35rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
   .header-left {
+    flex: 1 1 0 !important;
     gap: 0.45rem !important;
-    min-width: 0;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  .player-info {
+    flex: 1 !important;
+    min-width: 0 !important;
   }
   .header-center {
-    gap: 0.65rem !important;
-    flex-shrink: 0;
+    gap: 0.5rem !important;
+    flex-shrink: 0 !important;
   }
   .header-right {
-    gap: 0.35rem !important;
-    flex-shrink: 0;
+    gap: 0.3rem !important;
+    flex-shrink: 0 !important;
   }
   .player-name {
-    font-size: 0.96rem !important;
+    font-size: 0.94rem !important;
   }
   .player-career {
-    max-width: 118px !important;
+    max-width: 100% !important;
     font-size: 0.68rem !important;
   }
   .age-value,
@@ -2906,8 +3041,8 @@ onUnmounted(() => {
     font-size: 0.58rem !important;
   }
   .btn-icon {
-    width: 34px !important;
-    height: 34px !important;
+    width: 32px !important;
+    height: 32px !important;
     font-size: 0.9rem !important;
     padding: 0.2rem !important;
   }
@@ -3065,5 +3200,46 @@ onUnmounted(() => {
     overflow-x: auto;
     gap: 0.5rem;
   } /* Vẫn giữ tab nằm ngang mobile */
+}
+
+.choice-kbd {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--outline);
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  font-weight: 700;
+  font-family: monospace;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.recap-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.55rem;
+  margin-bottom: 1.25rem;
+}
+
+.recap-chip {
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text-dim);
+  font-size: 0.84rem;
+}
+
+.recap-chip strong {
+  color: var(--text);
+}
+
+.recap-chip.best {
+  border-color: var(--primary);
 }
 </style>

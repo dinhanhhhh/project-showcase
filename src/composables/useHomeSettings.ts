@@ -1,6 +1,8 @@
 import { ref, watch } from 'vue'
 
 export type VibeThemeId = 'cosmos' | 'emerald' | 'sunset' | 'arctic'
+export type LauncherViewMode = 'grid' | 'list'
+export type LauncherSortMode = 'featured' | 'alpha' | 'recent'
 
 export interface VibeThemeOption {
   id: VibeThemeId
@@ -44,7 +46,31 @@ const KEYS = {
   enableParticles: 'vibe:enable-particles',
   sidebarCollapsed: 'vibe:sidebar-collapsed',
   theme: 'vibe:theme',
+  viewMode: 'vibe:view-mode',
+  sortMode: 'vibe:sort-mode',
 } as const
+
+function safeReadBoolean(key: string, fallback: boolean): boolean {
+  const raw = localStorage.getItem(key)
+  if (raw === null) return fallback
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return typeof parsed === 'boolean' ? parsed : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function readStoredViewMode(): LauncherViewMode {
+  const saved = localStorage.getItem(KEYS.viewMode)
+  return saved === 'list' ? 'list' : 'grid'
+}
+
+function readStoredSortMode(): LauncherSortMode {
+  const saved = localStorage.getItem(KEYS.sortMode)
+  if (saved === 'alpha' || saved === 'recent') return saved
+  return 'featured'
+}
 
 function readStoredTheme(): VibeThemeId {
   const saved = localStorage.getItem(KEYS.theme)
@@ -64,10 +90,10 @@ export function useHomeSettings() {
   const userName = ref(localStorage.getItem(KEYS.userName) || 'Quản trị viên')
   const userRole = ref(localStorage.getItem(KEYS.userRole) || 'Nhà phát triển')
   const enableParticles = ref(localStorage.getItem(KEYS.enableParticles) !== 'false')
-  const isSidebarCollapsed = ref(
-    JSON.parse(localStorage.getItem(KEYS.sidebarCollapsed) ?? 'false') as boolean,
-  )
+  const isSidebarCollapsed = ref(safeReadBoolean(KEYS.sidebarCollapsed, false))
   const theme = ref<VibeThemeId>(readStoredTheme())
+  const viewMode = ref<LauncherViewMode>(readStoredViewMode())
+  const sortMode = ref<LauncherSortMode>(readStoredSortMode())
   const isSettingsOpen = ref(false)
 
   applyThemeToDocument(theme.value)
@@ -84,6 +110,8 @@ export function useHomeSettings() {
     localStorage.setItem(KEYS.theme, val)
     applyThemeToDocument(val)
   })
+  watch(viewMode, (val) => localStorage.setItem(KEYS.viewMode, val))
+  watch(sortMode, (val) => localStorage.setItem(KEYS.sortMode, val))
 
   function toggleSidebar() {
     isSidebarCollapsed.value = !isSidebarCollapsed.value
@@ -95,6 +123,8 @@ export function useHomeSettings() {
     enableParticles,
     isSidebarCollapsed,
     theme,
+    viewMode,
+    sortMode,
     isSettingsOpen,
     toggleSidebar,
   }

@@ -1,5 +1,11 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { VIBE_THEMES, type VibeThemeId } from '@/composables/useHomeSettings'
+import {
+  buildBackupPayload,
+  parseAndValidateBackup,
+  restoreBackupPayload,
+} from '@/utils/backup'
 
 interface Props {
   modelValue: boolean
@@ -9,7 +15,7 @@ interface Props {
   theme?: VibeThemeId
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   theme: 'cosmos',
 })
 
@@ -20,7 +26,117 @@ const emit = defineEmits<{
   (e: 'update:enableParticles', val: boolean): void
   (e: 'update:theme', val: VibeThemeId): void
   (e: 'clear-data'): void
+  (e: 'data-restored'): void
 }>()
+
+const isConfirmingClear = ref(false)
+const backupStatus = ref<{ kind: 'ok' | 'err'; text: string } | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+let clearConfirmTimer: ReturnType<typeof setTimeout> | null = null
+
+function resetClearConfirm() {
+  isConfirmingClear.value = false
+  if (clearConfirmTimer) {
+    clearTimeout(clearConfirmTimer)
+    clearConfirmTimer = null
+  }
+}
+
+function handleExportBackup() {
+  const payload = buildBackupPayload(localStorage)
+  const count = Object.keys(payload.entries).length
+  const json = JSON.stringify(payload, null, 2)
+  const dateStr = new Date().toISOString().slice(0, 10)
+
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `vibe-platform-backup-${dateStr}.json`
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+
+  backupStatus.value = {
+    kind: 'ok',
+    text: `✅ Đã xuất ${count} mục dữ liệu.`,
+  }
+}
+
+function triggerImportClick() {
+  fileInputRef.value?.click()
+}
+
+async function handleImportFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  try {
+    const raw = await file.text()
+    const parsed = parseAndValidateBackup(raw)
+    if (!parsed.ok) {
+      backupStatus.value = { kind: 'err', text: `⚠️ ${parsed.error}` }
+      return
+    }
+    const restoredCount = restoreBackupPayload(localStorage, parsed.data)
+    backupStatus.value = {
+      kind: 'ok',
+      text: `✅ Đã khôi phục ${restoredCount} mục — tải lại trang để áp dụng.`,
+    }
+    emit('data-restored')
+  } catch {
+    backupStatus.value = { kind: 'err', text: '⚠️ Không thể đọc tệp sao lưu.' }
+  }
+}
+
+function closeModal() {
+  resetClearConfirm()
+  backupStatus.value = null
+  emit('update:modelValue', false)
+}
+
+function handleClearClick() {
+  if (!isConfirmingClear.value) {
+    isConfirmingClear.value = true
+    if (clearConfirmTimer) clearTimeout(clearConfirmTimer)
+    clearConfirmTimer = setTimeout(() => {
+      isConfirmingClear.value = false
+      clearConfirmTimer = null
+    }, 4000)
+    return
+  }
+
+  resetClearConfirm()
+  emit('clear-data')
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.modelValue) {
+    e.preventDefault()
+    closeModal()
+  }
+}
+
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (!open) {
+      resetClearConfirm()
+    }
+  },
+)
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+  resetClearConfirm()
+})
 </script>
 
 <template>
@@ -31,7 +147,7 @@ const emit = defineEmits<{
     >
       <div
         class="overlay"
-        @click="emit('update:modelValue', false)"
+        @click="closeModal"
       />
       <div
         class="modal-content"
@@ -52,7 +168,7 @@ const emit = defineEmits<{
             type="button"
             class="close-btn"
             aria-label="Đóng cài đặt"
-            @click="emit('update:modelValue', false)"
+            @click="closeModal"
           >
             ✕
           </button>
@@ -124,6 +240,44 @@ const emit = defineEmits<{
           </div>
         </section>
 
+        <section class="st-group backup-zone">
+          <div class="st-info">
+            <label>💾 Sao lưu &amp; Khôi phục dữ liệu</label>
+            <span class="desc">Xuất hoặc nhập toàn bộ điểm cao, lịch sử và tiến trình game qua tệp JSON chuẩn Zod.</span>
+          </div>
+          <div class="backup-actions">
+            <button
+              type="button"
+              class="btn-backup"
+              @click="handleExportBackup"
+            >
+              ⬇️ Xuất sao lưu (.json)
+            </button>
+            <button
+              type="button"
+              class="btn-backup"
+              @click="triggerImportClick"
+            >
+              ⬆️ Khôi phục (.json)
+            </button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept="application/json,.json"
+              hidden
+              aria-label="Chọn tệp sao lưu JSON"
+              @change="handleImportFile"
+            >
+          </div>
+          <p
+            v-if="backupStatus"
+            class="backup-status"
+            :class="backupStatus.kind"
+          >
+            {{ backupStatus.text }}
+          </p>
+        </section>
+
         <section class="st-group danger-zone">
           <div class="st-info">
             <label>Đặt lại dữ liệu cá nhân</label>
@@ -132,9 +286,10 @@ const emit = defineEmits<{
           <button
             type="button"
             class="btn-danger"
-            @click="emit('clear-data')"
+            :class="{ confirming: isConfirmingClear }"
+            @click="handleClearClick"
           >
-            Xóa dữ liệu
+            {{ isConfirmingClear ? 'Bấm lại để xác nhận' : 'Xóa dữ liệu' }}
           </button>
         </section>
       </div>
@@ -266,7 +421,7 @@ const emit = defineEmits<{
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--outline);
 }
 
 .theme-card strong {
@@ -390,9 +545,57 @@ const emit = defineEmits<{
   border-color: var(--danger);
 }
 
+.btn-danger.confirming {
+  background: var(--danger);
+  color: #ffffff;
+  border-color: var(--danger);
+}
+
 @media (max-width: 480px) {
   .theme-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.backup-zone {
+  border-top: 1px solid var(--outline);
+  padding-top: 1.15rem;
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.btn-backup {
+  flex: 1 1 160px;
+  padding: 0.62rem 0.9rem;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.btn-backup:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.backup-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.backup-status.ok {
+  color: var(--primary);
+}
+
+.backup-status.err {
+  color: var(--danger);
 }
 </style>

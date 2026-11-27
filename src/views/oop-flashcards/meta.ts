@@ -2,7 +2,7 @@ import type { PageMeta } from '@/types/page'
 
 const meta: PageMeta = {
   name: 'OOP Flashcards',
-  description: 'Ôn tập 21 câu hỏi phỏng vấn OOP & SOLID với thẻ lật 3D, ví dụ code có highlight, phím tắt và lưu tiến trình học.',
+  description: 'Ôn tập 27 câu hỏi phỏng vấn OOP, SOLID & Design Patterns với thẻ lật 3D, chế độ Quiz trắc nghiệm chấm điểm, lọc thẻ chưa thuộc & thống kê tiến độ.',
   category: 'education',
   author: 'Truong Dinh Anh',
 }

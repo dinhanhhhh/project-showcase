@@ -538,3 +538,17 @@ export function findBestMove(
 
   return bestMove
 }
+
+export function exportMoveNotationText(history: readonly MoveRecord[]): string {
+  if (history.length === 0) return ''
+  const lines: string[] = []
+  for (let i = 0; i < history.length; i += 2) {
+    const turn = Math.floor(i / 2) + 1
+    const redMove = history[i]
+    const blackMove = history[i + 1]
+    const redPart = redMove ? `Đỏ: ${redMove.notation}` : ''
+    const blackPart = blackMove ? ` | Đen: ${blackMove.notation}` : ''
+    lines.push(`${turn}. ${redPart}${blackPart}`.trim())
+  }
+  return lines.join('\n')
+}

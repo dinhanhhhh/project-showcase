@@ -5,14 +5,17 @@ import { useOopFlashcardsStore } from '@/stores/oopFlashcards'
 import { OOP_FLASHCARDS, OOP_TOPICS } from './data'
 import {
   buildDeck,
+  computeGroupProgress,
+  generateQuizQuestions,
   getAccuracyPercent,
   getCompletionTitle,
   tokenizeJavaCode,
 } from './engine'
-import type { Flashcard, TopicFilter } from './types'
+import type { Flashcard, QuizOption, QuizQuestion, StudyMode, TopicFilter } from './types'
 
 const store = useOopFlashcardsStore()
 
+const studyMode = ref<StudyMode>('flashcard')
 const deck = ref<Flashcard[]>([])
 const currentIndex = ref(0)
 const isFlipped = ref(false)
@@ -24,17 +27,31 @@ const copiedCardId = ref<string | null>(null)
 const sessionRatings = ref<Array<{ cardId: string; known: boolean }>>([])
 const searchKeyword = ref('')
 
+const quizQuestions = ref<QuizQuestion[]>([])
+const quizIndex = ref(0)
+const selectedOptionId = ref<string | null>(null)
+const quizCorrect = ref(0)
+const quizDone = ref(false)
+
+const isConfirmingReset = ref(false)
+
 let touchStartX = 0
 let rateTimer: ReturnType<typeof setTimeout> | null = null
 let shakeTimer: ReturnType<typeof setTimeout> | null = null
 let copyTimer: ReturnType<typeof setTimeout> | null = null
+let resetConfirmTimer: ReturnType<typeof setTimeout> | null = null
 
 const isDone = computed(() => deck.value.length > 0 && currentIndex.value >= deck.value.length)
 const currentCard = computed<Flashcard | null>(() => deck.value[currentIndex.value] ?? null)
+const currentQuiz = computed<QuizQuestion | null>(() => quizQuestions.value[quizIndex.value] ?? null)
+const unmasteredCount = computed(() => Math.max(0, OOP_FLASHCARDS.length - store.masteredIds.length))
+const groupProgress = computed(() => computeGroupProgress(OOP_FLASHCARDS, store.masteredIds))
 
 const currentTopicTitle = computed(() => {
-  if (!currentCard.value) return ''
-  return OOP_TOPICS.find((t) => t.id === currentCard.value?.topicId)?.title ?? 'OOP'
+  const topicId =
+    studyMode.value === 'quiz' ? currentQuiz.value?.topicId : currentCard.value?.topicId
+  if (!topicId) return 'OOP'
+  return OOP_TOPICS.find((t) => t.id === topicId)?.title ?? 'OOP'
 })
 
 const highlightedCodeTokens = computed(() => {
@@ -45,12 +62,20 @@ const highlightedCodeTokens = computed(() => {
 const remainingCount = computed(() => Math.max(0, deck.value.length - currentIndex.value))
 
 const progressPercent = computed(() => {
+  if (studyMode.value === 'quiz') {
+    if (quizQuestions.value.length === 0) return 0
+    if (quizDone.value) return 100
+    return Math.min(100, Math.round((quizIndex.value / quizQuestions.value.length) * 100))
+  }
   if (deck.value.length === 0) return 0
   return Math.min(100, Math.round((currentIndex.value / deck.value.length) * 100))
 })
 
 const completionTitle = computed(() => getCompletionTitle(sessionKnown.value, deck.value.length))
 const accuracyPercent = computed(() => getAccuracyPercent(sessionKnown.value, deck.value.length))
+const quizAccuracyPercent = computed(() =>
+  getAccuracyPercent(quizCorrect.value, quizQuestions.value.length),
+)
 const masteryPercent = computed(() =>
   getAccuracyPercent(store.masteredIds.length, OOP_FLASHCARDS.length),
 )
@@ -71,7 +96,14 @@ function rebuildDeck(shuffle = isShuffled.value) {
     store.setSelectedTopic('all')
   }
 
-  const baseDeck = buildDeck(OOP_FLASHCARDS, activeFilter, store.reviewIds, shuffle)
+  const baseDeck = buildDeck(
+    OOP_FLASHCARDS,
+    activeFilter,
+    store.reviewIds,
+    shuffle,
+    Math.random,
+    store.masteredIds,
+  )
   const q = searchKeyword.value.trim().toLowerCase()
   deck.value = q
     ? baseDeck.filter(
@@ -86,6 +118,10 @@ function rebuildDeck(shuffle = isShuffled.value) {
   sessionKnown.value = 0
   sessionNope.value = 0
   sessionRatings.value = []
+
+  if (studyMode.value === 'quiz') {
+    startQuiz()
+  }
 }
 
 function selectTopic(filter: TopicFilter) {
@@ -93,14 +129,52 @@ function selectTopic(filter: TopicFilter) {
   rebuildDeck(false)
 }
 
+function startQuiz() {
+  const pool = deck.value.length > 0 ? deck.value : OOP_FLASHCARDS
+  quizQuestions.value = generateQuizQuestions(pool, OOP_FLASHCARDS, 8)
+  quizIndex.value = 0
+  selectedOptionId.value = null
+  quizCorrect.value = 0
+  quizDone.value = false
+}
+
+function switchStudyMode(mode: StudyMode) {
+  if (studyMode.value === mode) return
+  studyMode.value = mode
+  if (mode === 'quiz') {
+    startQuiz()
+  }
+}
+
+function selectQuizOption(option: QuizOption) {
+  const q = currentQuiz.value
+  if (!q || selectedOptionId.value !== null || quizDone.value) return
+  selectedOptionId.value = option.id
+  if (option.isCorrect) {
+    quizCorrect.value += 1
+  }
+  store.markCardResult(q.cardId, option.isCorrect)
+}
+
+function nextQuizQuestion() {
+  if (selectedOptionId.value === null) return
+  if (quizIndex.value + 1 >= quizQuestions.value.length) {
+    quizDone.value = true
+    store.recordQuizResult(quizCorrect.value, quizQuestions.value.length)
+    return
+  }
+  quizIndex.value += 1
+  selectedOptionId.value = null
+}
+
 function toggleFlip() {
-  if (isDone.value || !currentCard.value) return
+  if (studyMode.value !== 'flashcard' || isDone.value || !currentCard.value) return
   isFlipped.value = !isFlipped.value
 }
 
 function rateCard(known: boolean) {
   const card = currentCard.value
-  if (!card || isDone.value) return
+  if (studyMode.value !== 'flashcard' || !card || isDone.value) return
 
   store.markCardResult(card.id, known)
   sessionRatings.value = [...sessionRatings.value, { cardId: card.id, known }]
@@ -169,6 +243,7 @@ function handleTouchStart(e: TouchEvent) {
 }
 
 function handleTouchEnd(e: TouchEvent) {
+  if (studyMode.value !== 'flashcard') return
   const endX = e.changedTouches[0]?.screenX ?? 0
   const diff = touchStartX - endX
   if (Math.abs(diff) > 55) {
@@ -178,6 +253,7 @@ function handleTouchEnd(e: TouchEvent) {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+  if (studyMode.value !== 'flashcard') return
 
   if (isDone.value) {
     if (e.key === 'Enter') {
@@ -203,6 +279,21 @@ function handleKeydown(e: KeyboardEvent) {
 }
 
 function handleResetAll() {
+  if (!isConfirmingReset.value) {
+    isConfirmingReset.value = true
+    if (resetConfirmTimer) clearTimeout(resetConfirmTimer)
+    resetConfirmTimer = setTimeout(() => {
+      isConfirmingReset.value = false
+      resetConfirmTimer = null
+    }, 4000)
+    return
+  }
+
+  isConfirmingReset.value = false
+  if (resetConfirmTimer) {
+    clearTimeout(resetConfirmTimer)
+    resetConfirmTimer = null
+  }
   store.resetProgress()
   rebuildDeck(false)
 }
@@ -217,6 +308,7 @@ onUnmounted(() => {
   if (rateTimer) clearTimeout(rateTimer)
   if (shakeTimer) clearTimeout(shakeTimer)
   if (copyTimer) clearTimeout(copyTimer)
+  if (resetConfirmTimer) clearTimeout(resetConfirmTimer)
 })
 </script>
 
@@ -272,24 +364,78 @@ onUnmounted(() => {
         <button
           type="button"
           class="ghost-btn"
+          :class="{ confirming: isConfirmingReset }"
           title="Đặt lại toàn bộ tiến trình"
           @click="handleResetAll"
         >
-          ↺ Reset
+          {{ isConfirmingReset ? 'Xác nhận Reset?' : '↺ Reset' }}
         </button>
       </header>
 
+      <div class="mode-toggle-bar">
+        <div
+          class="study-switch"
+          role="group"
+          aria-label="Chọn chế độ học"
+        >
+          <button
+            type="button"
+            :class="{ active: studyMode === 'flashcard' }"
+            @click="switchStudyMode('flashcard')"
+          >
+            🎴 Thẻ lật
+          </button>
+          <button
+            type="button"
+            :class="{ active: studyMode === 'quiz' }"
+            @click="switchStudyMode('quiz')"
+          >
+            ⚡ Quiz nhanh
+          </button>
+        </div>
+
+        <div class="quiz-best-pill">
+          🏆 Kỷ lục Quiz: <strong>{{ store.bestQuizPercent }}%</strong>
+          <span>({{ store.quizzesCompleted }} lượt)</span>
+        </div>
+      </div>
+
+      <section class="group-progress-grid">
+        <div
+          v-for="group in groupProgress"
+          :key="group.id"
+          class="group-card"
+        >
+          <div class="group-head">
+            <span class="group-name">{{ group.title }}</span>
+            <strong class="group-ratio">{{ group.mastered }}/{{ group.total }}</strong>
+          </div>
+          <div class="group-bar-track">
+            <div
+              class="group-bar-fill"
+              :style="{ width: `${group.percent}%` }"
+            />
+          </div>
+        </div>
+      </section>
+
       <section class="stats-row">
         <div class="stat-pill stat-know">
-          <span class="stat-num">{{ sessionKnown }}</span>
-          <span class="stat-lbl">Đã biết</span>
+          <span class="stat-num">{{ studyMode === 'quiz' ? quizCorrect : sessionKnown }}</span>
+          <span class="stat-lbl">{{ studyMode === 'quiz' ? 'Đúng' : 'Đã biết' }}</span>
         </div>
         <div class="stat-pill stat-nope">
-          <span class="stat-num">{{ sessionNope }}</span>
-          <span class="stat-lbl">Cần ôn</span>
+          <span class="stat-num">{{ studyMode === 'quiz' ? unmasteredCount : sessionNope }}</span>
+          <span class="stat-lbl">{{ studyMode === 'quiz' ? 'Chưa thuộc' : 'Cần ôn' }}</span>
         </div>
         <div class="stat-pill stat-left">
-          <span class="stat-num">{{ remainingCount }}</span>
+          <span class="stat-num">
+            {{
+              studyMode === 'quiz'
+                ? Math.max(0, quizQuestions.length - quizIndex - (quizDone ? 1 : 0))
+                : remainingCount
+            }}
+          </span>
           <span class="stat-lbl">Còn lại</span>
         </div>
       </section>
@@ -322,6 +468,15 @@ onUnmounted(() => {
           </button>
 
           <button
+            type="button"
+            class="topic-pill topic-unmastered"
+            :class="{ active: store.selectedTopic === 'unmastered' }"
+            @click="selectTopic('unmastered')"
+          >
+            🎯 Chưa thuộc ({{ unmasteredCount }})
+          </button>
+
+          <button
             v-if="store.reviewIds.length > 0"
             type="button"
             class="topic-pill topic-review"
@@ -344,7 +499,104 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <main class="stage">
+      <!-- CHẾ ĐỘ QUIZ TRẮC NGHIỆM NHANH -->
+      <main
+        v-if="studyMode === 'quiz'"
+        class="stage"
+      >
+        <div
+          v-if="quizDone"
+          class="done-card"
+        >
+          <div class="done-trophy">
+            ⚡
+          </div>
+          <h2 class="done-title">
+            {{ getCompletionTitle(quizCorrect, quizQuestions.length) }}
+          </h2>
+          <p class="done-sub">
+            Bạn trả lời đúng <strong>{{ quizCorrect }} / {{ quizQuestions.length }}</strong> câu ({{ quizAccuracyPercent }}%)
+          </p>
+          <div class="done-actions">
+            <button
+              type="button"
+              class="primary-cta"
+              @click="startQuiz"
+            >
+              Làm bài Quiz mới
+            </button>
+            <button
+              type="button"
+              class="secondary-cta"
+              @click="switchStudyMode('flashcard')"
+            >
+              Về chế độ Thẻ lật
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-else-if="currentQuiz"
+          class="quiz-card"
+        >
+          <div class="face-meta">
+            <span class="topic-badge">{{ currentTopicTitle }}</span>
+            <span class="diff-badge">{{ currentQuiz.difficulty }}</span>
+            <span class="index-badge">Câu {{ quizIndex + 1 }} / {{ quizQuestions.length }}</span>
+          </div>
+
+          <h2 class="quiz-question">
+            {{ currentQuiz.question }}
+          </h2>
+
+          <div class="quiz-options">
+            <button
+              v-for="(opt, idx) in currentQuiz.options"
+              :key="opt.id"
+              type="button"
+              class="quiz-opt-btn"
+              :class="{
+                selected: selectedOptionId === opt.id,
+                correct: selectedOptionId !== null && opt.isCorrect,
+                wrong: selectedOptionId === opt.id && !opt.isCorrect,
+              }"
+              :disabled="selectedOptionId !== null"
+              @click="selectQuizOption(opt)"
+            >
+              <span class="opt-letter">{{ String.fromCharCode(65 + idx) }}</span>
+              <span class="opt-text">{{ opt.text }}</span>
+            </button>
+          </div>
+
+          <div
+            v-if="selectedOptionId !== null"
+            class="quiz-feedback"
+          >
+            <strong>Đáp án chuẩn · {{ currentQuiz.answerTitle }}</strong>
+            <ul>
+              <li
+                v-for="(line, idx) in currentQuiz.explanation"
+                :key="idx"
+              >
+                {{ line }}
+              </li>
+            </ul>
+            <button
+              type="button"
+              class="primary-cta quiz-next-btn"
+              @click="nextQuizQuestion"
+            >
+              {{ quizIndex + 1 >= quizQuestions.length ? 'Xem tổng kết Quiz →' : 'Câu tiếp theo →' }}
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <!-- CHẾ ĐỘ THẺ LẬT 3D -->
+      <main
+        v-else
+        class="stage"
+      >
         <div
           v-if="isDone"
           class="done-card"
@@ -485,26 +737,44 @@ onUnmounted(() => {
           class="done-card"
         >
           <div class="done-trophy">
-            🔎
+            {{ store.selectedTopic === 'unmastered' ? '🎉' : '🔎' }}
           </div>
           <h2 class="done-title">
-            Không tìm thấy thẻ khớp "{{ searchKeyword }}"
+            {{
+              store.selectedTopic === 'unmastered'
+                ? 'Chúc mừng! Bạn đã thuộc 100% các thẻ!'
+                : `Không tìm thấy thẻ khớp "${searchKeyword}"`
+            }}
           </h2>
           <p class="done-sub">
-            Thử xóa từ khóa hoặc chuyển về mục Tất cả để tiếp tục học.
+            {{
+              store.selectedTopic === 'unmastered'
+                ? 'Bạn có thể thử sức với chế độ Quiz nhanh hoặc xem lại toàn bộ bộ thẻ.'
+                : 'Thử xóa từ khóa hoặc chuyển về mục Tất cả để tiếp tục học.'
+            }}
           </p>
-          <button
-            type="button"
-            class="primary-cta"
-            @click="searchKeyword = ''; rebuildDeck(false)"
-          >
-            Xem lại toàn bộ bộ thẻ
-          </button>
+          <div class="done-actions">
+            <button
+              type="button"
+              class="primary-cta"
+              @click="searchKeyword = ''; selectTopic('all')"
+            >
+              Xem lại toàn bộ bộ thẻ
+            </button>
+            <button
+              v-if="store.selectedTopic === 'unmastered'"
+              type="button"
+              class="secondary-cta"
+              @click="selectTopic('all'); switchStudyMode('quiz')"
+            >
+              ⚡ Làm Quiz kiểm tra
+            </button>
+          </div>
         </div>
       </main>
 
       <footer
-        v-if="!isDone"
+        v-if="studyMode === 'flashcard' && !isDone"
         class="controls-bar"
       >
         <button
@@ -545,7 +815,7 @@ onUnmounted(() => {
       </footer>
 
       <p
-        v-if="!isDone"
+        v-if="studyMode === 'flashcard' && !isDone"
         class="shortcut-footer"
       >
         <kbd>Space</kbd> lật thẻ · <kbd>←</kbd> chưa nhớ · <kbd>→</kbd> đã biết · <kbd>↑</kbd> quay lại
@@ -601,10 +871,119 @@ onUnmounted(() => {
   color: var(--text-dim);
 }
 
+.ghost-btn.confirming {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--text-inverse);
+}
+
 .back-btn:hover,
 .ghost-btn:hover {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.ghost-btn.confirming:hover {
+  color: var(--text-inverse);
+}
+
+.mode-toggle-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.study-switch {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 13px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+}
+
+.study-switch button {
+  padding: 0.45rem 0.9rem;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.study-switch button.active {
+  background: var(--primary);
+  color: var(--text-inverse);
+}
+
+.quiz-best-pill {
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.quiz-best-pill strong {
+  color: var(--primary);
+}
+
+.group-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.group-card {
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  border-radius: 14px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
+}
+
+.group-name {
+  color: var(--text-dim);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-ratio {
+  color: var(--primary);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.group-bar-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--bg-input);
+  overflow: hidden;
+}
+
+.group-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  transition: width 0.35s ease;
 }
 
 .brand-block {
@@ -670,6 +1049,12 @@ onUnmounted(() => {
   border-radius: 12px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
+  transition: var(--transition-fast);
+}
+
+.card-search:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
 .card-search input {
@@ -822,6 +1207,117 @@ onUnmounted(() => {
 .topic-review {
   border-color: rgba(255, 85, 85, 0.35);
   color: var(--danger);
+}
+
+.topic-unmastered {
+  border-color: var(--outline-strong);
+  color: var(--primary);
+}
+
+.quiz-card {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  border-radius: 24px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  box-shadow: var(--shadow-card);
+}
+
+.quiz-question {
+  font-family: 'Manrope', sans-serif;
+  font-size: clamp(1.15rem, 2.5vw, 1.55rem);
+  font-weight: 800;
+  line-height: 1.38;
+  color: var(--text);
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.quiz-opt-btn {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  background: var(--bg-sidebar);
+  border: 1.5px solid var(--outline);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.quiz-opt-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+
+.quiz-opt-btn.correct {
+  border-color: var(--success);
+  background: rgba(52, 211, 153, 0.14);
+}
+
+.quiz-opt-btn.wrong {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.opt-letter {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.8rem;
+  color: var(--primary);
+}
+
+.opt-text {
+  flex: 1;
+}
+
+.quiz-feedback {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline-strong);
+  border-radius: 16px;
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.quiz-feedback strong {
+  color: var(--primary);
+  font-size: 0.92rem;
+}
+
+.quiz-feedback ul {
+  padding-left: 1.15rem;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.quiz-next-btn {
+  align-self: flex-end;
+  margin-top: 0.25rem;
 }
 
 .stage {
@@ -1165,6 +1661,20 @@ kbd {
 @media (max-width: 600px) {
   .flashcard-page {
     padding: 0.75rem;
+  }
+
+  .top-nav {
+    flex-wrap: wrap;
+    row-gap: 0.65rem;
+  }
+
+  .brand-block {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .group-progress-grid {
+    grid-template-columns: 1fr;
   }
 
   .card-face {

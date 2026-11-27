@@ -62,6 +62,7 @@ function cycleTheme() {
     <button
       type="button"
       class="palette-trigger"
+      aria-label="Tìm kiếm nhanh ứng dụng (Ctrl+K)"
       :data-tooltip="isSidebarCollapsed ? 'Tìm nhanh (Ctrl+K)' : undefined"
       @click="openPalette"
     >
@@ -87,6 +88,7 @@ function cycleTheme() {
       <button
         type="button"
         class="nav-item"
+        aria-label="Trang chủ"
         :class="{ active: !onlyShowFavorites && selectedCategory === 'all' && !searchQuery }"
         :data-tooltip="isSidebarCollapsed ? 'Trang chủ' : undefined"
         @click="emit('set-view', 'home')"
@@ -105,6 +107,7 @@ function cycleTheme() {
       <button
         type="button"
         class="nav-item"
+        aria-label="Khám phá danh mục"
         :class="{ active: !onlyShowFavorites && selectedCategory !== 'all' }"
         :data-tooltip="isSidebarCollapsed ? 'Khám phá danh mục' : undefined"
         @click="emit('set-view', 'categories')"
@@ -119,6 +122,7 @@ function cycleTheme() {
       <button
         type="button"
         class="nav-item"
+        aria-label="Ứng dụng yêu thích"
         :class="{ active: onlyShowFavorites }"
         :data-tooltip="isSidebarCollapsed ? 'Đã ghim yêu thích' : undefined"
         @click="emit('set-view', 'favorites')"
@@ -137,6 +141,7 @@ function cycleTheme() {
       <button
         type="button"
         class="nav-item"
+        aria-label="Đổi chủ đề màu"
         :data-tooltip="isSidebarCollapsed ? 'Đổi chủ đề màu' : undefined"
         @click="cycleTheme"
       >
@@ -150,6 +155,7 @@ function cycleTheme() {
       <button
         type="button"
         class="nav-item"
+        aria-label="Mở cài đặt hệ thống"
         :data-tooltip="isSidebarCollapsed ? 'Cài đặt hệ thống' : undefined"
         @click="emit('open-settings')"
       >
@@ -164,6 +170,7 @@ function cycleTheme() {
     <button
       type="button"
       class="collapse-trigger"
+      :aria-label="isSidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'"
       :data-tooltip="isSidebarCollapsed ? 'Mở rộng thanh bên' : 'Thu gọn'"
       @click="emit('toggle-sidebar')"
     >
@@ -200,6 +207,7 @@ function cycleTheme() {
     <button
       type="button"
       class="user-profile"
+      :aria-label="`Hồ sơ cá nhân (${userName}) — mở cài đặt`"
       :data-tooltip="isSidebarCollapsed ? userName : undefined"
       @click="emit('open-settings')"
     >

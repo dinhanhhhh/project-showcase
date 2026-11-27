@@ -2,42 +2,72 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useHomNayAnGiStore } from '@/stores/homNayAnGi'
-import { FOOD_CATEGORY_LABELS, SAMPLE_FOODS } from './data'
-import { filterFoods, pickRandomFood, validateFoodInput } from './engine'
-import type { FoodCategory, FoodFilter, FoodItem } from './types'
+import { useFoodAudio } from './composables/useFoodAudio'
+import {
+  FOOD_CATEGORY_LABELS,
+  MEAL_TIME_LABELS,
+  PRICE_TIER_LABELS,
+  SAMPLE_FOODS,
+} from './data'
+import {
+  filterFoodsAdvanced,
+  generateDailyMealPlan,
+  getSpinDelays,
+  pickRandomFood,
+  validateFoodInput,
+  type DailyMealPlan,
+} from './engine'
+import type {
+  FoodCategory,
+  FoodFilter,
+  FoodItem,
+  MealTime,
+  MealTimeFilter,
+  PriceTier,
+  PriceTierFilter,
+} from './types'
 
 const store = useHomNayAnGiStore()
+const { playTick, playReveal, cleanup: cleanupAudio } = useFoodAudio()
 
 const activeFilter = ref<FoodFilter>('all')
+const activeMealTime = ref<MealTimeFilter>('all')
+const activePriceTier = ref<PriceTierFilter>('all')
 const currentFood = ref<FoodItem | null>(null)
 const isRolling = ref(false)
 const brokenImageIds = ref<Record<string, boolean>>({})
+const dailyPlan = ref<DailyMealPlan | null>(null)
 
 const newName = ref('')
 const newImage = ref('')
 const newCategory = ref<FoodCategory>('custom')
 const newEmoji = ref('🍽️')
+const newMealTime = ref<MealTime>('trua')
+const newPriceTier = ref<PriceTier>('vua-tui')
+const newPriceLabel = ref('')
 const formError = ref('')
 const formSuccess = ref('')
 
-let rollTimer: ReturnType<typeof setInterval> | null = null
+let rollTimer: ReturnType<typeof setTimeout> | null = null
 let successTimer: ReturnType<typeof setTimeout> | null = null
 
 const FILTER_ORDER: FoodFilter[] = ['all', 'nuoc', 'kho', 'an-vat', 'favorite', 'custom']
+const MEAL_TIME_ORDER: MealTimeFilter[] = ['all', 'sang', 'trua', 'toi', 'an-vat']
+const PRICE_TIER_ORDER: PriceTierFilter[] = ['all', 'tiet-kiem', 'vua-tui', 'sang-chanh']
 const EMOJI_OPTIONS = ['🍽️', '🍜', '🍛', '🍕', '🍔', '🍣', '🥗', '🧋', '🍰', '🍗']
 
 interface MealSlotPreset {
   id: 'morning' | 'lunch' | 'afternoon' | 'night'
   label: string
   hint: string
-  targetFilter: FoodFilter
+  mealTime: MealTime
 }
 
 const MEAL_PRESETS: readonly MealSlotPreset[] = [
-  { id: 'morning', label: '🌅 Sáng', hint: 'Món nước nhẹ bụng', targetFilter: 'nuoc' },
-  { id: 'lunch', label: '☀️ Trưa', hint: 'Chắc bụng đầy năng lượng', targetFilter: 'kho' },
-  { id: 'afternoon', label: '🌇 Chiều', hint: 'Ăn vặt xế chiều', targetFilter: 'an-vat' },
-  { id: 'night', label: '🌙 Đêm', hint: 'Ấm bụng đêm khuya', targetFilter: 'nuoc' },
+  { id: 'morning', label: '🌅 Sáng', hint: 'Nhẹ bụng đầu ngày', mealTime: 'sang' },
+  { id: 'lunch', label: '☀️ Trưa', hint: 'Chắc bụng đầy năng lượng', mealTime: 'trua' },
+  { id: 'afternoon', label: '🌇 Chiều', hint: 'Ăn vặt xế chiều', mealTime: 'an-vat' },
+  { id: 'night', label: '🌙 Đêm', hint: 'Ấm bụng đêm khuya', mealTime: 'toi' },
 ]
 
 const currentMealId = computed<MealSlotPreset['id']>(() => {
@@ -48,15 +78,15 @@ const currentMealId = computed<MealSlotPreset['id']>(() => {
   return 'night'
 })
 
-function applyMealPreset(preset: MealSlotPreset) {
-  selectFilter(preset.targetFilter)
-  rollRandomFood()
-}
-
 const allFoods = computed<FoodItem[]>(() => [...store.customFoods, ...SAMPLE_FOODS])
 
 const filteredFoods = computed<FoodItem[]>(() =>
-  filterFoods(allFoods.value, activeFilter.value, store.favoriteIds),
+  filterFoodsAdvanced(allFoods.value, {
+    category: activeFilter.value,
+    mealTime: activeMealTime.value,
+    priceTier: activePriceTier.value,
+    favoriteIds: store.favoriteIds,
+  }),
 )
 
 const isCurrentFavorite = computed(() =>
@@ -72,12 +102,40 @@ function handleImageError(foodId: string) {
   brokenImageIds.value = { ...brokenImageIds.value, [foodId]: true }
 }
 
-function selectFilter(filter: FoodFilter) {
-  activeFilter.value = filter
-  const pool = filterFoods(allFoods.value, filter, store.favoriteIds)
+function syncSpotlightToPool() {
+  const pool = filteredFoods.value
   if (!currentFood.value || !pool.some((f) => f.id === currentFood.value?.id)) {
     currentFood.value = pickRandomFood(pool)
   }
+}
+
+function selectFilter(filter: FoodFilter) {
+  activeFilter.value = filter
+  syncSpotlightToPool()
+}
+
+function selectMealTime(mealTime: MealTimeFilter) {
+  activeMealTime.value = mealTime
+  syncSpotlightToPool()
+}
+
+function selectPriceTier(priceTier: PriceTierFilter) {
+  activePriceTier.value = priceTier
+  syncSpotlightToPool()
+}
+
+function resetAllFilters() {
+  activeFilter.value = 'all'
+  activeMealTime.value = 'all'
+  activePriceTier.value = 'all'
+  syncSpotlightToPool()
+}
+
+function applyMealPreset(preset: MealSlotPreset) {
+  activeFilter.value = 'all'
+  activeMealTime.value = preset.mealTime
+  syncSpotlightToPool()
+  rollRandomFood()
 }
 
 function rollRandomFood() {
@@ -90,31 +148,45 @@ function rollRandomFood() {
   if (pool.length === 1) {
     currentFood.value = pool[0]
     store.recordPick(pool[0])
+    playReveal(store.isMuted)
     return
   }
 
-  if (rollTimer) clearInterval(rollTimer)
+  if (rollTimer) {
+    clearTimeout(rollTimer)
+    rollTimer = null
+  }
   isRolling.value = true
 
-  let ticks = 0
-  const maxTicks = 10
-  rollTimer = setInterval(() => {
-    ticks += 1
+  const prefersReduced =
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+  const delays = getSpinDelays(prefersReduced ? 3 : 14)
+  let step = 0
+
+  const runStep = () => {
     const candidate = pickRandomFood(pool, currentFood.value?.id)
     if (candidate) {
       currentFood.value = candidate
     }
-    if (ticks >= maxTicks) {
-      if (rollTimer) {
-        clearInterval(rollTimer)
-        rollTimer = null
-      }
+    playTick(step, delays.length, store.isMuted)
+
+    step += 1
+    if (step >= delays.length) {
+      rollTimer = null
       isRolling.value = false
       if (currentFood.value) {
         store.recordPick(currentFood.value)
+        playReveal(store.isMuted)
       }
+      return
     }
-  }, 75)
+
+    rollTimer = setTimeout(runStep, delays[step] ?? 120)
+  }
+
+  rollTimer = setTimeout(runStep, delays[0] ?? 45)
 }
 
 function handleAddFood() {
@@ -133,6 +205,9 @@ function handleAddFood() {
     image: validation.sanitizedImage,
     emoji: newEmoji.value,
     category: newCategory.value,
+    mealTimes: [newMealTime.value],
+    priceTier: newPriceTier.value,
+    priceLabel: newPriceLabel.value.trim() || PRICE_TIER_LABELS[newPriceTier.value],
     isCustom: true,
   }
 
@@ -142,6 +217,7 @@ function handleAddFood() {
 
   newName.value = ''
   newImage.value = ''
+  newPriceLabel.value = ''
   formSuccess.value = `Đã thêm "${created.name}" vào thực đơn!`
   if (successTimer) clearTimeout(successTimer)
   successTimer = setTimeout(() => {
@@ -159,6 +235,30 @@ function handleRemoveCustom(foodId: string) {
 function pickFromMenu(food: FoodItem) {
   currentFood.value = food
   store.recordPick(food)
+  playReveal(store.isMuted)
+}
+
+function jumpToHistory(foodId: string) {
+  const found = allFoods.value.find((f) => f.id === foodId)
+  if (!found) return
+  currentFood.value = found
+}
+
+const DAILY_PLAN_SLOTS: ReadonlyArray<{ key: keyof DailyMealPlan; label: string }> = [
+  { key: 'sang', label: '🌅 Sáng' },
+  { key: 'trua', label: '☀️ Trưa' },
+  { key: 'toi', label: '🌙 Tối' },
+  { key: 'anVat', label: '🧋 Ăn vặt' },
+]
+
+function buildDailyPlan() {
+  dailyPlan.value = generateDailyMealPlan(allFoods.value)
+  playReveal(store.isMuted)
+}
+
+function selectPlanDish(food: FoodItem | null) {
+  if (!food) return
+  pickFromMenu(food)
 }
 
 onMounted(() => {
@@ -166,8 +266,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (rollTimer) clearInterval(rollTimer)
+  if (rollTimer) clearTimeout(rollTimer)
   if (successTimer) clearTimeout(successTimer)
+  cleanupAudio()
 })
 </script>
 
@@ -185,8 +286,19 @@ onUnmounted(() => {
           <h1>Hôm Nay Ăn Gì? 🍜</h1>
           <p>Chốt món nhanh trong 1 giây — không còn cảnh suy nghĩ cả tiếng!</p>
         </div>
-        <div class="menu-count">
-          {{ allFoods.length }} món
+        <div class="header-right-tools">
+          <button
+            type="button"
+            class="mute-btn"
+            :title="store.isMuted ? 'Bật âm thanh quay món' : 'Tắt âm thanh'"
+            :aria-label="store.isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'"
+            @click="store.toggleMute()"
+          >
+            {{ store.isMuted ? '🔇' : '🔊' }}
+          </button>
+          <div class="menu-count">
+            {{ allFoods.length }} món
+          </div>
         </div>
       </header>
 
@@ -198,7 +310,7 @@ onUnmounted(() => {
             :key="preset.id"
             type="button"
             class="meal-pill"
-            :class="{ current: currentMealId === preset.id }"
+            :class="{ current: currentMealId === preset.id, active: activeMealTime === preset.mealTime }"
             :title="preset.hint"
             @click="applyMealPreset(preset)"
           >
@@ -208,17 +320,59 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <section class="filter-bar">
-        <button
-          v-for="filter in FILTER_ORDER"
-          :key="filter"
-          type="button"
-          class="filter-chip"
-          :class="{ active: activeFilter === filter }"
-          @click="selectFilter(filter)"
+      <section class="filters-stack">
+        <div
+          class="filter-bar"
+          role="group"
+          aria-label="Lọc theo nhóm món"
         >
-          {{ FOOD_CATEGORY_LABELS[filter] }}
-        </button>
+          <button
+            v-for="filter in FILTER_ORDER"
+            :key="filter"
+            type="button"
+            class="filter-chip"
+            :class="{ active: activeFilter === filter }"
+            @click="selectFilter(filter)"
+          >
+            {{ FOOD_CATEGORY_LABELS[filter] }}
+          </button>
+        </div>
+
+        <div class="sub-filters">
+          <div
+            class="sub-filter-group"
+            role="group"
+            aria-label="Lọc theo buổi ăn"
+          >
+            <button
+              v-for="mt in MEAL_TIME_ORDER"
+              :key="mt"
+              type="button"
+              class="mini-chip"
+              :class="{ active: activeMealTime === mt }"
+              @click="selectMealTime(mt)"
+            >
+              {{ MEAL_TIME_LABELS[mt] }}
+            </button>
+          </div>
+
+          <div
+            class="sub-filter-group"
+            role="group"
+            aria-label="Lọc theo mức giá"
+          >
+            <button
+              v-for="pt in PRICE_TIER_ORDER"
+              :key="pt"
+              type="button"
+              class="mini-chip price-chip"
+              :class="{ active: activePriceTier === pt }"
+              @click="selectPriceTier(pt)"
+            >
+              {{ PRICE_TIER_LABELS[pt] }}
+            </button>
+          </div>
+        </div>
       </section>
 
       <div class="main-grid">
@@ -255,12 +409,14 @@ onUnmounted(() => {
                 class="dish-fallback"
               >
                 <span class="fallback-emoji">{{ currentFood.emoji }}</span>
+                <span class="fallback-tag">{{ FOOD_CATEGORY_LABELS[currentFood.category] }}</span>
               </div>
               <button
                 type="button"
                 class="fav-floating"
                 :class="{ active: isCurrentFavorite }"
                 title="Lưu yêu thích"
+                aria-label="Lưu món yêu thích"
                 @click="store.toggleFavorite(currentFood.id)"
               >
                 {{ isCurrentFavorite ? '★' : '☆' }}
@@ -268,7 +424,15 @@ onUnmounted(() => {
             </div>
 
             <div class="dish-info">
-              <span class="dish-cat-tag">{{ FOOD_CATEGORY_LABELS[currentFood.category] }}</span>
+              <div class="dish-tags-row">
+                <span class="dish-cat-tag">{{ FOOD_CATEGORY_LABELS[currentFood.category] }}</span>
+                <span
+                  v-if="currentFood.priceLabel"
+                  class="dish-price-tag"
+                >
+                  💵 {{ currentFood.priceLabel }}
+                </span>
+              </div>
               <h2 class="dish-name">
                 {{ currentFood.emoji }} {{ currentFood.name }}
               </h2>
@@ -280,24 +444,78 @@ onUnmounted(() => {
             class="empty-spotlight"
           >
             <span>🍽️</span>
-            <p>Nhóm này chưa có món nào. Hãy chọn nhóm khác hoặc tự thêm món bên cạnh!</p>
+            <p>Không có món nào khớp bộ lọc hiện tại. Thử nới bộ lọc hoặc tự thêm món!</p>
+            <button
+              type="button"
+              class="reset-filters-btn"
+              @click="resetAllFilters"
+            >
+              🔄 Đặt lại bộ lọc
+            </button>
           </div>
 
-          <button
-            type="button"
-            class="roll-btn"
-            :disabled="isRolling || filteredFoods.length === 0"
-            @click="rollRandomFood"
+          <div class="roll-actions">
+            <button
+              type="button"
+              class="roll-btn"
+              :disabled="isRolling || filteredFoods.length === 0"
+              @click="rollRandomFood"
+            >
+              {{ isRolling ? '🎲 Đang quay món...' : '🎲 Quay món ngẫu nhiên' }}
+            </button>
+            <button
+              type="button"
+              class="daily-plan-btn"
+              :disabled="isRolling || allFoods.length === 0"
+              @click="buildDailyPlan"
+            >
+              📅 Gợi ý cả ngày
+            </button>
+          </div>
+
+          <div
+            v-if="dailyPlan"
+            class="daily-plan-box"
           >
-            {{ isRolling ? '🎲 Đang quay món...' : '🎲 Quay món ngẫu nhiên' }}
-          </button>
+            <div class="history-head">
+              <h3>📅 Thực đơn gợi ý cả ngày</h3>
+              <button
+                type="button"
+                class="link-btn"
+                @click="buildDailyPlan"
+              >
+                🔄 Đổi thực đơn
+              </button>
+            </div>
+            <div class="daily-plan-grid">
+              <button
+                v-for="slot in DAILY_PLAN_SLOTS"
+                :key="slot.key"
+                type="button"
+                class="plan-slot-card"
+                :disabled="!dailyPlan[slot.key]"
+                @click="selectPlanDish(dailyPlan[slot.key])"
+              >
+                <span class="plan-slot-label">{{ slot.label }}</span>
+                <strong class="plan-slot-name">
+                  {{ dailyPlan[slot.key]?.emoji ?? '🍽️' }} {{ dailyPlan[slot.key]?.name ?? 'Chưa có món' }}
+                </strong>
+                <small
+                  v-if="dailyPlan[slot.key]?.priceLabel"
+                  class="plan-slot-price"
+                >
+                  {{ dailyPlan[slot.key]?.priceLabel }}
+                </small>
+              </button>
+            </div>
+          </div>
 
           <div
             v-if="store.history.length > 0"
             class="history-box"
           >
             <div class="history-head">
-              <h3>Gợi ý gần đây</h3>
+              <h3>Gợi ý gần đây ({{ store.history.length }}/10)</h3>
               <button
                 type="button"
                 class="link-btn"
@@ -307,14 +525,16 @@ onUnmounted(() => {
               </button>
             </div>
             <div class="history-chips">
-              <span
+              <button
                 v-for="(item, idx) in store.history"
                 :key="`${item.foodId}-${idx}`"
+                type="button"
                 class="history-chip"
+                @click="jumpToHistory(item.foodId)"
               >
                 {{ item.emoji }} {{ item.foodName }}
                 <small>{{ item.pickedAt }}</small>
-              </span>
+              </button>
             </div>
           </div>
         </section>
@@ -370,6 +590,27 @@ onUnmounted(() => {
               </label>
             </div>
 
+            <div class="form-row">
+              <label class="field">
+                <span>Buổi phù hợp</span>
+                <select v-model="newMealTime">
+                  <option value="sang">Sáng</option>
+                  <option value="trua">Trưa</option>
+                  <option value="toi">Tối</option>
+                  <option value="an-vat">Ăn vặt</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Mức giá</span>
+                <select v-model="newPriceTier">
+                  <option value="tiet-kiem">Dưới 40k</option>
+                  <option value="vua-tui">40k – 80k</option>
+                  <option value="sang-chanh">Trên 80k</option>
+                </select>
+              </label>
+            </div>
+
             <p
               v-if="formError"
               class="msg-error"
@@ -407,6 +648,10 @@ onUnmounted(() => {
                 >
                   <span>{{ food.emoji }}</span>
                   <span class="menu-name">{{ food.name }}</span>
+                  <span
+                    v-if="food.priceLabel"
+                    class="menu-price"
+                  >{{ food.priceLabel }}</span>
                 </button>
                 <div class="menu-actions">
                   <button
@@ -494,10 +739,35 @@ onUnmounted(() => {
   margin-top: 0.25rem;
 }
 
+.header-right-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mute-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.mute-btn:hover {
+  border-color: var(--primary);
+}
+
 .menu-count {
   padding: 0.4rem 0.85rem;
   border-radius: 999px;
-  background: rgba(109, 221, 255, 0.12);
+  background: var(--primary-soft);
   color: var(--primary);
   font-weight: 700;
   font-size: 0.85rem;
@@ -580,11 +850,60 @@ onUnmounted(() => {
   to { transform: translateX(-50%); }
 }
 
+.filters-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
 .filter-bar {
   display: flex;
   gap: 0.55rem;
   overflow-x: auto;
-  padding-bottom: 0.25rem;
+  padding-bottom: 0.2rem;
+}
+
+.sub-filters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.sub-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.mini-chip {
+  padding: 0.36rem 0.72rem;
+  border-radius: 10px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.mini-chip:hover {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.mini-chip.active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.mini-chip.price-chip.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .filter-chip {
@@ -662,13 +981,28 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--bg-sidebar), var(--bg));
+  gap: 0.65rem;
+  background:
+    radial-gradient(circle at 50% 45%, var(--primary-soft) 0%, transparent 62%),
+    linear-gradient(135deg, var(--bg-sidebar), var(--bg-card));
 }
 
 .fallback-emoji {
   font-size: 4.5rem;
+  filter: drop-shadow(0 6px 14px rgba(2, 6, 23, 0.14));
+}
+
+.fallback-tag {
+  padding: 0.22rem 0.72rem;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  font-weight: 700;
 }
 
 .fav-floating {
@@ -678,11 +1012,22 @@ onUnmounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid var(--outline);
-  background: rgba(9, 19, 40, 0.82);
-  color: var(--text-dim);
+  border: 1px solid var(--outline-strong);
+  background: var(--bg-card);
+  color: var(--text);
   font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(2, 6, 23, 0.16);
   cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.fav-floating:hover {
+  border-color: var(--property-group-d);
+  color: var(--property-group-d);
+  transform: scale(1.06);
 }
 
 .fav-floating.active {
@@ -694,15 +1039,33 @@ onUnmounted(() => {
   text-align: center;
 }
 
+.dish-tags-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+}
+
 .dish-cat-tag {
   display: inline-block;
   padding: 0.25rem 0.7rem;
   border-radius: 999px;
-  background: rgba(210, 119, 255, 0.14);
+  background: var(--accent-soft);
   color: var(--accent);
   font-size: 0.78rem;
   font-weight: 700;
-  margin-bottom: 0.45rem;
+}
+
+.dish-price-tag {
+  display: inline-block;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .dish-name {
@@ -718,12 +1081,22 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 0.65rem;
+  gap: 0.75rem;
   color: var(--text-dim);
 }
 
 .empty-spotlight span {
   font-size: 3rem;
+}
+
+.reset-filters-btn {
+  padding: 0.55rem 1rem;
+  border-radius: 12px;
+  background: var(--primary);
+  border: none;
+  color: var(--text-inverse);
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .roll-btn {
@@ -791,11 +1164,26 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.3rem 0.65rem;
+  padding: 0.34rem 0.7rem;
   border-radius: 999px;
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
+  color: var(--text);
   font-size: 0.8rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.history-chip:hover {
+  border-color: var(--primary);
+}
+
+.menu-price {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--primary);
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .history-chip small {
@@ -954,6 +1342,93 @@ onUnmounted(() => {
   color: var(--danger);
 }
 
+.roll-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.roll-actions .roll-btn {
+  flex: 1 1 210px;
+}
+
+.daily-plan-btn {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--outline);
+  border-radius: 14px;
+  padding: 0.85rem 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 48px;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.daily-plan-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.daily-plan-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.daily-plan-box {
+  width: 100%;
+  margin-top: 0.85rem;
+  padding: 0.85rem;
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--outline);
+}
+
+.daily-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.plan-slot-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition: border-color 0.2s, transform 0.2s;
+}
+
+.plan-slot-card:hover:not(:disabled) {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.plan-slot-label {
+  font-size: 0.74rem;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.plan-slot-name {
+  font-size: 0.88rem;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.plan-slot-price {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+
 @media (max-width: 820px) {
   .main-grid {
     grid-template-columns: 1fr;
@@ -966,6 +1441,12 @@ onUnmounted(() => {
   .header-title {
     order: 3;
     flex-basis: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .daily-plan-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

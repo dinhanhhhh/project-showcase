@@ -330,4 +330,104 @@ interface Drawable { // Interface
     }
 }`,
   },
+  {
+    id: '7.6',
+    topicId: 7,
+    difficulty: 'Trung bình',
+    question: 'Factory Method Pattern giải quyết vấn đề gì?',
+    answerTitle: 'Mẫu Khởi tạo Factory Method',
+    answerPoints: [
+      'Ủy quyền việc khởi tạo object cụ thể cho subclass thay vì gọi "new" cứng ở khắp nơi.',
+      'Tách biệt code sử dụng đối tượng (Client) khỏi class cụ thể (ConcreteProduct).',
+      'Dễ dàng bổ sung loại sản phẩm mới theo nguyên lý Open/Closed.',
+    ],
+    codeExample: `interface Transport { void deliver(); }
+abstract class Logistics {
+    abstract Transport createTransport();
+    public void planDelivery() { createTransport().deliver(); }
+}`,
+  },
+  {
+    id: '7.7',
+    topicId: 7,
+    difficulty: 'Trung bình',
+    question: 'Strategy Pattern khác gì so với việc dùng nhiều if/else?',
+    answerTitle: 'Mẫu Chiến lược (Strategy)',
+    answerPoints: [
+      'Đóng gói từng thuật toán thành một class riêng biệt có chung Interface.',
+      'Cho phép hoán đổi thuật toán lúc Runtime (VD: đổi phương thức thanh toán MoMo / VNPay / Card).',
+      'Loại bỏ khối if/else hoặc switch/case phình to khó bảo trì.',
+    ],
+    codeExample: `interface PayStrategy { void pay(int amount); }
+class Checkout {
+    private PayStrategy strategy;
+    public void setStrategy(PayStrategy s) { this.strategy = s; }
+    public void process(int money) { strategy.pay(money); }
+}`,
+  },
+  {
+    id: '7.8',
+    topicId: 7,
+    difficulty: 'Nâng cao',
+    question: 'Observer Pattern hoạt động ra sao trong thực tế?',
+    answerTitle: 'Mẫu Quan sát (Pub/Sub)',
+    answerPoints: [
+      'Định nghĩa quan hệ Một-Nhiều (Subject -> danh sách Observers).',
+      'Khi trạng thái của Subject thay đổi, tất cả Observer đã đăng ký tự động nhận thông báo cập nhật.',
+      'Là nền tảng cho Event Listener, RxJS, Vue Reactivity và Webhook.',
+    ],
+    codeExample: `interface Listener { void update(String event); }
+class EventBus {
+    private List<Listener> subs = new ArrayList<>();
+    public void emit(String ev) {
+        subs.forEach(s -> s.update(ev));
+    }
+}`,
+  },
+  {
+    id: '7.9',
+    topicId: 7,
+    difficulty: 'Nâng cao',
+    question: 'Decorator Pattern dùng khi nào thay cho Kế thừa?',
+    answerTitle: 'Mẫu Trang trí (Wrapper)',
+    answerPoints: [
+      'Gắn thêm hành vi mới cho một object tại runtime bằng cách bọc (wrap) nó qua các lớp vỏ cùng interface.',
+      'Tránh bùng nổ số lượng subclass khi kết hợp nhiều tùy chọn (VD: Cà phê + Sữa + Trân châu).',
+      'Java I/O (BufferedReader(new FileReader(...))) là ví dụ kinh điển.',
+    ],
+    codeExample: `interface Coffee { int cost(); }
+class MilkDecorator implements Coffee {
+    private Coffee base;
+    public MilkDecorator(Coffee base) { this.base = base; }
+    public int cost() { return base.cost() + 5; }
+}`,
+  },
+  {
+    id: '7.10',
+    topicId: 7,
+    difficulty: 'Cơ bản',
+    question: 'Builder Pattern hữu ích thế nào với object nhiều tham số?',
+    answerTitle: 'Mẫu Xây dựng Từng bước (Builder)',
+    answerPoints: [
+      'Tách quá trình khởi tạo đối tượng phức tạp ra khỏi biểu diễn cuối cùng của nó.',
+      'Giải quyết vấn đề Constructor có quá nhiều tham số tùy chọn dễ nhầm thứ tự.',
+      'Hỗ trợ Fluent API nối chuỗi gọn gàng và tạo object Immutable.',
+    ],
+    codeExample: `User u = new UserBuilder("Anh")
+    .role("Frontend")
+    .active(true)
+    .build();`,
+  },
+  {
+    id: '7.11',
+    topicId: 7,
+    difficulty: 'Nâng cao',
+    question: 'Liskov Substitution Principle (L trong SOLID) đòi hỏi gì?',
+    answerTitle: 'Nguyên lý Thay thế Liskov',
+    answerPoints: [
+      'Đối tượng của class con phải có thể thay thế hoàn toàn class cha mà không làm sai lệch hành vi chương trình.',
+      'Class con không được thắt chặt điều kiện đầu vào hoặc ném thêm Exception bất ngờ ngoài hợp đồng class cha.',
+      'Ví dụ kinh điển: Chim cánh cụt không nên kế thừa Bird có hàm fly() nếu không bay được.',
+    ],
+  },
 ]

@@ -884,11 +884,13 @@
     constructor(gridElement) {
       this.gridElement = gridElement;
       this.plotElements = new Map();
+      this.badgeElements = new Map();
     }
 
     renderInitial() {
       this.gridElement.innerHTML = '';
       this.plotElements.clear();
+      this.badgeElements.clear();
 
       const TILE_W = 116;
       const TILE_H = 58;
@@ -896,6 +898,10 @@
       const HALF_H = TILE_H / 2;
       const ORIGIN_X = 2 * HALF_W;
       const ORIGIN_Y = 0;
+
+      const badgeLayer = document.createElement('div');
+      badgeLayer.id = 'farm-badge-layer';
+      badgeLayer.className = 'farm-badge-layer';
 
       state.plots.forEach(plot => {
         const plotEl = document.createElement('div');
@@ -927,25 +933,40 @@
           </div>
           <div class="plot-billboard-container">
             <div class="plot-content"></div>
-            <div class="plot-timer-badge hidden">
-              <span class="timer-text">00:00</span>
-              <div class="timer-progress"><div class="timer-bar"></div></div>
-            </div>
           </div>
         `;
 
         this.gridElement.appendChild(plotEl);
         this.plotElements.set(plot.id, plotEl);
-        this.updatePlotElement(plot, plotEl);
+
+        const badgeSlot = document.createElement('div');
+        badgeSlot.className = 'plot-badge-slot';
+        badgeSlot.dataset.plotId = plot.id;
+        badgeSlot.style.left = `${x + HALF_W}px`;
+        badgeSlot.style.top = `${y + 38}px`;
+        badgeSlot.innerHTML = `
+          <div class="plot-timer-badge hidden" data-plot-id="${plot.id}">
+            <span class="timer-text">00:00</span>
+          </div>
+          <div class="iso-harvest-badge hidden" data-plot-id="${plot.id}" title="Chạm hoặc vuốt để thu hoạch!">
+            <span>🌾 Gặt</span>
+          </div>
+        `;
+        badgeLayer.appendChild(badgeSlot);
+        this.badgeElements.set(plot.id, badgeSlot);
       });
+
+      this.gridElement.appendChild(badgeLayer);
+      state.plots.forEach(plot => this.updatePlotElement(plot));
     }
 
     updatePlotElement(plot, plotEl = this.plotElements.get(plot.id)) {
       if (!plotEl) return;
       const contentEl = plotEl.querySelector('.plot-content');
-      const timerBadge = plotEl.querySelector('.plot-timer-badge');
-      const timerText = plotEl.querySelector('.timer-text');
-      const timerBar = plotEl.querySelector('.timer-bar');
+      const badgeSlot = this.badgeElements.get(plot.id);
+      const timerBadge = badgeSlot ? badgeSlot.querySelector('.plot-timer-badge') : null;
+      const timerText = timerBadge ? timerBadge.querySelector('.timer-text') : null;
+      const harvestBadge = badgeSlot ? badgeSlot.querySelector('.iso-harvest-badge') : null;
 
       const userLvl = state.getLevelData().level;
       const canUnlockLvl = plot.status === 'LOCKED' && userLvl >= (plot.reqLevel || 2);
@@ -969,31 +990,26 @@
               contentEl.innerHTML = `<div class="plot-lock-sign"><span>🔒 Lv.${plot.reqLevel}</span></div>`;
               plotEl.setAttribute('aria-label', `Ô đất ${plot.id + 1}: Khóa, cần cấp ${plot.reqLevel}`);
             }
-            timerBadge.classList.add('hidden');
             break;
           }
 
           case 'RAW':
             contentEl.innerHTML = '<div class="plot-wild-grass"><span class="grass-tuft">🌱</span></div>';
             plotEl.setAttribute('aria-label', `Ô đất ${plot.id + 1}: Đất hoang`);
-            timerBadge.classList.add('hidden');
             break;
 
           case 'TILLED':
             contentEl.innerHTML = '<div class="plot-tilled-empty"></div>';
             plotEl.setAttribute('aria-label', `Ô đất ${plot.id + 1}: Đất trống, chạm để gieo hạt`);
-            timerBadge.classList.add('hidden');
             break;
 
           case 'PLANTED_DRY':
             contentEl.innerHTML = `
               <div class="plant-billboard plant-thirsty">
                 ${getPlantSvg(plot.cropId, Math.max(15, plot.growthProgress || 15))}
-                <div class="iso-water-alert" title="Chạm để tưới nước ngay!"><span class="water-alert-icon">🚿</span></div>
               </div>
             `;
             plotEl.setAttribute('aria-label', `Ô đất ${plot.id + 1}: ${CROPS[plot.cropId]?.name || 'Cây'} đang cần tưới`);
-            timerBadge.classList.remove('hidden');
             break;
 
           case 'PLANTED_WATERED':
@@ -1003,7 +1019,6 @@
               </div>
             `;
             plotEl.setAttribute('aria-label', `Ô đất ${plot.id + 1}: ${CROPS[plot.cropId]?.name || 'Cây'} đang lớn`);
-            timerBadge.classList.remove('hidden');
             break;
 
           case 'MATURE':
@@ -1011,7 +1026,6 @@
               <div class="plant-billboard plant-mature crop-ready-bounce">
                 <div class="mature-sun-glow"></div>
                 ${getPlantSvg(plot.cropId, 100)}
-                <div class="iso-harvest-badge"><span>Thu hoạch!</span></div>
                 <div class="plant-sparkles-cluster">
                   <span class="sparkle s1">✨</span>
                   <span class="sparkle s2">🌸</span>
@@ -1021,19 +1035,35 @@
               </div>
             `;
             plotEl.setAttribute('aria-label', `Ô đất ${plot.id + 1}: ${CROPS[plot.cropId]?.name || 'Cây'} đã chín, chạm để thu hoạch`);
-            timerBadge.classList.add('hidden');
             break;
         }
       }
 
-      if (plot.status === 'PLANTED_WATERED' || plot.status === 'PLANTED_DRY') {
-        const rem = getRemainingRealSeconds(plot);
-        const mins = Math.floor(rem / 60);
-        const secs = rem % 60;
-        const speedTag = plot.isWatered ? '⏳' : '💧';
-        timerText.textContent = `${speedTag} ${mins > 0 ? mins + 'p' : ''}${secs < 10 && mins > 0 ? '0' : ''}${secs}s`;
-        if (timerBar) timerBar.style.width = `${plot.growthProgress || 0}%`;
-        timerBadge.classList.remove('hidden');
+      if (plot.status === 'MATURE') {
+        if (harvestBadge) harvestBadge.classList.remove('hidden');
+        if (timerBadge) {
+          timerBadge.classList.add('hidden');
+          timerBadge.classList.remove('is-thirsty');
+        }
+      } else if (plot.status === 'PLANTED_WATERED' || plot.status === 'PLANTED_DRY') {
+        if (harvestBadge) harvestBadge.classList.add('hidden');
+        if (timerBadge && timerText) {
+          const isDry = plot.status === 'PLANTED_DRY';
+          const rem = getRemainingRealSeconds(plot);
+          const mins = Math.floor(rem / 60);
+          const secs = rem % 60;
+          const speedTag = isDry ? '🚿' : '⏳';
+          timerText.textContent = `${speedTag} ${mins > 0 ? mins + 'p' : ''}${secs < 10 && mins > 0 ? '0' : ''}${secs}s`;
+          timerBadge.classList.toggle('is-thirsty', isDry);
+          timerBadge.title = isDry ? 'Chạm để tưới nước ngay!' : 'Đang lớn (x2 tốc độ)';
+          timerBadge.classList.remove('hidden');
+        }
+      } else {
+        if (harvestBadge) harvestBadge.classList.add('hidden');
+        if (timerBadge) {
+          timerBadge.classList.add('hidden');
+          timerBadge.classList.remove('is-thirsty');
+        }
       }
     }
 
@@ -1197,7 +1227,10 @@
         this.startX = e.clientX;
         this.startY = e.clientY;
 
-        let plotEl = e.target.closest('.farm-plot');
+        const badgeTarget = e.target.closest('.plot-timer-badge[data-plot-id], .iso-harvest-badge[data-plot-id]');
+        let plotEl = badgeTarget
+          ? this.renderer.plotElements.get(parseInt(badgeTarget.dataset.plotId, 10))
+          : e.target.closest('.farm-plot');
         if (!plotEl) {
           plotEl = this.getClosestPlot(e.clientX, e.clientY);
         }
@@ -1216,7 +1249,10 @@
         if (!this.isDragging) return;
 
         const el = document.elementFromPoint(e.clientX, e.clientY);
-        let plotEl = el ? el.closest('.farm-plot') : null;
+        const badgeTarget = el ? el.closest('.plot-timer-badge[data-plot-id], .iso-harvest-badge[data-plot-id]') : null;
+        let plotEl = badgeTarget
+          ? this.renderer.plotElements.get(parseInt(badgeTarget.dataset.plotId, 10))
+          : (el ? el.closest('.farm-plot') : null);
         if (!plotEl && el && (el.closest('.farm-grid') || el.closest('.farm-lawn-plateau'))) {
           plotEl = this.getClosestPlot(e.clientX, e.clientY);
         }
@@ -1620,6 +1656,42 @@
           this.closeCropInfo();
         });
       }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const tag = e.target?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+        if (e.key === 'Escape') {
+          this.closeAllModals();
+          return;
+        }
+
+        const modalsOpen = [
+          this.dom.shopModal,
+          this.dom.barnModal,
+          this.dom.ordersModal,
+          this.dom.guideModal,
+          this.dom.profileModal,
+          this.dom.levelupModal,
+        ].some((m) => m && !m.classList.contains('hidden'));
+        if (modalsOpen) return;
+
+        const key = e.key.toLowerCase();
+        if (key === '1' || key === 'g') {
+          e.preventDefault();
+          this.dom.btnAutoPlant?.click();
+        } else if (key === '2' || key === 'w') {
+          e.preventDefault();
+          this.dom.btnWaterAll?.click();
+        } else if (key === '3' || key === 'h') {
+          e.preventDefault();
+          this.dom.btnHarvestAll?.click();
+        } else if (key === '4' || key === 'f') {
+          e.preventDefault();
+          this.dom.btnEnergyBoost?.click();
+        }
+      });
 
       document.addEventListener('pointerdown', (e) => {
         if (!e.target.closest('#plot-crop-popup') && !e.target.closest('.farm-plot')) {

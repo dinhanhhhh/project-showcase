@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import SettingsModal from '@/components/SettingsModal.vue'
 import { VIBE_THEMES, useHomeSettings } from '@/composables/useHomeSettings'
 import { useParticlesBackground } from '@/composables/useParticlesBackground'
 import { usePagesStore } from '@/stores/usePagesStore'
 import type { PageEntry } from '@/types/page'
+import { pickSurprisePage } from '@/utils/launcher'
 import AppCoverArt from './AppCoverArt.vue'
 
 interface AppVisualMeta {
   icon: string
   accent: string
+  accentLight: string
   badge: string
   tags: string[]
   featured?: boolean
@@ -22,22 +24,25 @@ const APP_VISUALS: Record<string, AppVisualMeta> = {
   ngare: {
     icon: '🧭',
     accent: '#6dddff',
+    accentLight: '#0369a1',
     badge: 'Flagship RPG',
-    tags: ['Mô phỏng cuộc đời', 'Sự kiện & Nghề nghiệp', 'Pinia Persist'],
+    tags: ['Phím 1–4 nhanh', 'Life Recap', 'Pinia Persist'],
     featured: true,
     priority: 1,
   },
   'co-tuong': {
     icon: '♟️',
     accent: '#fbbf24',
+    accentLight: '#b45309',
     badge: 'AI Minimax',
-    tags: ['Cờ Tướng chuẩn luật', 'AI 3 cấp độ', '2 Người & Web Audio'],
+    tags: ['6 Cờ Thế tàn cuộc', 'Chép biên bản', 'AI 3 cấp & Web Audio'],
     featured: true,
     priority: 2,
   },
   'saigon-tycoon': {
     icon: '🎲',
     accent: '#34d399',
+    accentLight: '#047857',
     badge: '40 Ô Sài Gòn',
     tags: ['Luật quốc tế', 'Bot AI & Đấu giá', 'Đài Radio Lo-Fi'],
     featured: true,
@@ -46,51 +51,58 @@ const APP_VISUALS: Record<string, AppVisualMeta> = {
   'anime-farm': {
     icon: '🌾',
     accent: '#a3e635',
+    accentLight: '#4d7c0f',
     badge: 'Isometric 2.5D',
-    tags: ['Nông trại Anime', 'Kéo thả gieo hạt', 'Kho & Đơn hàng'],
+    tags: ['6 cây màu nước', 'Kéo thả gieo hạt', 'Kho & Đơn hàng'],
     featured: true,
     priority: 4,
   },
   'oop-flashcards': {
     icon: '🎴',
     accent: '#38bdf8',
-    badge: '21 Thẻ Phỏng Vấn',
-    tags: ['OOP & SOLID', 'Thẻ lật 3D', 'Code Highlight'],
+    accentLight: '#0284c7',
+    badge: 'Quiz + 27 Thẻ',
+    tags: ['Quiz trắc nghiệm', 'Tiến độ OOP/SOLID', 'Lọc chưa thuộc'],
     priority: 5,
   },
   'hom-nay-an-gi': {
     icon: '🍜',
     accent: '#fb7185',
+    accentLight: '#be123c',
     badge: 'Food Roulette',
-    tags: ['20+ Món Việt', 'Thực đơn cá nhân', 'Lọc theo bữa'],
+    tags: ['Lọc buổi ăn & giá', 'Lịch sử 10 món', 'Web Audio mượt'],
     priority: 6,
   },
   'oracle-tarot': {
     icon: '🔮',
     accent: '#d277ff',
-    badge: 'Mystic Tarot',
-    tags: ['Trải bài 1 & 3 lá', 'Thông điệp vũ trụ', 'Hình học thần bí'],
+    accentLight: '#7c3aed',
+    badge: 'Trải bài 1 & 3 lá',
+    tags: ['Quá khứ-Hiện-Tương lai', 'Lá Ngược/Xuôi', 'Nhật ký 10 lần bói'],
     priority: 7,
   },
   'neon-typing': {
     icon: '⌨️',
     accent: '#22d3ee',
-    badge: 'Realtime WPM',
-    tags: ['Highlight từng ký tự', 'Đếm WPM & Combo', '15s / 30s / 60s'],
+    accentLight: '#0e7490',
+    badge: '5 Bộ Từ Vựng',
+    tags: ['Tiếng Việt có dấu', 'Biểu đồ 10 ván WPM', 'Sudden Death 3 mạng'],
     priority: 8,
   },
   'mini-piano': {
     icon: '🎹',
     accent: '#c084fc',
-    badge: 'Web Audio Synth',
-    tags: ['13 Phím trắng & đen', '4 Âm sắc Synth', 'Bản nhạc mẫu'],
+    accentLight: '#7e22ce',
+    badge: 'Polyphony Synth',
+    tags: ['Đa âm & Sustain', 'Lưu 5 bản thu', 'Thử thách giai điệu'],
     priority: 9,
   },
   'color-game': {
     icon: '🎨',
     accent: '#f472b6',
-    badge: 'RGB & HEX',
-    tags: ['Phản xạ màu sắc', '3 Cấp độ 4/6/9 ô', 'Chuỗi Streak'],
+    accentLight: '#be185d',
+    badge: 'RGB · HEX · HSL',
+    tags: ['Phím tắt 1–9 & H/R', 'Copy mã màu', 'Thống kê độ chính xác'],
     priority: 10,
   },
 }
@@ -104,15 +116,11 @@ const CATEGORY_META: Record<string, { label: string; icon: string }> = {
   spiritual: { label: 'Tâm linh', icon: '🔮' },
 }
 
-type ViewMode = 'grid' | 'list'
-type SortMode = 'featured' | 'alpha' | 'recent'
-
+const router = useRouter()
 const store = usePagesStore()
 const searchQuery = ref('')
 const selectedCategory = ref('all')
 const onlyShowFavorites = ref(false)
-const viewMode = ref<ViewMode>('grid')
-const sortMode = ref<SortMode>('featured')
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
 const {
@@ -121,9 +129,19 @@ const {
   enableParticles,
   isSidebarCollapsed,
   theme,
+  viewMode,
+  sortMode,
   isSettingsOpen,
   toggleSidebar,
 } = useHomeSettings()
+
+function launchSurpriseApp() {
+  const pool = filteredPages.value.length > 0 ? filteredPages.value : store.pages
+  const picked = pickSurprisePage(pool, lastVisitedPage.value?.slug ?? null)
+  if (picked && router) {
+    void router.push(picked.path)
+  }
+}
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const { init: initParticles } = useParticlesBackground(canvasRef, enableParticles)
@@ -141,11 +159,17 @@ function getAppVisual(page: PageEntry): AppVisualMeta {
     APP_VISUALS[page.slug] ?? {
       icon: getCategoryIcon(page.category),
       accent: '#6dddff',
+      accentLight: '#0284c7',
       badge: getCategoryLabel(page.category),
       tags: [getCategoryLabel(page.category)],
       priority: 99,
     }
   )
+}
+
+function getThemeAccent(page: PageEntry): string {
+  const visual = getAppVisual(page)
+  return theme.value === 'arctic' ? visual.accentLight : visual.accent
 }
 
 function setView(view: 'home' | 'favorites' | 'categories') {
@@ -179,9 +203,7 @@ function handleCardMouseMove(e: MouseEvent) {
 }
 
 function handleClearData() {
-  if (confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu yêu thích và lịch sử?')) {
-    store.clearUserData()
-  }
+  store.clearUserData()
 }
 
 const categories = computed(() => {
@@ -246,7 +268,8 @@ function handleGlobalKeydown(e: KeyboardEvent) {
   if (
     e.key === '/' &&
     !(e.target instanceof HTMLInputElement) &&
-    !(e.target instanceof HTMLTextAreaElement)
+    !(e.target instanceof HTMLTextAreaElement) &&
+    !document.querySelector('[role="dialog"]')
   ) {
     e.preventDefault()
     searchInputRef.value?.focus()
@@ -423,7 +446,7 @@ onUnmounted(() => {
             :key="`spot-${fp.slug}`"
             :to="fp.path"
             class="spotlight-item"
-            :style="{ '--item-accent': getAppVisual(fp).accent }"
+            :style="{ '--item-accent': getThemeAccent(fp) }"
           >
             <span class="spot-icon">{{ getAppVisual(fp).icon }}</span>
             <div class="spot-info">
@@ -516,6 +539,15 @@ onUnmounted(() => {
                 ☰
               </button>
             </div>
+
+            <button
+              type="button"
+              class="surprise-btn"
+              title="Mở ngẫu nhiên một mini-app"
+              @click="launchSurpriseApp"
+            >
+              🎲 Ngẫu nhiên
+            </button>
           </div>
         </div>
 
@@ -567,7 +599,7 @@ onUnmounted(() => {
             :key="page.slug"
             :to="page.path"
             class="app-card"
-            :style="{ '--card-accent': getAppVisual(page).accent }"
+            :style="{ '--card-accent': getThemeAccent(page) }"
             @mousemove="handleCardMouseMove"
           >
             <div class="cursor-spotlight" />
@@ -1072,7 +1104,7 @@ onUnmounted(() => {
 
 .spotlight-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 0.85rem;
 }
 
@@ -1087,7 +1119,7 @@ onUnmounted(() => {
   border: 1px solid var(--outline);
   text-decoration: none;
   color: inherit;
-  transition: var(--transition-normal);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, box-shadow 0.2s ease;
   box-shadow: var(--shadow-card);
 }
 
@@ -1117,16 +1149,15 @@ onUnmounted(() => {
 .spot-top {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.45rem;
   margin-bottom: 0.2rem;
 }
 
 .spot-top strong {
   font-family: 'Manrope', sans-serif;
-  font-size: 0.94rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.92rem;
+  line-height: 1.25;
 }
 
 .spot-badge {
@@ -1175,7 +1206,7 @@ onUnmounted(() => {
 
 .search-box {
   flex: 1;
-  min-width: 240px;
+  min-width: min(100%, 240px);
   background: var(--bg-sidebar);
   border: 1px solid var(--outline);
   padding: 0.7rem 1.05rem;
@@ -1228,6 +1259,7 @@ onUnmounted(() => {
 .view-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.55rem;
 }
 
@@ -1248,6 +1280,7 @@ onUnmounted(() => {
   color: var(--text-dim);
   font-size: 0.8rem;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
   transition: var(--transition-fast);
 }
@@ -1344,7 +1377,7 @@ onUnmounted(() => {
 
 .app-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 310px), 1fr));
   gap: 1.35rem;
 }
 
@@ -1364,7 +1397,7 @@ onUnmounted(() => {
   text-decoration: none;
   color: inherit;
   overflow: hidden;
-  transition: var(--transition-normal);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s ease, box-shadow 0.2s ease;
   border: 1px solid var(--outline);
   display: flex;
   flex-direction: column;
@@ -1776,5 +1809,23 @@ onUnmounted(() => {
   .secondary-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.surprise-btn {
+  padding: 0.5rem 0.9rem;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+}
+
+.surprise-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
 }
 </style>

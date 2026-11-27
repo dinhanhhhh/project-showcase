@@ -1,4 +1,4 @@
-import type { FoodFilter, FoodItem } from './types'
+import type { FoodFilter, FoodItem, MealTimeFilter, PriceTierFilter } from './types'
 
 export const FOOD_CATEGORY_LABELS: Record<FoodFilter, string> = {
   all: 'Tất cả',
@@ -9,6 +9,21 @@ export const FOOD_CATEGORY_LABELS: Record<FoodFilter, string> = {
   custom: '✨ Món của tôi',
 }
 
+export const MEAL_TIME_LABELS: Record<MealTimeFilter, string> = {
+  all: 'Cả ngày',
+  sang: '🌅 Sáng',
+  trua: '☀️ Trưa',
+  toi: '🌙 Tối',
+  'an-vat': '🌇 Ăn vặt',
+}
+
+export const PRICE_TIER_LABELS: Record<PriceTierFilter, string> = {
+  all: 'Mọi mức giá',
+  'tiet-kiem': '💸 Dưới 40k',
+  'vua-tui': '💵 40k – 80k',
+  'sang-chanh': '💎 Trên 80k',
+}
+
 export const SAMPLE_FOODS: FoodItem[] = [
   {
     id: '1',
@@ -16,6 +31,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/qtuwxu1468233098.jpg',
     emoji: '🍜',
     category: 'nuoc',
+    mealTimes: ['sang', 'trua', 'toi'],
+    priceTier: 'vua-tui',
+    priceLabel: '45k–65k',
   },
   {
     id: '2',
@@ -23,6 +41,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/1529444830.jpg',
     emoji: '🥢',
     category: 'kho',
+    mealTimes: ['trua', 'toi'],
+    priceTier: 'vua-tui',
+    priceLabel: '45k–60k',
   },
   {
     id: '3',
@@ -30,6 +51,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/7n8c6z1608678713.jpg',
     emoji: '🌯',
     category: 'an-vat',
+    mealTimes: ['sang', 'an-vat'],
+    priceTier: 'tiet-kiem',
+    priceLabel: '25k–35k',
   },
   {
     id: '4',
@@ -37,6 +61,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/yrstur1511816601.jpg',
     emoji: '🥞',
     category: 'kho',
+    mealTimes: ['toi', 'an-vat'],
+    priceTier: 'vua-tui',
+    priceLabel: '45k–75k',
   },
   {
     id: '5',
@@ -44,6 +71,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/1529446152.jpg',
     emoji: '🍛',
     category: 'kho',
+    mealTimes: ['sang', 'trua', 'toi'],
+    priceTier: 'tiet-kiem',
+    priceLabel: '35k–40k',
   },
   {
     id: '6',
@@ -51,6 +81,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/utxryw1511721588.jpg',
     emoji: '🥖',
     category: 'kho',
+    mealTimes: ['sang', 'an-vat'],
+    priceTier: 'tiet-kiem',
+    priceLabel: '20k–35k',
   },
   {
     id: '7',
@@ -58,6 +91,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/58oia61564916529.jpg',
     emoji: '🥟',
     category: 'an-vat',
+    mealTimes: ['an-vat', 'toi'],
+    priceTier: 'tiet-kiem',
+    priceLabel: '30k–40k',
   },
   {
     id: '8',
@@ -65,6 +101,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/4pqimk1683207418.jpg',
     emoji: '🍲',
     category: 'nuoc',
+    mealTimes: ['sang', 'trua', 'toi'],
+    priceTier: 'vua-tui',
+    priceLabel: '45k–65k',
   },
   {
     id: '9',
@@ -72,6 +111,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/vptqpw1511798500.jpg',
     emoji: '🍥',
     category: 'kho',
+    mealTimes: ['sang'],
+    priceTier: 'tiet-kiem',
+    priceLabel: '30k–40k',
   },
   {
     id: '10',
@@ -79,6 +121,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/1548772327.jpg',
     emoji: '🐟',
     category: 'nuoc',
+    mealTimes: ['trua', 'toi'],
+    priceTier: 'vua-tui',
+    priceLabel: '50k–75k',
   },
   {
     id: '11',
@@ -86,6 +131,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/yrqppx1511799090.jpg',
     emoji: '🦀',
     category: 'nuoc',
+    mealTimes: ['sang', 'trua'],
+    priceTier: 'tiet-kiem',
+    priceLabel: '35k–40k',
   },
   {
     id: '12',
@@ -93,6 +141,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/xrrtss1511555269.jpg',
     emoji: '🥣',
     category: 'nuoc',
+    mealTimes: ['sang', 'toi'],
+    priceTier: 'tiet-kiem',
+    priceLabel: '30k–40k',
   },
   {
     id: '13',
@@ -100,6 +151,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/rwuyqx1511383174.jpg',
     emoji: '🍢',
     category: 'kho',
+    mealTimes: ['trua', 'toi', 'an-vat'],
+    priceTier: 'vua-tui',
+    priceLabel: '50k–70k',
   },
   {
     id: '14',
@@ -107,6 +161,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/qptpvt1487339892.jpg',
     emoji: '🍗',
     category: 'nuoc',
+    mealTimes: ['trua', 'toi'],
+    priceTier: 'vua-tui',
+    priceLabel: '50k–75k',
   },
   {
     id: '15',
@@ -114,6 +171,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/qwtrtp1511799242.jpg',
     emoji: '🥘',
     category: 'nuoc',
+    mealTimes: ['sang', 'toi'],
+    priceTier: 'vua-tui',
+    priceLabel: '45k–65k',
   },
   {
     id: '16',
@@ -121,6 +181,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/sxxpst1468569714.jpg',
     emoji: '🍜',
     category: 'nuoc',
+    mealTimes: ['sang', 'toi'],
+    priceTier: 'tiet-kiem',
+    priceLabel: '35k–40k',
   },
   {
     id: '17',
@@ -128,6 +191,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/wyrqqq1468233628.jpg',
     emoji: '🫕',
     category: 'nuoc',
+    mealTimes: ['toi'],
+    priceTier: 'sang-chanh',
+    priceLabel: '160k–260k',
   },
   {
     id: '18',
@@ -135,6 +201,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/vrspxv1511722107.jpg',
     emoji: '🐚',
     category: 'an-vat',
+    mealTimes: ['toi', 'an-vat'],
+    priceTier: 'sang-chanh',
+    priceLabel: '85k–120k',
   },
   {
     id: '19',
@@ -142,6 +211,9 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/020z181619788836.jpg',
     emoji: '🥗',
     category: 'an-vat',
+    mealTimes: ['an-vat'],
+    priceTier: 'tiet-kiem',
+    priceLabel: '20k–30k',
   },
   {
     id: '20',
@@ -149,5 +221,8 @@ export const SAMPLE_FOODS: FoodItem[] = [
     image: 'https://www.themealdb.com/images/media/meals/tquywr1504648675.jpg',
     emoji: '🧋',
     category: 'an-vat',
+    mealTimes: ['an-vat'],
+    priceTier: 'vua-tui',
+    priceLabel: '40k–65k',
   },
 ]

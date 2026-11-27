@@ -5,6 +5,7 @@ interface HomNayAnGiState {
   customFoods: FoodItem[]
   favoriteIds: string[]
   history: PickHistoryEntry[]
+  isMuted: boolean
 }
 
 export const useHomNayAnGiStore = defineStore('hom-nay-an-gi', {
@@ -12,6 +13,7 @@ export const useHomNayAnGiStore = defineStore('hom-nay-an-gi', {
     customFoods: [],
     favoriteIds: [],
     history: [],
+    isMuted: false,
   }),
 
   actions: {
@@ -48,10 +50,15 @@ export const useHomNayAnGiStore = defineStore('hom-nay-an-gi', {
     clearHistory() {
       this.history = []
     },
+
+    toggleMute() {
+      this.isMuted = !this.isMuted
+    },
   },
 
   persist: {
     key: 'vibe_hom_nay_an_gi',
     storage: localStorage,
+    pick: ['customFoods', 'favoriteIds', 'history', 'isMuted'],
   },
 })

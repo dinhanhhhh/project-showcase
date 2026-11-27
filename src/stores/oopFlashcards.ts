@@ -6,6 +6,8 @@ interface OopFlashcardsState {
   reviewIds: string[]
   selectedTopic: TopicFilter
   sessionsCompleted: number
+  bestQuizPercent: number
+  quizzesCompleted: number
 }
 
 export const useOopFlashcardsStore = defineStore('oop-flashcards', {
@@ -14,6 +16,8 @@ export const useOopFlashcardsStore = defineStore('oop-flashcards', {
     reviewIds: [],
     selectedTopic: 'all',
     sessionsCompleted: 0,
+    bestQuizPercent: 0,
+    quizzesCompleted: 0,
   }),
 
   actions: {
@@ -39,10 +43,21 @@ export const useOopFlashcardsStore = defineStore('oop-flashcards', {
       this.sessionsCompleted += 1
     },
 
+    recordQuizResult(correct: number, total: number) {
+      this.quizzesCompleted += 1
+      if (total <= 0) return
+      const pct = Math.round((correct / total) * 100)
+      if (pct > this.bestQuizPercent) {
+        this.bestQuizPercent = pct
+      }
+    },
+
     resetProgress() {
       this.masteredIds = []
       this.reviewIds = []
       this.sessionsCompleted = 0
+      this.bestQuizPercent = 0
+      this.quizzesCompleted = 0
       this.selectedTopic = 'all'
     },
   },
@@ -50,5 +65,13 @@ export const useOopFlashcardsStore = defineStore('oop-flashcards', {
   persist: {
     key: 'vibe_oop_flashcards',
     storage: localStorage,
+    pick: [
+      'masteredIds',
+      'reviewIds',
+      'selectedTopic',
+      'sessionsCompleted',
+      'bestQuizPercent',
+      'quizzesCompleted',
+    ],
   },
 })

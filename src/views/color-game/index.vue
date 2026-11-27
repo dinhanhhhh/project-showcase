@@ -13,6 +13,7 @@ import {
   createSwatch,
   formatColorSwatch,
   getComboMultiplier,
+  getFormatAccuracy,
   getRoundPoints,
 } from './engine'
 import type { ColorFormat, ColorGameMode, ColorSwatch, GridSize } from './types'
@@ -46,6 +47,9 @@ const isRoundWon = ref(false)
 let nextRoundTimer: ReturnType<typeof setTimeout> | null = null
 let timeAttackInterval: ReturnType<typeof setInterval> | null = null
 let deltaHintTimer: ReturnType<typeof setTimeout> | null = null
+let copyTimer: ReturnType<typeof setTimeout> | null = null
+
+const isCopied = ref(false)
 
 const displayCode = computed(() => formatColorSwatch(target.value, colorFormat.value))
 
@@ -58,6 +62,20 @@ const activeMultiplier = computed(() => getComboMultiplier(streak.value))
 const timeProgressPercent = computed(() =>
   Math.max(0, Math.min(100, (timeLeft.value / TIME_ATTACK_START_SECONDS) * 100)),
 )
+
+const formatAccuracies = computed(() => {
+  const stats = store.formatStats ?? {
+    rgb: { hits: 0, attempts: 0 },
+    hex: { hits: 0, attempts: 0 },
+    hsl: { hits: 0, attempts: 0 },
+  }
+  return (['rgb', 'hex', 'hsl'] as const).map((fmt) => ({
+    format: fmt,
+    label: fmt.toUpperCase(),
+    attempts: stats[fmt]?.attempts ?? 0,
+    accuracy: getFormatAccuracy(stats[fmt]?.hits ?? 0, stats[fmt]?.attempts ?? 0),
+  }))
+})
 
 const canUseLifeline = computed(
   () =>
@@ -79,6 +97,23 @@ function clearTimers() {
   if (deltaHintTimer) {
     clearTimeout(deltaHintTimer)
     deltaHintTimer = null
+  }
+  if (copyTimer) {
+    clearTimeout(copyTimer)
+    copyTimer = null
+  }
+}
+
+async function copyTargetCode() {
+  try {
+    await navigator.clipboard?.writeText(displayCode.value)
+    isCopied.value = true
+    if (copyTimer) clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => {
+      isCopied.value = false
+    }, 1600)
+  } catch {
+    // Trình duyệt không cấp quyền clipboard
   }
 }
 
@@ -120,8 +155,9 @@ function startNewRound() {
   eliminatedHexes.value = {}
   usedLifelineThisRound.value = false
   isRoundWon.value = false
+  isCopied.value = false
   statusType.value = 'neutral'
-  statusText.value = 'Chọn ô màu khớp với mã bên trên!'
+  statusText.value = 'Chọn ô màu khớp với mã bên trên (hoặc nhấn phím 1–9)!'
 }
 
 function resetSession() {
@@ -171,6 +207,7 @@ function handlePick(choice: ColorSwatch) {
   }
 
   if (choice.hex === target.value.hex) {
+    store.recordAttempt(colorFormat.value, true)
     isRoundWon.value = true
     streak.value += 1
     roundsCleared.value += 1
@@ -200,6 +237,7 @@ function handlePick(choice: ColorSwatch) {
     const delayMs = gameMode.value === 'time_attack' ? 650 : 1200
     nextRoundTimer = setTimeout(startNewRound, delayMs)
   } else {
+    store.recordAttempt(colorFormat.value, false)
     eliminatedHexes.value = { ...eliminatedHexes.value, [choice.hex]: true }
     streak.value = 0
     score.value = Math.max(0, score.value - 1)
@@ -219,12 +257,40 @@ function handlePick(choice: ColorSwatch) {
   }
 }
 
+function handleKeydown(e: KeyboardEvent) {
+  if (e.ctrlKey || e.metaKey || e.altKey) return
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+  if (document.querySelector('[role="dialog"]')) return
+
+  if (e.key >= '1' && e.key <= '9') {
+    const idx = Number(e.key) - 1
+    const opt = options.value[idx]
+    if (opt) {
+      e.preventDefault()
+      handlePick(opt)
+    }
+    return
+  }
+
+  const lower = e.key.toLowerCase()
+  if (lower === 'h') {
+    e.preventDefault()
+    useLifeline()
+  } else if (lower === 'r') {
+    e.preventDefault()
+    if (gameMode.value === 'time_attack') resetSession()
+    else startNewRound()
+  }
+}
+
 onMounted(() => {
   startNewRound()
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   clearTimers()
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -241,7 +307,7 @@ onUnmounted(() => {
 
         <div class="title-wrap">
           <h1>🎨 Color Studio Reflex</h1>
-          <p>Luyện cảm nhận RGB · HEX · HSL · Time Attack 45s &amp; Trợ giúp 50:50</p>
+          <p>RGB · HEX · HSL · Phím tắt <kbd>1–9</kbd>, <kbd>H</kbd> (50:50), <kbd>R</kbd> đổi màu</p>
         </div>
 
         <button
@@ -407,11 +473,32 @@ onUnmounted(() => {
         class="studio-card"
       >
         <div class="code-display">
-          <span class="code-eyebrow">
-            MÃ MÀU MỤC TIÊU ({{ colorFormat.toUpperCase() }})
-          </span>
+          <div class="code-header-row">
+            <span class="code-eyebrow">
+              MÃ MÀU MỤC TIÊU ({{ colorFormat.toUpperCase() }})
+            </span>
+            <button
+              type="button"
+              class="copy-code-btn"
+              @click="copyTargetCode"
+            >
+              {{ isCopied ? '✅ Đã chép' : '📋 Copy mã' }}
+            </button>
+          </div>
           <div class="target-code">
             {{ displayCode }}
+          </div>
+
+          <div class="format-acc-strip">
+            <span
+              v-for="stat in formatAccuracies"
+              :key="stat.format"
+              class="acc-pill"
+              :class="{ active: stat.format === colorFormat }"
+            >
+              {{ stat.label }}:
+              <strong>{{ stat.attempts > 0 ? `${stat.accuracy}%` : '—' }}</strong>
+            </span>
           </div>
 
           <!-- Phân tích kênh HSL khi chọn hệ màu HSL -->
@@ -519,9 +606,10 @@ onUnmounted(() => {
               winner: isRoundWon && item.hex === target.hex,
             }"
             :style="{ backgroundColor: item.rgb }"
-            :aria-label="`Ô màu ${idx + 1}`"
+            :aria-label="`Ô màu ${idx + 1} (Phím ${idx + 1})`"
             @click="handlePick(item)"
           >
+            <span class="tile-hotkey">{{ idx + 1 }}</span>
             <span
               v-if="eliminatedHexes[item.hex] || isRoundWon"
               class="tile-code"
@@ -1082,5 +1170,74 @@ onUnmounted(() => {
   .summary-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.code-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.copy-code-btn {
+  padding: 0.24rem 0.62rem;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.copy-code-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.format-acc-strip {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.acc-pill {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+
+.acc-pill.active {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.color-tile {
+  position: relative;
+}
+
+.tile-hotkey {
+  position: absolute;
+  top: 7px;
+  left: 8px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
 }
 </style>

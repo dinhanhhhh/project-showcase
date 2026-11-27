@@ -973,11 +973,11 @@ body {
 }
 
 .btn-dock-action:disabled {
-  opacity: 0.78;
+  opacity: 0.84;
   cursor: not-allowed;
-  background: #4e3b2e;
-  color: #e6dccf;
-  border-color: rgba(255, 255, 255, 0.2);
+  background: #594335;
+  color: #f3eadb !important;
+  border-color: rgba(255, 255, 255, 0.28);
   box-shadow: none;
 }
 

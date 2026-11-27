@@ -44,4 +44,40 @@ describe('Ngare Pinia Store Persistence', () => {
     expect(nextEvent).not.toBeNull()
     expect(store2.engine.usedEvents instanceof Set).toBe(true)
   })
+
+  it('recovers gracefully when persisted state has partial fields or legacy shapes', async () => {
+    localStorage.setItem(
+      'ngare_game_state',
+      JSON.stringify({
+        gameState: {
+          name: 'Legacy',
+          careerId: 'programmer',
+          age: 26,
+          stats: { money: 40, happiness: 60, skill: 55, stress: 25 },
+        },
+      }),
+    )
+
+    activatePersistedPinia()
+    const store = useNgareStore()
+    store.loadFromStorage()
+    await store.engine.ensureData()
+
+    expect(store.engine.usedEvents instanceof Set).toBe(true)
+    const ev = store.engine.getNextEvent()
+    expect(ev).not.toBeNull()
+  })
+
+  it('resets active game state and clears saved game via resetGame()', async () => {
+    activatePersistedPinia()
+    const store = useNgareStore()
+    await store.startNewGame('Reset Tester', 'programmer')
+    await nextTick()
+    expect(store.gameState).not.toBeNull()
+
+    store.resetGame()
+    await nextTick()
+    expect(store.gameState).toBeNull()
+    expect(store.engine.state).toBeNull()
+  })
 })

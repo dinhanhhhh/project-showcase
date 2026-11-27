@@ -1,8 +1,18 @@
-export type WordPackId = 'dev' | 'vietnamese' | 'syntax' | 'english'
+export type WordPackId = 'dev' | 'vietnamese' | 'quotes_vn' | 'syntax' | 'english'
 
 export type TypingMode = 'timed' | 'sudden_death'
 
 export type TypingRank = 'S+' | 'S' | 'A' | 'B' | 'C'
+
+export interface TypingRunRecord {
+  id: string
+  wpm: number
+  accuracy: number
+  rank: TypingRank
+  mode: TypingMode
+  pack: WordPackId
+  timestamp: string
+}
 
 export interface WordPackMeta {
   id: WordPackId

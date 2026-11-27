@@ -1,20 +1,40 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createApp, nextTick } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+import { useOopFlashcardsStore } from '@/stores/oopFlashcards'
 import { OOP_FLASHCARDS } from '@/views/oop-flashcards/data'
 import {
   buildDeck,
+  computeGroupProgress,
+  generateQuizQuestions,
   getAccuracyPercent,
   getCompletionTitle,
   tokenizeJavaCode,
 } from '@/views/oop-flashcards/engine'
 
-describe('OOP Flashcards Engine', () => {
-  it('filters deck by topic and review ids', () => {
+describe('OOP Flashcards Engine & Store', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    const app = createApp({})
+    const pinia = createPinia()
+    pinia.use(piniaPluginPersistedstate)
+    app.use(pinia)
+    setActivePinia(pinia)
+  })
+
+  it('filters deck by topic, review ids, and unmastered cards', () => {
     const solidDeck = buildDeck(OOP_FLASHCARDS, 7, [], false)
     expect(solidDeck.length).toBeGreaterThan(0)
     expect(solidDeck.every((c) => c.topicId === 7)).toBe(true)
 
     const reviewDeck = buildDeck(OOP_FLASHCARDS, 'review', ['1.1', '7.5'], false)
     expect(reviewDeck.map((c) => c.id)).toEqual(['1.1', '7.5'])
+
+    const mastered = ['1.1', '1.2']
+    const unmastered = buildDeck(OOP_FLASHCARDS, 'unmastered', [], false, Math.random, mastered)
+    expect(unmastered).toHaveLength(OOP_FLASHCARDS.length - 2)
+    expect(unmastered.some((c) => c.id === '1.1')).toBe(false)
   })
 
   it('shuffles deterministically when provided a seeded rng', () => {
@@ -37,5 +57,88 @@ describe('OOP Flashcards Engine', () => {
     expect(getCompletionTitle(10, 10)).toContain('100%')
     expect(getCompletionTitle(7, 10)).toContain('tốt')
     expect(getCompletionTitle(3, 10)).toContain('Cố lên')
+  })
+
+  it('computes group mastery progress across OOP Core, Pillars, and SOLID/Patterns', () => {
+    const coreIds = OOP_FLASHCARDS.filter((c) => c.topicId === 1 || c.topicId === 2).map(
+      (c) => c.id,
+    )
+    const groups = computeGroupProgress(OOP_FLASHCARDS, coreIds)
+    expect(groups).toHaveLength(3)
+    expect(groups[0].id).toBe('oop-core')
+    expect(groups[0].percent).toBe(100)
+    expect(groups[1].mastered).toBe(0)
+    expect(groups[2].id).toBe('solid-patterns')
+  })
+
+  it('generates 4-option quiz questions with exactly 1 correct answer and records best quiz score', async () => {
+    const questions = generateQuizQuestions(OOP_FLASHCARDS, OOP_FLASHCARDS, 5, () => 0.42)
+    expect(questions).toHaveLength(5)
+    for (const q of questions) {
+      expect(q.options).toHaveLength(4)
+      expect(q.options.filter((opt) => opt.isCorrect)).toHaveLength(1)
+    }
+
+    const store = useOopFlashcardsStore()
+    store.recordQuizResult(6, 8)
+    store.recordQuizResult(4, 8)
+    await nextTick()
+    expect(store.quizzesCompleted).toBe(2)
+    expect(store.bestQuizPercent).toBe(75)
+  })
+
+  it('handles small quiz pools, empty pools, and empty code tokenization safely', () => {
+    expect(tokenizeJavaCode('')).toEqual([])
+
+    const emptyQuiz = generateQuizQuestions([], OOP_FLASHCARDS, 4)
+    expect(emptyQuiz).toEqual([])
+
+    const tinyPool = OOP_FLASHCARDS.slice(0, 2)
+    const tinyQuiz = generateQuizQuestions(tinyPool, tinyPool, 5, () => 0.25)
+    expect(tinyQuiz).toHaveLength(2)
+    for (const q of tinyQuiz) {
+      expect(q.options.filter((opt) => opt.isCorrect)).toHaveLength(1)
+    }
+  })
+
+  it('toggles mastered/review flags and resets store progress cleanly', async () => {
+    const store = useOopFlashcardsStore()
+    store.markCardResult('1.1', true)
+    store.markCardResult('2.1', false)
+    await nextTick()
+    expect(store.masteredIds).toContain('1.1')
+    expect(store.reviewIds).toContain('2.1')
+
+    // Moving mastered card back to review removes it from masteredIds cleanly
+    store.markCardResult('1.1', false)
+    expect(store.masteredIds).not.toContain('1.1')
+    expect(store.reviewIds).toContain('1.1')
+
+    store.markCardResult('1.2', true)
+    store.recordQuizResult(5, 5)
+    store.resetProgress()
+    await nextTick()
+
+    expect(store.masteredIds).toEqual([])
+    expect(store.reviewIds).toEqual([])
+    expect(store.quizzesCompleted).toBe(0)
+    expect(store.bestQuizPercent).toBe(0)
+  })
+
+  it('includes at least 27 unique cards covering Design Patterns and SOLID in solid-patterns group', () => {
+    expect(OOP_FLASHCARDS.length).toBeGreaterThanOrEqual(27)
+    const uniqueIds = new Set(OOP_FLASHCARDS.map((card) => card.id))
+    expect(uniqueIds.size).toBe(OOP_FLASHCARDS.length)
+
+    for (const id of ['7.6', '7.7', '7.8', '7.9', '7.10', '7.11']) {
+      expect(uniqueIds.has(id)).toBe(true)
+    }
+
+    const solidGroup = computeGroupProgress(OOP_FLASHCARDS, ['7.6', '7.7', '7.8']).find(
+      (g) => g.id === 'solid-patterns',
+    )
+    expect(solidGroup).toBeDefined()
+    expect(solidGroup!.total).toBeGreaterThanOrEqual(11)
+    expect(solidGroup!.mastered).toBe(3)
   })
 })

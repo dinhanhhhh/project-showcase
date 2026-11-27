@@ -38,6 +38,10 @@ export class DebtResolutionModal {
   }
 
   hide() {
+    if (this.concedeTimer) {
+      clearTimeout(this.concedeTimer);
+      this.concedeTimer = null;
+    }
     this.container.innerHTML = "";
   }
 
@@ -224,18 +228,28 @@ export class DebtResolutionModal {
       };
     }
 
-    // 3. Nút Đầu Hàng / Phá Sản
+    // 3. Nút Đầu Hàng / Phá Sản (xác nhận 2 chạm nội tuyến thay cho confirm())
     const btnConcede = this.container.querySelector("#btn-debt-concede");
     if (btnConcede) {
       btnConcede.onclick = () => {
-        if (
-          confirm(
-            "Bạn có chắc chắn muốn chấp nhận Phá Sản và rời khỏi cuộc chơi không?",
-          )
-        ) {
-          if (this.opts.onConcede) {
-            this.opts.onConcede();
-          }
+        if (btnConcede.dataset.armed !== "true") {
+          btnConcede.dataset.armed = "true";
+          btnConcede.textContent = "⚠️ Bấm lại xác nhận Phá Sản";
+          if (this.concedeTimer) clearTimeout(this.concedeTimer);
+          this.concedeTimer = setTimeout(() => {
+            if (btnConcede.isConnected) {
+              btnConcede.dataset.armed = "false";
+              btnConcede.textContent = "🏳️ Chấp Nhận Phá Sản";
+            }
+          }, 4000);
+          return;
+        }
+        if (this.concedeTimer) {
+          clearTimeout(this.concedeTimer);
+          this.concedeTimer = null;
+        }
+        if (this.opts.onConcede) {
+          this.opts.onConcede();
         }
       };
     }

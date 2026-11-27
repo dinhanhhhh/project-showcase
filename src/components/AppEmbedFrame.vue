@@ -52,12 +52,20 @@ function onFullscreenChange() {
   isFullscreen.value = Boolean(document.fullscreenElement)
 }
 
+function onEmbedKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && isTheaterMode.value && !document.fullscreenElement) {
+    isTheaterMode.value = false
+  }
+}
+
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
+  window.addEventListener('keydown', onEmbedKeydown)
 })
 
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  window.removeEventListener('keydown', onEmbedKeydown)
 })
 </script>
 
@@ -98,6 +106,7 @@ onUnmounted(() => {
           type="button"
           class="tool-btn"
           title="Chuyển nhanh ứng dụng (Ctrl+K)"
+          aria-label="Chuyển nhanh ứng dụng"
           @click="openQuickSwitcher"
         >
           ⌘ <span class="btn-label">Chuyển app</span>
@@ -106,6 +115,7 @@ onUnmounted(() => {
           type="button"
           class="tool-btn hide-xs"
           title="Ẩn thanh trên để chơi rộng hơn"
+          aria-label="Chế độ rộng khung"
           @click="isTheaterMode = true"
         >
           🎬 <span class="btn-label">Rộng khung</span>
@@ -114,6 +124,7 @@ onUnmounted(() => {
           type="button"
           class="tool-btn"
           title="Tải lại ứng dụng"
+          aria-label="Tải lại ứng dụng"
           @click="handleReload"
         >
           🔄 <span class="btn-label">Tải lại</span>
@@ -122,6 +133,7 @@ onUnmounted(() => {
           type="button"
           class="tool-btn"
           :title="isFullscreen ? 'Thoát toàn màn hình' : 'Toàn màn hình'"
+          :aria-label="isFullscreen ? 'Thoát toàn màn hình' : 'Mở toàn màn hình'"
           @click="toggleFullscreen"
         >
           {{ isFullscreen ? '🗗' : '⛶' }}
@@ -133,6 +145,7 @@ onUnmounted(() => {
           rel="noopener noreferrer"
           class="tool-btn hide-xs"
           title="Mở ở tab mới"
+          aria-label="Mở ứng dụng trong tab mới"
         >
           ↗ <span class="btn-label">Tab mới</span>
         </a>
@@ -144,7 +157,8 @@ onUnmounted(() => {
         v-if="isTheaterMode"
         type="button"
         class="exit-theater-pill"
-        title="Hiện lại thanh điều khiển"
+        title="Hiện lại thanh điều khiển (Esc)"
+        aria-label="Thoát chế độ rộng khung"
         @click="isTheaterMode = false"
       >
         ↓ Hiện thanh điều khiển

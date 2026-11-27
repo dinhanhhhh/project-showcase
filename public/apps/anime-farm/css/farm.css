@@ -50,6 +50,24 @@
   z-index: 2;
 }
 
+/* LỚP PHỦ NHÃN TRẠNG THÁI (Nằm trên mọi cây 102px của cả 12 ô để không bao giờ bị lá hàng trước che) */
+.farm-badge-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.plot-badge-slot {
+  position: absolute;
+  width: 0;
+  height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
 @media (max-width: 768px) {
   .farm-lawn-plateau {
     transform: scale(1.0) translate(20px, 0px);
@@ -489,27 +507,38 @@
   100% { transform: translateY(-28px) scale(1.1); opacity: 0; }
 }
 
-/* Huy hiệu Thu Hoạch: Màu lá rêu nắng ấm viền kem giấy da thay xanh neon */
+/* Huy hiệu Thu Hoạch: Đặt gọn trong lớp phủ #farm-badge-layer tại tâm (x + 58, y + 38) */
 .iso-harvest-badge {
   position: absolute;
-  top: -22px;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%);
   background: linear-gradient(180deg, #5ca33b 0%, #3d7524 100%);
   color: #fffef0;
-  font-size: 0.72rem;
+  font-size: 0.6rem;
   font-weight: 800;
-  padding: 3px 10px;
-  border-radius: 12px;
+  padding: 2px 7px;
+  border-radius: 9px;
+  line-height: 1.15;
   box-shadow:
     inset 0 1px 0 rgba(235, 255, 210, 0.45),
-    0 3px 8px rgba(34, 58, 16, 0.45),
-    0 0 0 1.4px #31591a;
-  border: 1.5px solid #fef3c7;
-  text-shadow: 0 1px 1.5px rgba(20, 42, 8, 0.8);
+    0 2px 6px rgba(34, 58, 16, 0.48),
+    0 0 0 1.2px #31591a;
+  border: 1.2px solid #fef3c7;
+  text-shadow: 0 1px 1.5px rgba(20, 42, 8, 0.85);
   white-space: nowrap;
-  animation: floatBubble 2.2s infinite ease-in-out;
-  z-index: 15;
+  animation: harvestSlotBob 2.2s infinite ease-in-out;
   pointer-events: auto;
   cursor: pointer;
+}
+
+.iso-harvest-badge.hidden {
+  display: none !important;
+}
+
+@keyframes harvestSlotBob {
+  0%, 100% { transform: translate(-50%, -50%); }
+  50% { transform: translate(-50%, calc(-50% - 2px)); }
 }
 
 /* Cảnh báo Cần tưới - Huy hiệu giọt nước màu mật ong ấm áp */
@@ -709,25 +738,44 @@
   transform: scale(1.2) rotate(-8deg);
 }
 
-/* ĐỒNG HỒ ĐẾM NGƯỢC GIÂY TRỰC QUAN TRÊN TỪNG CÂY TRỒNG (GỌN GÀNG, CHUẨN ANIME) */
+/* ĐỒNG HỒ ĐẾM NGƯỢC & CẢNH BÁO TƯỚI 1 CHẠM: ĐẶT TRONG #farm-badge-layer TẠI (x + 58, y + 38) */
 .plot-timer-badge {
   position: absolute;
   left: 0;
-  bottom: 56px;
-  transform: translate(-50%, 0);
-  background: linear-gradient(135deg, rgba(28, 14, 8, 0.9) 0%, rgba(16, 8, 4, 0.95) 100%);
-  color: #fde047;
-  padding: 2px 7px;
-  border-radius: 12px;
+  top: 0;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(180deg, rgba(72, 42, 20, 0.94) 0%, rgba(44, 24, 10, 0.96) 100%);
+  color: #fef3c7;
+  padding: 1.5px 6px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45), 0 0 6px rgba(245, 158, 11, 0.25);
-  border: 1.2px solid #f59e0b;
+  box-shadow: 0 2px 5px rgba(24, 12, 4, 0.45);
+  border: 1.2px solid #d49b3b;
   white-space: nowrap;
   pointer-events: none;
-  z-index: 18;
+}
+
+.plot-timer-badge.is-thirsty {
+  background: linear-gradient(180deg, #e59b28 0%, #b56c10 100%);
+  border: 1.2px solid #fef3c7;
+  color: #fffef2;
+  box-shadow: 0 2px 7px rgba(138, 76, 10, 0.55), 0 0 0 1px #5c3309;
+  pointer-events: auto;
+  cursor: pointer;
+  animation: thirstyPulse 2s infinite ease-in-out;
+}
+
+.plot-timer-badge.is-thirsty .timer-text {
+  color: #fffef5;
+  text-shadow: 0 1px 1.5px rgba(56, 26, 4, 0.85);
+}
+
+@keyframes thirstyPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, calc(-50% - 2px)) scale(1.04); }
 }
 
 .plot-timer-badge.hidden {
@@ -735,12 +783,12 @@
 }
 
 .timer-text {
-  font-size: 0.68rem;
+  font-size: 0.59rem;
   font-weight: 800;
-  color: #fde047;
-  letter-spacing: 0.2px;
-  line-height: 1;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  color: #fef3c7;
+  letter-spacing: 0.15px;
+  line-height: 1.1;
+  text-shadow: 0 1px 1.5px rgba(24, 12, 4, 0.85);
 }
 
 .timer-progress {

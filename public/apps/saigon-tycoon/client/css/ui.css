@@ -1306,10 +1306,23 @@
 .resume-details {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   font-size: 0.72rem;
   font-weight: 700;
   color: #7d6608;
+}
+
+@media (max-width: 600px) {
+  .resume-game-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .btn-resume-game {
+    justify-content: center;
+  }
 }
 
 .btn-resume-game {
@@ -4759,6 +4772,32 @@
 .station-select option {
   background: #2b1f15;
   color: #fff;
+}
+
+@media (max-width: 640px) {
+  .vintage-radio-widget {
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: calc(100vw - 16px);
+  }
+
+  .cassette-radio-body {
+    width: 100% !important;
+    max-height: 54dvh;
+    overflow-y: auto;
+  }
+
+  .radio-main-housing {
+    padding: 9px 10px 10px;
+    gap: 8px;
+  }
+
+  .freq-number {
+    font-size: 1.45rem;
+  }
 }
 
 /* ==========================================================================

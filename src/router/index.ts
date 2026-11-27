@@ -3,7 +3,7 @@ import HomeView from '@/views/home/index.vue'
 import { usePagesStore } from '@/stores/usePagesStore'
 import { buildAppRoutes } from './routes'
 
-const modules = import.meta.glob('../views/**/index.vue')
+const modules = import.meta.glob(['../views/*/index.vue', '!../views/home/index.vue'])
 
 const router = createRouter({
   history: createWebHistory(),
