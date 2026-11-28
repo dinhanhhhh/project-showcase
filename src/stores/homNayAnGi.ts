@@ -18,23 +18,28 @@ export const useHomNayAnGiStore = defineStore('hom-nay-an-gi', {
 
   actions: {
     addCustomFood(food: FoodItem) {
-      this.customFoods = [food, ...this.customFoods]
+      const foods = Array.isArray(this.customFoods) ? this.customFoods : []
+      this.customFoods = [food, ...foods]
     },
 
     removeCustomFood(foodId: string) {
-      this.customFoods = this.customFoods.filter((f) => f.id !== foodId)
-      this.favoriteIds = this.favoriteIds.filter((id) => id !== foodId)
+      const foods = Array.isArray(this.customFoods) ? this.customFoods : []
+      const favs = Array.isArray(this.favoriteIds) ? this.favoriteIds : []
+      this.customFoods = foods.filter((f) => f.id !== foodId)
+      this.favoriteIds = favs.filter((id) => id !== foodId)
     },
 
     toggleFavorite(foodId: string) {
-      if (this.favoriteIds.includes(foodId)) {
-        this.favoriteIds = this.favoriteIds.filter((id) => id !== foodId)
+      const favs = Array.isArray(this.favoriteIds) ? this.favoriteIds : []
+      if (favs.includes(foodId)) {
+        this.favoriteIds = favs.filter((id) => id !== foodId)
       } else {
-        this.favoriteIds = [foodId, ...this.favoriteIds]
+        this.favoriteIds = [foodId, ...favs]
       }
     },
 
     recordPick(food: FoodItem) {
+      const prevHistory = Array.isArray(this.history) ? this.history : []
       const entry: PickHistoryEntry = {
         foodId: food.id,
         foodName: food.name,
@@ -44,7 +49,7 @@ export const useHomNayAnGiStore = defineStore('hom-nay-an-gi', {
           minute: '2-digit',
         }),
       }
-      this.history = [entry, ...this.history].slice(0, 10)
+      this.history = [entry, ...prevHistory].slice(0, 10)
     },
 
     clearHistory() {

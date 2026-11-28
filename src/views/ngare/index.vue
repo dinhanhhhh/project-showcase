@@ -1,44 +1,112 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useNgareStore } from '@/stores/ngare'
+import { isEditableEventTarget } from '@/utils/keyboard'
+import { useNgareAudio } from './composables/useNgareAudio'
+import { CHARACTER_TRAITS } from './data/traits'
+import { UNEMPLOYED_TITLE, clampStatValue, computeLifeRecap, computeNetWorth } from './engine'
 import {
+  getNextCareerLevel,
   loadGameData,
+  type ActiveSkill,
+  type AssetId,
+  type Choice,
+  type EndingDefinition,
   type GameDataJson,
   type GameEvent,
-  type Choice,
   type PassiveItem,
-  type ActiveSkill,
+  type Stats,
+  type TraitId,
 } from './game-data'
-import { computeLifeRecap } from './engine'
-import { useNgareStore } from '@/stores/ngare'
+import EndingsGalleryModal from './components/EndingsGalleryModal.vue'
+import InventoryModal from './components/InventoryModal.vue'
+import LifeRecapScreen from './components/LifeRecapScreen.vue'
+import ShopSkillModal from './components/ShopSkillModal.vue'
+import StatsDashboard from './components/StatsDashboard.vue'
+import YearlyActionsBar from './components/YearlyActionsBar.vue'
 
 const ngareStore = useNgareStore()
-const currentScreen = ref('intro')
+const {
+  playChoice,
+  playCoin,
+  playLevelUp,
+  playAchievement,
+  playWarning,
+  playEnding,
+  cleanup: cleanupAudio,
+} = useNgareAudio()
+
+const currentScreen = ref<'intro' | 'create' | 'game' | 'end'>('intro')
 const gameData = ref<GameDataJson | null>(null)
-const gameState = computed(() => ngareStore.gameState)
-const lifeRecap = computed(() => (gameState.value ? computeLifeRecap(gameState.value) : null))
 const currentEvent = ref<GameEvent | null>(null)
 const charNameInput = ref('')
-const selectedCareerId = ref('')
+const selectedCareerId = ref('programmer')
+const selectedTraitId = ref<TraitId>('balanced')
+
 const isShopOpen = ref(false)
 const isInventoryOpen = ref(false)
 const isMenuOpen = ref(false)
-const toasts = ref<Array<{ id: number; message: string; type: string }>>([])
-const statChanges = ref<Record<string, number> | null>(null)
-const previewModalEvent = ref<GameEvent | null>(null)
-const shopTab = ref('items')
-const inventoryTab = ref('inventory')
-const canvasRef = ref<HTMLCanvasElement | null>(null)
-const hasSavedGame = ref(false)
-const isSidebarCollapsed = ref(false)
 const isGalleryOpen = ref(false)
-const unlockedEndings = ref<string[]>([])
-const activeTimers = new Set<ReturnType<typeof setTimeout>>()
-const activeParticles = new Set<HTMLElement>()
+const isSidebarCollapsed = ref(false)
+const previewModalEvent = ref<GameEvent | null>(null)
 const confirmingDeleteSave = ref(false)
 const confirmingRestart = ref(false)
+
+const toasts = ref<Array<{ id: number; message: string; type: 'info' | 'positive' | 'negative' }>>([])
+const statDeltas = ref<Partial<Record<string, number>> | null>(null)
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+
+const activeTimers = new Set<ReturnType<typeof setTimeout>>()
 let stopParticles: (() => void) | null = null
-let animationId = 0
+
+const gameState = computed(() => ngareStore.gameState)
+const lifeRecap = computed(() => (gameState.value ? computeLifeRecap(gameState.value) : null))
+const hasSavedGame = computed(() => Boolean(ngareStore.gameState && !ngareStore.gameState.gameOver))
+
+const currentEnding = computed<EndingDefinition>(() => ngareStore.engine.calculateEnding())
+
+const isUnemployed = computed(() => Boolean(gameState.value?.flags?.includes('unemployed')))
+
+const nextLevelTooltip = computed(() => {
+  if (!gameState.value || !gameData.value) return ''
+  if (isUnemployed.value) {
+    return 'Đang thất nghiệp (Lương 0). Có thể mở Cửa hàng → Đầu tư & Nghề để tìm việc mới.'
+  }
+  const next = getNextCareerLevel(
+    gameState.value.careerId,
+    gameState.value.stats.skill,
+    gameData.value.careers,
+    {
+      relationships: gameState.value.stats.relationships,
+      netWorth: computeNetWorth(gameState.value),
+      age: gameState.value.age,
+    },
+  )
+  if (!next) return 'Đã đạt cấp bậc cao nhất của ngành!'
+  const reqs = [`Kỹ năng ≥ ${next.minSkill}`]
+  if (next.minRelationships !== undefined) reqs.push(`Quan hệ ≥ ${next.minRelationships}`)
+  if (next.minNetWorth !== undefined) reqs.push(`Tài sản ròng ≥ ${next.minNetWorth}`)
+  if (next.minAge !== undefined) reqs.push(`Tuổi ≥ ${next.minAge}`)
+  return `Cấp tiếp theo: ${next.title} (${reqs.join(' · ')})`
+})
+
+const careerPreview = computed(() => {
+  if (!selectedCareerId.value || !gameData.value) return null
+  return gameData.value.careers[selectedCareerId.value] ?? null
+})
+
+const previewCombinedStats = computed<Stats | null>(() => {
+  if (!careerPreview.value) return null
+  const trait = CHARACTER_TRAITS.find((t) => t.id === selectedTraitId.value) ?? CHARACTER_TRAITS[0]
+  const base: Stats = { ...careerPreview.value.startStats }
+  for (const [k, delta] of Object.entries(trait.statModifiers)) {
+    if (typeof delta === 'number' && base[k] !== undefined) {
+      base[k] = clampStatValue(k, base[k] + delta)
+    }
+  }
+  return base
+})
 
 function scheduleTimer(fn: () => void, ms: number): ReturnType<typeof setTimeout> {
   const id = setTimeout(() => {
@@ -49,64 +117,7 @@ function scheduleTimer(fn: () => void, ms: number): ReturnType<typeof setTimeout
   return id
 }
 
-const ALL_ENDINGS = [
-  { id: 'vien_man', icon: '🏆', title: 'Cuộc Đời Viên Mãn', condition: 'Điểm tổng kết >= 350' },
-  { id: 'thanh_cong', icon: '⭐', title: 'Cuộc Đời Thành Công', condition: 'Điểm tổng kết >= 280' },
-  { id: 'binh_di', icon: '🌿', title: 'Cuộc Đời Bình Dị', condition: 'Điểm tổng kết >= 200' },
-  { id: 'gap_ghenh', icon: '🌧️', title: 'Cuộc Đời Gập Ghềnh', condition: 'Điểm tổng kết >= 120' },
-  {
-    id: 'thu_thach',
-    icon: '💔',
-    title: 'Cuộc Đời Đầy Thử Thách',
-    condition: 'Điểm tổng kết < 120',
-  },
-  {
-    id: 'pha_san',
-    icon: '📉',
-    title: 'Phá Sản',
-    condition: 'Vỡ nợ, đánh mất tất cả sự nghiệp và tài sản',
-  },
-  {
-    id: 'benh_tat',
-    icon: '🚑',
-    title: 'Đầu Hàng Tuổi Tác',
-    condition: 'Mắc bệnh nan y ở độ tuổi xế chiều',
-  },
-  {
-    id: 'luc_bat_tong_tam',
-    icon: '🚑',
-    title: 'Lực Bất Tòng Tâm',
-    condition: 'Cày cuốc đến mức cạn kiệt sinh lực (Sức khỏe 0)',
-  },
-  {
-    id: 'hoan_toan_guc_nga',
-    icon: '😵',
-    title: 'Hoàn Toàn Gục Ngã',
-    condition: 'Áp lực cuộc sống đánh gục tinh thần (Căng thẳng 100)',
-  },
-  {
-    id: 'ket_thuc_dot_ngot',
-    icon: '🏁',
-    title: 'Kết Thúc Đột Ngột',
-    condition: 'Những sự cố ngẫu nhiên cướp đi sinh mệnh',
-  },
-]
-
-function openGallery() {
-  try {
-    unlockedEndings.value = JSON.parse(localStorage.getItem('ngare_endings') || '[]')
-  } catch {
-    unlockedEndings.value = []
-  }
-  isGalleryOpen.value = true
-}
-
-const careerPreview = computed(() => {
-  if (!selectedCareerId.value || !gameData.value) return null
-  return gameData.value.careers[selectedCareerId.value]
-})
-
-function showToast(message: string, type = 'info') {
+function showToast(message: string, type: 'info' | 'positive' | 'negative' = 'info') {
   const id = Date.now() + Math.random()
   toasts.value.push({ id, message, type })
   scheduleTimer(() => {
@@ -114,18 +125,43 @@ function showToast(message: string, type = 'info') {
   }, 3000)
 }
 
+function getStatName(stat: string): string {
+  const names: Record<string, string> = {
+    money: 'Tiền mặt',
+    skill: 'Kỹ năng',
+    happiness: 'Hạnh phúc',
+    stress: 'Áp lực',
+    health: 'Sức khỏe',
+    relationships: 'Quan hệ',
+  }
+  return names[stat] ?? stat
+}
+
+function flashDeltas(deltas: Partial<Record<string, number>> | undefined) {
+  if (!deltas || Object.keys(deltas).length === 0) return
+  statDeltas.value = deltas
+  scheduleTimer(() => {
+    statDeltas.value = null
+  }, 2200)
+}
+
 async function startNewGame() {
   if (!charNameInput.value.trim()) {
-    showToast('Vui lòng nhập tên!', 'toast-negative')
+    showToast('Vui lòng nhập tên nhân vật!', 'negative')
     return
   }
   if (!selectedCareerId.value) {
-    showToast('Vui lòng chọn nghề!', 'toast-negative')
+    showToast('Vui lòng chọn nghề nghiệp!', 'negative')
     return
   }
-  await ngareStore.startNewGame(charNameInput.value, selectedCareerId.value)
+  await ngareStore.startNewGame(
+    charNameInput.value.trim(),
+    selectedCareerId.value,
+    selectedTraitId.value,
+  )
   currentEvent.value = ngareStore.engine.getNextEvent()
   currentScreen.value = 'game'
+  playChoice(ngareStore.soundEnabled)
   window.scrollTo({ top: 0, behavior: 'instant' })
 }
 
@@ -134,492 +170,287 @@ async function loadGame() {
   ngareStore.loadFromStorage()
   if (ngareStore.gameState) {
     currentEvent.value = ngareStore.engine.getNextEvent()
-    currentScreen.value = 'game'
-    showToast('Đã tải game!', 'toast-info')
+    currentScreen.value = ngareStore.gameState.gameOver ? 'end' : 'game'
+    showToast('Đã khôi phục hành trình trước đó!', 'info')
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 }
 
-function triggerStatCelebration(stat: string) {
-  const el = document.querySelector(`.stat-item[data-stat="${stat}"]`)
-  if (!el) return
-
-  const rect = el.getBoundingClientRect()
-  const centerX = rect.left + rect.width / 2 + window.scrollX
-  const centerY = rect.top + rect.height / 2 + window.scrollY
-
-  const icons = ['✨', '🌟', '🎊', '🔥', '💎', getStatIcon(stat)]
-
-  for (let i = 0; i < 15; i++) {
-    const p = document.createElement('div')
-    p.className = 'stat-particle'
-    const icon = icons[Math.floor(Math.random() * icons.length)]
-    if (icon) p.innerText = icon
-    p.style.left = `${centerX}px`
-    p.style.top = `${centerY}px`
-
-    const angle = Math.random() * Math.PI * 2
-    const dist = 60 + Math.random() * 120
-    p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`)
-    p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`)
-
-    document.body.appendChild(p)
-    activeParticles.add(p)
-    scheduleTimer(() => {
-      activeParticles.delete(p)
-      p.remove()
-    }, 1000)
-  }
-
-  showToast(`🌟 Tuyệt vời! ${getStatName(stat)} đã đạt mức tối đa!`, 'toast-positive')
-}
-
-function triggerStatWarning(stat: string, message: string) {
-  showToast(message, 'toast-negative')
-}
-
 async function handleChoice(choice: Choice) {
-  const oldStats = gameState.value ? { ...gameState.value.stats } : null
+  if (!gameState.value) return
+  const prevLevel = gameState.value.currentLevel
+  const prevAchCount = gameState.value.unlockedAchievements.length
 
   const result = await ngareStore.makeChoice(choice)
   if (!result) return
 
-  // Kiểm tra mốc chỉ số
-  if (oldStats && gameState.value) {
-    const newStats = gameState.value.stats
-    const oldS = oldStats as Record<string, number>
-
-    for (const key in newStats) {
-      const k = key as keyof typeof newStats
-      const val = newStats[k]
-      const oldVal = oldS[k]
-
-      if (val === undefined || oldVal === undefined) continue
-
-      // TH1: Ăn mừng chỉ số tích cực đạt 100
-      if (key !== 'stress' && val >= 100 && oldVal < 100) {
-        triggerStatCelebration(key)
-      }
-
-      // TH2: Cảnh báo Căng thẳng đạt 100
-      if (key === 'stress' && val >= 100 && oldVal < 100) {
-        triggerStatWarning(
-          key,
-          '⚠️ Nguy hiểm! Mức độ căng thẳng đã quá tải. Bạn cần giải tỏa ngay lập tức!',
-        )
-      }
-
-      // TH3: Cảnh báo Sức khỏe quá thấp (<= 20)
-      if (key === 'health' && val <= 20 && oldVal > 20) {
-        triggerStatWarning(
-          key,
-          '⚠️ Cảnh báo! Sức khỏe đang ở mức báo động. Bạn nên dành thời gian nghỉ ngơi!',
-        )
-      }
-    }
+  if (choice.result) {
+    showToast(choice.result, 'info')
   }
-
-  if (result.effects && Object.keys(result.effects).length > 0) {
-    statChanges.value = result.effects as Record<string, number>
-    scheduleTimer(() => {
-      statChanges.value = null
-    }, 2000)
-  }
+  flashDeltas(result.lastDeltas)
 
   if (result.gameOver) {
-    showToast(result.gameOverInfo?.message || 'Game Over', 'toast-negative')
+    const ending = ngareStore.engine.calculateEnding()
+    const isNegative =
+      ending.id === 'pha_san' ||
+      ending.id === 'benh_tat' ||
+      ending.id === 'luc_bat_tong_tam' ||
+      ending.id === 'hoan_toan_guc_nga' ||
+      ending.id === 'ket_thuc_dot_ngot'
+    playEnding(ngareStore.soundEnabled, isNegative)
+    const isNewEnding = ngareStore.recordCompletedLife(ending)
     currentScreen.value = 'end'
-    const endResult = calculateEnding()
-    if (endResult && endResult.id && endResult.id !== 'unknown') {
-      let unlocked = []
-      try {
-        unlocked = JSON.parse(localStorage.getItem('ngare_endings') || '[]')
-      } catch {}
-      if (!unlocked.includes(endResult.id)) {
-        unlocked.push(endResult.id)
-        localStorage.setItem('ngare_endings', JSON.stringify(unlocked))
-        scheduleTimer(() => {
-          showToast(`🏆 Đã mở khóa cái kết mới: ${endResult.title}`, 'toast-positive')
-        }, 1000)
-      }
+    if (isNewEnding) {
+      scheduleTimer(() => {
+        showToast(`🏆 Mở khóa kết cục mới: ${ending.title}`, 'positive')
+      }, 650)
+    }
+    return
+  }
+
+  if (result.unlockedAchievements.length > prevAchCount) {
+    playAchievement(ngareStore.soundEnabled)
+    showToast('🎉 Đạt thành tựu mới!', 'positive')
+  } else if (result.currentLevel === UNEMPLOYED_TITLE && prevLevel !== UNEMPLOYED_TITLE) {
+    playWarning(ngareStore.soundEnabled)
+    showToast('📉 Bạn đã mất việc! Chức danh chuyển sang Đang thất nghiệp (Lương 0)', 'negative')
+  } else if (prevLevel === UNEMPLOYED_TITLE && result.currentLevel !== UNEMPLOYED_TITLE) {
+    playLevelUp(ngareStore.soundEnabled)
+    showToast(`💼 Đã có việc trở lại: ${result.currentLevel}!`, 'positive')
+  } else if (result.currentLevel !== prevLevel && result.currentLevel !== UNEMPLOYED_TITLE) {
+    playLevelUp(ngareStore.soundEnabled)
+    showToast(`📈 Thăng tiến: ${result.currentLevel}!`, 'positive')
+  } else if (result.stats.stress >= 80 || result.stats.health <= 20) {
+    playWarning(ngareStore.soundEnabled)
+  } else {
+    playChoice(ngareStore.soundEnabled)
+  }
+
+  currentEvent.value = ngareStore.engine.getNextEvent()
+  if (ngareStore.gameState && ngareStore.engine.state?.lastNotice) {
+    ngareStore.loadFromStorage()
+    showToast(ngareStore.engine.state.lastNotice, 'positive')
+  }
+}
+
+async function handleYearlyAction(actionId: string) {
+  const res = await ngareStore.performYearlyAction(actionId)
+  if (res.success) {
+    playCoin(ngareStore.soundEnabled)
+    flashDeltas(ngareStore.gameState?.lastDeltas)
+    showToast(res.message, 'positive')
+    if (ngareStore.gameState?.gameOver) {
+      const ending = ngareStore.engine.calculateEnding()
+      ngareStore.recordCompletedLife(ending)
+      currentScreen.value = 'end'
     }
   } else {
-    currentEvent.value = ngareStore.engine.getNextEvent()
+    showToast(res.message, 'negative')
+  }
+}
+
+async function handleBuyItem(item: PassiveItem) {
+  const res = await ngareStore.buyItem(item.id)
+  if (res.success) playCoin(ngareStore.soundEnabled)
+  showToast(res.message, res.success ? 'positive' : 'negative')
+}
+
+async function handleBuySkill(skill: ActiveSkill) {
+  const res = await ngareStore.buySkill(skill.id)
+  if (res.success) playCoin(ngareStore.soundEnabled)
+  showToast(res.message, res.success ? 'positive' : 'negative')
+}
+
+async function handleBuyAsset(assetId: AssetId) {
+  const res = await ngareStore.buyAsset(assetId)
+  if (res.success) playCoin(ngareStore.soundEnabled)
+  showToast(res.message, res.success ? 'positive' : 'negative')
+}
+
+async function handleSellAsset(assetId: AssetId) {
+  const res = await ngareStore.sellAsset(assetId)
+  if (res.success) playCoin(ngareStore.soundEnabled)
+  showToast(res.message, res.success ? 'positive' : 'negative')
+}
+
+async function handleSwitchCareer(careerId: string) {
+  const res = await ngareStore.switchCareer(careerId)
+  if (res.success) {
+    playLevelUp(ngareStore.soundEnabled)
+    isShopOpen.value = false
+  }
+  showToast(res.message, res.success ? 'positive' : 'negative')
+}
+
+async function handleUseSkill(skillId: string) {
+  const res = await ngareStore.useSkill(skillId)
+  if (res.success) {
+    playAchievement(ngareStore.soundEnabled)
+    showToast(`⚡ ${res.message}`, 'info')
+    if ('isPreview' in res && res.isPreview && 'previewEvent' in res && res.previewEvent) {
+      previewModalEvent.value = res.previewEvent
+      isInventoryOpen.value = false
+    }
+    if (skillId === 'skill_time_rewind' && gameState.value) {
+      currentEvent.value = ngareStore.engine.getNextEvent()
+    }
+  } else {
+    showToast(`❌ ${res.message}`, 'negative')
   }
 }
 
 function saveGame() {
-  // Pinia persistedstate tự động save, ta chỉ cần thông báo
-  showToast('Đã lưu game!', 'toast-info')
-  hasSavedGame.value = true
+  showToast('💾 Đã lưu tự động vào trình duyệt!', 'info')
   isMenuOpen.value = false
 }
 
 function deleteSaveGame() {
   if (!confirmingDeleteSave.value) {
     confirmingDeleteSave.value = true
-    showToast('Bấm lại "Xóa Dữ Liệu Lưu" trong 4s để xác nhận', 'toast-info')
+    showToast('Bấm lại "Xóa Save" trong 4s để xác nhận', 'info')
     scheduleTimer(() => {
       confirmingDeleteSave.value = false
     }, 4000)
     return
   }
-
   confirmingDeleteSave.value = false
   ngareStore.resetGame()
-  hasSavedGame.value = false
-  showToast('Đã xóa dữ liệu lưu!', 'toast-info')
+  showToast('Đã xóa dữ liệu ván chơi hiện tại!', 'info')
 }
 
 function restartGame() {
   if (currentScreen.value !== 'end' && !confirmingRestart.value) {
     confirmingRestart.value = true
-    showToast('Bấm lại "Chơi Lại" trong 4s để bắt đầu ván mới', 'toast-info')
+    showToast('Bấm lại "Chơi Lại" trong 4s để bắt đầu ván mới', 'info')
     scheduleTimer(() => {
       confirmingRestart.value = false
     }, 4000)
     return
   }
-
   confirmingRestart.value = false
   ngareStore.resetGame()
   currentScreen.value = 'intro'
   currentEvent.value = null
-  charNameInput.value = ''
-  selectedCareerId.value = ''
   isMenuOpen.value = false
 }
 
-async function buyItemFn(item: PassiveItem) {
-  const result = await ngareStore.engine.buyItem(item.id)
-  showToast(result.message, result.success ? 'toast-info' : 'toast-negative')
+function getMilestoneBadge(text: string): string {
+  if (text.includes('Thăng tiến') || text.includes('Chuyển ngành')) return 'ms-promo'
+  if (text.includes('thành tựu') || text.includes('Thành tựu')) return 'ms-ach'
+  if (text.includes('Khiên bảo vệ')) return 'ms-shield'
+  return ''
 }
 
-async function buySkillFn(skill: ActiveSkill) {
-  const result = await ngareStore.engine.buySkill(skill.id)
-  showToast(result.message, result.success ? 'toast-info' : 'toast-negative')
-}
-
-async function useSkillFn(skillId: string) {
-  const result = await ngareStore.engine.useSkill(skillId)
-  if (result.success) {
-    showToast(`⚡ ${result.message}`, 'toast-info')
-    const r = result as { isPreview?: boolean; previewEvent?: GameEvent }
-    if (r.isPreview && r.previewEvent) {
-      previewModalEvent.value = r.previewEvent
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (previewModalEvent.value) {
+      previewModalEvent.value = null
+      return
     }
-  } else {
-    showToast(`❌ ${result.message}`, 'toast-negative')
-  }
-}
-
-function getStatIcon(stat: string) {
-  const icons: Record<string, string> = {
-    money: '💰',
-    skill: '🧠',
-    happiness: '😊',
-    stress: '😰',
-    health: '❤️',
-    relationships: '🤝',
-  }
-  return icons[stat] || '📊'
-}
-
-function getStatName(stat: string) {
-  const names: Record<string, string> = {
-    money: 'Tài chính',
-    skill: 'Kỹ năng',
-    happiness: 'Hạnh phúc',
-    stress: 'Căng thẳng',
-    health: 'Sức khỏe',
-    relationships: 'Quan hệ',
-  }
-  return names[stat] || stat
-}
-
-function calculateEnding() {
-  if (!gameState.value) return { id: 'unknown', icon: '🏁', title: 'Game Over', subtitle: '' }
-
-  // Ưu tiên các trường hợp Game Over đặc biệt (như hết máu, phá sản, gục ngã)
-  if (gameState.value.gameOverInfo) {
-    const info = gameState.value.gameOverInfo
-    // Kiểm tra theo type từ event (vd: type: 'bankruptcy')
-    if (info.type === 'bankruptcy')
-      return {
-        id: 'pha_san',
-        icon: info.icon || '📉',
-        title: 'Phá Sản',
-        subtitle: info.message || 'Bạn đã mất trắng sự nghiệp...',
-      }
-    if (info.type === 'disease')
-      return {
-        id: 'benh_tat',
-        icon: info.icon || '🚑',
-        title: 'Đầu Hàng Tuổi Tác',
-        subtitle: info.message || 'Sức khỏe không cho phép bạn bước tiếp...',
-      }
-
-    // Kiểm tra theo reason từ check GameOver hệ thống (health, burnout)
-    if (info.reason === 'health')
-      return {
-        id: 'luc_bat_tong_tam',
-        icon: '🚑',
-        title: 'Lực Bất Tòng Tâm',
-        subtitle: info.message || 'Tiền bạc nhiều đến mấy cũng không mua được sức khỏe...',
-      }
-    if (info.reason === 'burnout')
-      return {
-        id: 'hoan_toan_guc_nga',
-        icon: '😵',
-        title: 'Hoàn Toàn Gục Ngã',
-        subtitle: info.message || 'Áp lực cuộc sống đã đánh gục bạn...',
-      }
-
-    // Fallback cho các custom reason khác (trừ lý do "age" là về hưu bình thường)
-    if (info.reason && info.reason !== 'age') {
-      return {
-        id: 'ket_thuc_dot_ngot',
-        icon: info.icon || '🏁',
-        title: 'Kết Thúc Đột Ngột',
-        subtitle: info.message || 'Hành trình kết thúc một cách ngoài ý muốn.',
-      }
+    if (isGalleryOpen.value) {
+      isGalleryOpen.value = false
+      return
     }
-    // Nếu event có type khác mà không khớp ở trên
-    if (info.type) {
-      return {
-        id: 'ket_thuc_dot_ngot',
-        icon: info.icon || '🏁',
-        title: 'Kết Thúc',
-        subtitle: info.message || 'Hành trình của bạn dừng lại ở đây.',
-      }
+    if (isShopOpen.value) {
+      isShopOpen.value = false
+      return
+    }
+    if (isInventoryOpen.value) {
+      isInventoryOpen.value = false
+      return
+    }
+    if (isMenuOpen.value) {
+      isMenuOpen.value = false
+      return
     }
   }
 
-  // Chấm điểm bình thường cho người chơi sống tận cuối đời (age >= 60 hoặc reason = 'age')
-  const s = gameState.value.stats
-  const total = s.money + s.skill + s.happiness + s.health + s.relationships - s.stress
-  if (total >= 350)
-    return {
-      id: 'vien_man',
-      icon: '🏆',
-      title: 'Cuộc Đời Viên Mãn',
-      subtitle: 'Bạn đã sống một cuộc đời trọn vẹn, cân bằng và hạnh phúc!',
-    }
-  if (total >= 280)
-    return {
-      id: 'thanh_cong',
-      icon: '⭐',
-      title: 'Cuộc Đời Thành Công',
-      subtitle: 'Bạn đạt được nhiều thành tựu đáng tự hào!',
-    }
-  if (total >= 200)
-    return {
-      id: 'binh_di',
-      icon: '🌿',
-      title: 'Cuộc Đời Bình Dị',
-      subtitle: 'Cuộc sống bình thường nhưng ý nghĩa theo cách riêng.',
-    }
-  if (total >= 120)
-    return {
-      id: 'gap_ghenh',
-      icon: '🌧️',
-      title: 'Cuộc Đời Gập Ghềnh',
-      subtitle: 'Nhiều khó khăn nhưng bạn vẫn vượt qua.',
-    }
-  return {
-    id: 'thu_thach',
-    icon: '💔',
-    title: 'Cuộc Đời Đầy Thử Thách',
-    subtitle: 'Cuộc sống không dễ dàng, nhưng bạn đã cố gắng.',
+  if (
+    currentScreen.value !== 'game' ||
+    isShopOpen.value ||
+    isInventoryOpen.value ||
+    isMenuOpen.value ||
+    isGalleryOpen.value ||
+    previewModalEvent.value
+  ) {
+    return
   }
-}
+  if (e.ctrlKey || e.metaKey || e.altKey || isEditableEventTarget(e.target)) return
 
-function canBuyItem(item: PassiveItem): boolean {
-  return (
-    (gameState.value?.stats?.money ?? 0) >= item.cost &&
-    !(gameState.value?.inventory ?? []).includes(item.id)
-  )
-}
-
-function canBuySkill(skill: ActiveSkill): boolean {
-  return (
-    (gameState.value?.stats?.money ?? 0) >= skill.cost &&
-    !(gameState.value?.activeSkills ?? []).includes(skill.id)
-  )
+  const index = Number(e.key) - 1
+  if (index >= 0 && index < (currentEvent.value?.choices.length ?? 0)) {
+    const choice = currentEvent.value?.choices[index]
+    if (choice) void handleChoice(choice)
+  }
 }
 
 function initParticles(): () => void {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    return () => {}
-  }
   const canvas = canvasRef.value
   if (!canvas) return () => {}
+  if (
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return () => {}
+  }
+
   const ctx = canvas.getContext('2d')
   if (!ctx) return () => {}
-  const particles: Array<{
-    x: number
-    y: number
-    r: number
-    dx: number
-    dy: number
-    alpha: number
-  }> = []
+
+  let animId = 0
   const resize = () => {
     canvas.width = window.innerWidth
     canvas.height = window.innerHeight
   }
   resize()
   window.addEventListener('resize', resize)
-  for (let i = 0; i < 60; i++)
-    particles.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      r: Math.random() * 2 + 0.5,
-      dx: (Math.random() - 0.5) * 0.4,
-      dy: (Math.random() - 0.5) * 0.4,
-      alpha: Math.random() * 0.4 + 0.1,
-    })
-  const animate = () => {
+
+  const particles = Array.from({ length: 28 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    vx: (Math.random() - 0.5) * 0.28,
+    vy: (Math.random() - 0.5) * 0.28,
+    size: Math.random() * 2 + 0.8,
+  }))
+
+  const render = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    particles.forEach((p) => {
-      p.x += p.dx
-      p.y += p.dy
-      if (p.x < 0) p.x = canvas.width
-      if (p.x > canvas.width) p.x = 0
-      if (p.y < 0) p.y = canvas.height
-      if (p.y > canvas.height) p.y = 0
+    const rgb =
+      getComputedStyle(document.documentElement).getPropertyValue('--particle-rgb').trim() ||
+      '109, 221, 255'
+    ctx.fillStyle = `rgba(${rgb}, 0.22)`
+    for (const p of particles) {
+      p.x = (p.x + p.vx + canvas.width) % canvas.width
+      p.y = (p.y + p.vy + canvas.height) % canvas.height
       ctx.beginPath()
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(99,102,241,${p.alpha})`
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
       ctx.fill()
-    })
-    for (let i = 0; i < particles.length; i++)
-      for (let j = i + 1; j < particles.length; j++) {
-        const p1 = particles[i]
-        const p2 = particles[j]
-        if (!p1 || !p2) continue
-        const dx = p1.x - p2.x,
-          dy = p1.y - p2.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist < 120) {
-          ctx.beginPath()
-          ctx.moveTo(p1.x, p1.y)
-          ctx.lineTo(p2.x, p2.y)
-          ctx.strokeStyle = `rgba(99,102,241,${0.08 * (1 - dist / 120)})`
-          ctx.stroke()
-        }
-      }
-    animationId = requestAnimationFrame(animate)
+    }
+    animId = window.requestAnimationFrame(render)
   }
-  animate()
+  render()
+
   return () => {
+    window.cancelAnimationFrame(animId)
     window.removeEventListener('resize', resize)
-    cancelAnimationFrame(animationId)
   }
 }
 
-function goBack() {
-  if (currentScreen.value === 'create') {
-    currentScreen.value = 'intro'
-  } else {
-    isMenuOpen.value = true
-  }
-}
-
-function handleGlobalKeydown(e: KeyboardEvent) {
-  if (e.ctrlKey || e.metaKey || e.altKey) return
-  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-  if (document.querySelector('[role="dialog"]')) return
-
-  if (e.key === 'Escape') {
-    if (previewModalEvent.value) {
-      previewModalEvent.value = null
-      e.preventDefault()
-    } else if (isShopOpen.value) {
-      isShopOpen.value = false
-      e.preventDefault()
-    } else if (isInventoryOpen.value) {
-      isInventoryOpen.value = false
-      e.preventDefault()
-    } else if (isGalleryOpen.value) {
-      isGalleryOpen.value = false
-      e.preventDefault()
-    } else if (isMenuOpen.value) {
-      isMenuOpen.value = false
-      e.preventDefault()
-    }
-    return
-  }
-
-  if (
-    currentScreen.value === 'game' &&
-    !isShopOpen.value &&
-    !isInventoryOpen.value &&
-    !isMenuOpen.value &&
-    !isGalleryOpen.value &&
-    !previewModalEvent.value &&
-    e.key >= '1' &&
-    e.key <= '4'
-  ) {
-    const idx = Number(e.key) - 1
-    const choice = currentEvent.value?.choices[idx]
-    if (choice) {
-      e.preventDefault()
-      void handleChoice(choice)
-    }
-    return
-  }
-
-  if (e.key === 'Enter') {
-    // Ưu tiên không trigger khi đang ở trong các modal
-    if (isShopOpen.value || isInventoryOpen.value || isMenuOpen.value || previewModalEvent.value)
-      return
-
-    if (currentScreen.value === 'intro') {
-      currentScreen.value = 'create'
-    } else if (currentScreen.value === 'create') {
-      if (charNameInput.value.trim() && selectedCareerId.value) {
-        startNewGame()
-      }
-    } else if (currentScreen.value === 'end') {
-      restartGame()
-    }
-  }
-}
-
-function getMilestoneInfo(text: string) {
-  const t = text.toLowerCase()
-  if (t.includes('thăng tiến') || t.includes('thăng chức') || t.includes('vị trí mới'))
-    return { is: true, type: 'career', icon: '🚀', color: '#8b5cf6' }
-  if (t.includes('tốt nghiệp')) return { is: true, type: 'success', icon: '🎓', color: '#3b82f6' }
-  if (t.includes('kết hôn') || t.includes('đám cưới') || t.includes('người đặc biệt'))
-    return { is: true, type: 'life', icon: '❤️', color: '#ec4899' }
-  if (t.includes('mua') || t.includes('tài chính') || t.includes('đầu tư'))
-    return { is: true, type: 'success', icon: '💰', color: '#f59e0b' }
-  if (t.includes('thành tựu') || t.includes('💎'))
-    return { is: true, type: 'special', icon: '🏆', color: '#10b981' }
-  return { is: false, type: '', icon: '', color: '' }
-}
-
-onMounted(() => {
-  loadGameData().then((d) => (gameData.value = d))
+onMounted(async () => {
+  gameData.value = await loadGameData()
+  ngareStore.loadFromStorage()
   stopParticles = initParticles()
-  hasSavedGame.value = ngareStore.engine.hasSave()
-  window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener('keydown', handleKeydown)
   stopParticles?.()
-  stopParticles = null
-  for (const timer of activeTimers) {
-    clearTimeout(timer)
+  for (const id of activeTimers) {
+    clearTimeout(id)
   }
   activeTimers.clear()
-  for (const el of activeParticles) {
-    el.remove()
-  }
-  activeParticles.clear()
+  cleanupAudio()
 })
 </script>
 
@@ -627,706 +458,428 @@ onUnmounted(() => {
   <div class="ngare-wrapper">
     <canvas
       ref="canvasRef"
-      class="particles-canvas"
+      class="bg-particles"
+      aria-hidden="true"
     />
 
-    <!-- GLOBAL NAVIGATION -->
-    <!-- Global nav: ẩn khi đang chơi game vì header game đã có đủ nút -->
-    <div
-      v-if="currentScreen === 'intro' || currentScreen === 'create'"
-      class="global-nav"
-    >
-      <RouterLink
-        to="/"
-        class="btn-home"
-        title="Về trang chủ"
-      >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <polyline points="9 22 9 12 15 12 15 22" />
-        </svg>
-      </RouterLink>
-      <!-- Nút Quay lại chỉ hiện ở màn hình tạo nhân vật -->
-      <button
-        v-if="currentScreen === 'create'"
-        class="btn-home btn-back-screen"
-        title="Quay lại"
-        @click="goBack"
-      >
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="m15 18-6-6 6-6" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- INTRO -->
+    <!-- INTRO SCREEN -->
     <div
       v-if="currentScreen === 'intro'"
-      class="screen active"
+      class="screen-center"
     >
-      <div class="intro-container">
-        <div class="intro-logo">
-          <span class="logo-icon">🔀</span>
-          <h1 class="intro-title">
-            Ngã Rẽ<br><span class="highlight">Cuộc Đời</span>
-          </h1>
+      <div class="intro-card">
+        <RouterLink
+          to="/"
+          class="intro-back"
+        >
+          ← Về Launcher
+        </RouterLink>
+        <div class="intro-badge">
+          ✨ Phiên bản Nâng cấp · 83 Sự Kiện & 15 Kết Cục
         </div>
+        <h1 class="intro-title">
+          Ngã Rẽ Cuộc Đời
+        </h1>
         <p class="intro-subtitle">
-          Mỗi lựa chọn, một hành trình. Mỗi ngã rẽ, một cuộc đời.
+          Từ tuổi 22 tốt nghiệp đến tuổi 60 nghỉ hưu: chọn xuất thân, xây dựng sự nghiệp, đầu tư tài sản,
+          vượt qua biến cố cốt truyện đa nhánh và khắc tên lên Bảng Vàng.
         </p>
-        <div class="intro-features">
-          <div class="feature-tag">
-            🎓 Tốt nghiệp đại học
-          </div>
-          <div class="feature-tag">
-            💼 Chọn sự nghiệp
-          </div>
-          <div class="feature-tag">
-            🔀 Đối mặt ngã rẽ
-          </div>
-          <div class="feature-tag">
-            🏆 Viết nên cuộc đời
-          </div>
+
+        <div class="intro-pills">
+          <span>🚀 4 Chuỗi Cốt Truyện</span>
+          <span>📈 Đầu Tư & Chu Kỳ Thị Trường</span>
+          <span>🎭 5 Tính Cách Khởi Đầu</span>
+          <span>🏆 12 Thành Tựu</span>
         </div>
+
         <div class="intro-actions">
           <button
-            class="btn-base btn-primary btn-glow"
+            type="button"
+            class="btn-main"
             @click="currentScreen = 'create'"
           >
-            <span>Bắt Đầu Hành Trình</span>
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
+            Bắt Đầu Hành Trình →
           </button>
-          <div
-            style="
-              display: flex;
-              gap: 0.5rem;
-              justify-content: center;
-              flex-wrap: wrap;
-              margin-top: 0.8rem;
-            "
-          >
+          <div class="intro-sub-actions">
             <button
               v-if="hasSavedGame"
-              class="btn-base btn-secondary"
+              type="button"
+              class="btn-ghost"
               @click="loadGame"
             >
-              <span>📂 Tiếp Tục Game Đã Lưu</span>
+              📂 Tiếp Tục Ván Đã Lưu
             </button>
             <button
-              class="btn-base btn-secondary"
-              @click="openGallery"
+              type="button"
+              class="btn-ghost"
+              @click="isGalleryOpen = true"
             >
-              <span>📚 Bộ Sưu Tập Kết Cục</span>
+              📚 Kết Cục ({{ ngareStore.unlockedEndings.length }}/15) & Bảng Vàng
             </button>
             <button
               v-if="hasSavedGame"
-              class="btn-base btn-danger"
+              type="button"
+              class="btn-danger"
               @click="deleteSaveGame"
             >
-              <span>{{ confirmingDeleteSave ? '⚠️ Bấm lại để xóa save' : '🗑️ Xóa Dữ Liệu Lưu' }}</span>
+              {{ confirmingDeleteSave ? '⚠️ Bấm lại để xóa save' : '🗑️ Xóa Save' }}
             </button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- CREATE -->
+    <!-- CREATE SCREEN -->
     <div
-      v-if="currentScreen === 'create'"
-      class="screen active"
+      v-else-if="currentScreen === 'create'"
+      class="screen-center"
     >
-      <div class="create-container">
-        <h2 class="screen-title">
-          Tạo Nhân Vật
-        </h2>
-        <p class="screen-desc">
-          Chọn nghề nghiệp khởi đầu cho hành trình của bạn.
-        </p>
-        <div class="form-group">
-          <label>Tên của bạn</label>
-          <input
-            v-model="charNameInput"
-            type="text"
-            placeholder="Nhập tên nhân vật..."
-            maxlength="20"
-            autocomplete="off"
-            @keyup.enter="startNewGame"
-          >
-        </div>
-        <div class="create-split-layout">
-          <div class="career-selection-side">
-            <div class="form-group">
-              <label>Chọn ngành nghề khởi điểm</label>
-              <div class="career-grid">
-                <button
-                  v-for="(career, id) in gameData?.careers ?? {}"
-                  :key="String(id)"
-                  type="button"
-                  class="career-card"
-                  :class="{ selected: selectedCareerId === String(id) }"
-                  :aria-pressed="selectedCareerId === String(id)"
-                  @click="selectedCareerId = String(id)"
-                >
-                  <span class="career-emoji">{{ career.emoji }}</span>
-                  <span class="career-label">{{ career.name }}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="career-preview-side">
-            <div
-              v-if="careerPreview"
-              class="career-preview"
-            >
-              <div class="preview-header">
-                <span class="preview-icon">{{ careerPreview.emoji }}</span>
-                <div>
-                  <h3>{{ careerPreview.name }}</h3>
-                  <p>{{ careerPreview.description }}</p>
-                </div>
-              </div>
-              <div class="preview-stats">
-                <div
-                  v-for="(val, key) in careerPreview.startStats"
-                  :key="String(key)"
-                  class="preview-stat"
-                >
-                  <span class="ps-label">{{ getStatName(String(key)) }}</span>
-                  <span class="ps-value">{{ val }}</span>
-                </div>
-              </div>
-              <!-- Nút bắt đầu chuyển vào đây để luôn thấy trên Desktop -->
-              <div class="create-actions inline-actions">
-                <button
-                  class="btn-base btn-primary btn-glow"
-                  :class="{ 'btn-ready-pulse': charNameInput && selectedCareerId }"
-                  :disabled="!charNameInput || !selectedCareerId"
-                  @click="startNewGame"
-                >
-                  <span>Bắt Đầu Cuộc Đời</span>
-                </button>
-              </div>
-            </div>
-            <div
-              v-else
-              class="career-preview placeholder"
-            >
-              <div class="placeholder-content">
-                <span class="placeholder-icon">🖱️</span>
-                <p>Chọn một ngành nghề bên trái để xem thông số khởi đầu</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- GAME -->
-    <div
-      v-if="currentScreen === 'game' && gameState"
-      id="screen-game"
-      class="screen active"
-    >
-      <div class="game-layout">
-        <header class="game-header">
-          <div class="header-left">
-            <!-- Nút Home — hiện cả trên mobile lẫn desktop, được đưa ra bên trái cho dễ thấy -->
-            <RouterLink
-              to="/"
-              class="btn-icon btn-icon-home"
-              title="Về trang chủ"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-              >
-                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-            </RouterLink>
-            <div class="player-info">
-              <span class="player-name">{{ gameState.name }}</span>
-              <span class="player-career">{{ gameState.careerEmoji }} {{ gameState.currentLevel }}</span>
-            </div>
-          </div>
-          <div class="header-center">
-            <div class="age-display">
-              <span class="age-label">Tuổi</span>
-              <span class="age-value">{{ gameState.age }}</span>
-            </div>
-            <div class="year-display">
-              <span class="year-label">Năm</span>
-              <span class="year-value">{{ gameState.year }}</span>
-            </div>
-          </div>
-          <div class="header-right">
-            <button
-              type="button"
-              class="btn-icon"
-              title="Cửa hàng"
-              aria-label="Mở cửa hàng"
-              @click="isShopOpen = true"
-            >
-              🛒
-            </button>
-            <button
-              type="button"
-              class="btn-icon"
-              title="Túi đồ"
-              aria-label="Mở túi đồ"
-              @click="isInventoryOpen = true"
-            >
-              🎒
-            </button>
-            <!-- Nút Ẩn/Hiện Nhật ký -->
-            <button
-              type="button"
-              class="btn-icon hide-mobile"
-              :title="isSidebarCollapsed ? 'Hiện Nhật ký' : 'Ẩn Nhật ký'"
-              :aria-label="isSidebarCollapsed ? 'Hiện Nhật ký' : 'Ẩn Nhật ký'"
-              :class="{ 'btn-icon-active': !isSidebarCollapsed }"
-              @click="isSidebarCollapsed = !isSidebarCollapsed"
-            >
-              📖
-            </button>
-            <!-- Nút Save - ẩn trên mobile (có trong Menu) -->
-            <button
-              type="button"
-              class="btn-icon hide-mobile"
-              title="Lưu game"
-              aria-label="Lưu game"
-              @click="saveGame"
-            >
-              💾
-            </button>
-            <button
-              type="button"
-              class="btn-icon"
-              title="Menu"
-              aria-label="Mở menu"
-              @click="isMenuOpen = true"
-            >
-              ☰
-            </button>
-          </div>
-        </header>
-
-        <div class="game-main-split">
-          <div class="game-left-column">
-            <div class="stats-panel">
-              <div
-                v-for="(val, stat) in gameState.stats"
-                :key="String(stat)"
-                class="stat-item"
-                :class="{
-                  'stat-warning':
-                    (String(stat) === 'stress' && val >= 80) ||
-                    (String(stat) === 'health' && val <= 20),
-                  'stat-positive': String(stat) !== 'stress' && val >= 100,
-                }"
-                :data-stat="String(stat)"
-              >
-                <div class="stat-header">
-                  <span class="stat-icon">{{ getStatIcon(String(stat)) }}</span>
-                  <span class="stat-name">{{ getStatName(String(stat)) }}</span>
-                  <span class="stat-value">{{ val }}</span>
-                </div>
-                <div class="stat-bar">
-                  <div
-                    class="stat-fill"
-                    :style="{ width: val + '%' }"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div
-              id="event-area"
-              class="event-area"
-            >
-              <div
-                v-if="currentEvent"
-                class="event-card"
-              >
-                <div class="event-type">
-                  {{ currentEvent.type }}
-                </div>
-                <h3 class="event-title">
-                  {{ currentEvent.title }}
-                </h3>
-                <p class="event-desc">
-                  {{ currentEvent.description }}
-                </p>
-                <div class="event-choices">
-                  <button
-                    v-for="(choice, idx) in currentEvent.choices"
-                    :key="idx"
-                    class="choice-btn"
-                    @click="handleChoice(choice)"
-                  >
-                    <span class="choice-kbd">{{ idx + 1 }}</span>
-                    <span class="choice-icon">{{ choice.icon }}</span>
-                    <div class="choice-text">
-                      {{ choice.text }}
-                      <span class="choice-hint">{{ choice.hint }}</span>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <aside
-            class="game-timeline-sidebar"
-            :class="{ 'sidebar-collapsed': isSidebarCollapsed }"
-          >
-            <div class="timeline-panel">
-              <h3 class="timeline-title">
-                <span class="title-icon">📜</span>
-                <span class="title-text">Nhật ký cuộc đời</span>
-              </h3>
-              <div class="timeline-list">
-                <div
-                  v-for="(entry, idx) in [...gameState.history].reverse()"
-                  :key="idx"
-                  class="timeline-entry"
-                  :class="{
-                    'milestone-entry': getMilestoneInfo(entry.text).is,
-                    [getMilestoneInfo(entry.text).type]: true,
-                  }"
-                  :style="
-                    getMilestoneInfo(entry.text).is
-                      ? `--ms-color: ${getMilestoneInfo(entry.text).color}`
-                      : ''
-                  "
-                >
-                  <span class="timeline-year">{{ entry.age }} tuổi</span>
-                  <span class="timeline-dot" />
-                  <div class="timeline-content">
-                    <span
-                      v-if="getMilestoneInfo(entry.text).is"
-                      class="ms-icon"
-                    >{{
-                      getMilestoneInfo(entry.text).icon
-                    }}</span>
-                    <span class="timeline-text">{{ entry.text }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </aside>
-        </div>
-      </div>
-    </div>
-
-    <!-- END -->
-    <div
-      v-if="currentScreen === 'end'"
-      class="screen active"
-    >
-      <div class="end-container">
-        <div class="end-header">
-          <span class="end-icon">{{ calculateEnding().icon }}</span>
-          <h2 class="end-title">
-            {{ calculateEnding().title }}
-          </h2>
-          <p class="end-subtitle">
-            {{ calculateEnding().subtitle }}
-          </p>
-        </div>
-        <div
-          v-if="lifeRecap"
-          class="recap-highlights"
-        >
-          <span class="recap-chip">
-            🏅 Điểm: <strong>{{ lifeRecap.totalScore }}</strong>
-          </span>
-          <span class="recap-chip">
-            ⏳ Hành trình: <strong>{{ lifeRecap.yearsLived }} năm</strong>
-          </span>
-          <span class="recap-chip">
-            🏆 Thành tựu: <strong>{{ lifeRecap.milestonesCount }}</strong>
-          </span>
-          <span class="recap-chip best">
-            💪 Mạnh nhất: <strong>{{ getStatName(String(lifeRecap.strongestStat.key)) }} ({{ lifeRecap.strongestStat.value }})</strong>
-          </span>
-          <span class="recap-chip weak">
-            🌱 Cần rèn: <strong>{{ getStatName(String(lifeRecap.weakestStat.key)) }} ({{ lifeRecap.weakestStat.value }})</strong>
-          </span>
-        </div>
-        <div
-          v-if="gameState"
-          class="end-stats"
-        >
-          <div
-            v-for="(val, stat) in gameState.stats"
-            :key="String(stat)"
-            class="end-stat-card"
-          >
-            <span class="es-icon">{{ getStatIcon(String(stat)) }}</span>
-            <span class="es-value">{{ val }}</span>
-            <span class="es-label">{{ getStatName(String(stat)) }}</span>
-          </div>
-        </div>
-        <div class="end-actions">
+      <div class="create-card">
+        <div class="create-head">
           <button
-            class="btn-base btn-primary btn-glow"
-            @click="restartGame"
+            type="button"
+            class="btn-icon-sm"
+            @click="currentScreen = 'intro'"
           >
-            <span>🔄 Chơi Lại</span>
+            ← Quay lại
           </button>
+          <h2>Tạo Nhân Vật</h2>
           <RouterLink
             to="/"
-            class="btn-base btn-secondary"
+            class="btn-icon-sm"
           >
-            <span>🏠 Về Trang Chủ</span>
+            🏠 Launcher
           </RouterLink>
         </div>
-      </div>
-    </div>
 
-    <!-- SHOP MODAL -->
-    <div
-      v-if="isShopOpen"
-      class="modal-overlay"
-      @click.self="isShopOpen = false"
-    >
-      <div class="modal-content modal-large">
-        <h3>🛒 Cửa Hàng</h3>
-        <div class="shop-tabs">
-          <button
-            class="shop-tab"
-            :class="{ active: shopTab === 'items' }"
-            @click="shopTab = 'items'"
-          >
-            📦 Vật Phẩm
-          </button>
-          <button
-            class="shop-tab"
-            :class="{ active: shopTab === 'skills' }"
-            @click="shopTab = 'skills'"
-          >
-            ✨ Kỹ Năng
-          </button>
-        </div>
-        <div class="shop-content">
-          <div v-show="shopTab === 'items'">
-            <div
-              v-for="item in gameData?.passiveItems ?? []"
-              :key="item.id"
-              class="shop-item"
-            >
-              <div class="shop-item-icon">
-                {{ item.name.split(' ')[0] }}
-              </div>
-              <div class="shop-item-info">
-                <div class="shop-item-header">
-                  <span class="shop-item-name">{{
-                    item.name.substring(item.name.indexOf(' ') + 1)
-                  }}</span>
-                  <span class="shop-item-price">💰 {{ item.cost }}</span>
-                </div>
-                <div class="shop-item-desc">
-                  {{ item.description }}
-                </div>
-                <div class="shop-item-actions">
-                  <button
-                    class="btn-buy"
-                    :disabled="!canBuyItem(item)"
-                    @click="buyItemFn(item)"
-                  >
-                    {{ (gameState?.inventory ?? []).includes(item.id) ? '✓ Đã có' : '🛒 Mua' }}
-                  </button>
-                </div>
-              </div>
+        <div class="create-grid">
+          <div class="create-left">
+            <div class="field-box">
+              <label for="ngare-name">Tên nhân vật</label>
+              <input
+                id="ngare-name"
+                v-model="charNameInput"
+                type="text"
+                maxlength="24"
+                placeholder="Nhập tên của bạn..."
+                autocomplete="off"
+                @keyup.enter="startNewGame"
+              >
             </div>
-          </div>
-          <div v-show="shopTab === 'skills'">
-            <div
-              v-for="skill in gameData?.activeSkills ?? []"
-              :key="skill.id"
-              class="shop-item"
-            >
-              <div class="shop-item-icon">
-                {{ skill.name.split(' ')[0] }}
-              </div>
-              <div class="shop-item-info">
-                <div class="shop-item-header">
-                  <span class="shop-item-name">{{
-                    skill.name.substring(skill.name.indexOf(' ') + 1)
-                  }}</span>
-                  <span class="shop-item-price">💰 {{ skill.cost }}</span>
-                </div>
-                <div class="shop-item-desc">
-                  {{ skill.description }}
-                </div>
-                <div class="shop-item-actions">
-                  <button
-                    class="btn-buy"
-                    :disabled="!canBuySkill(skill)"
-                    @click="buySkillFn(skill)"
-                  >
-                    {{
-                      (gameState?.activeSkills ?? []).includes(skill.id) ? '✓ Đã học' : '✨ Mở khóa'
-                    }}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <button
-          class="modal-btn modal-close"
-          @click="isShopOpen = false"
-        >
-          ✕ Đóng
-        </button>
-      </div>
-    </div>
 
-    <!-- INVENTORY MODAL -->
-    <div
-      v-if="isInventoryOpen"
-      class="modal-overlay"
-      @click.self="isInventoryOpen = false"
-    >
-      <div class="modal-content modal-large">
-        <h3>🎒 Túi Đồ</h3>
-        <div class="shop-tabs">
-          <button
-            class="shop-tab"
-            :class="{ active: inventoryTab === 'inventory' }"
-            @click="inventoryTab = 'inventory'"
-          >
-            📦 Vật Phẩm
-          </button>
-          <button
-            class="shop-tab"
-            :class="{ active: inventoryTab === 'skills' }"
-            @click="inventoryTab = 'skills'"
-          >
-            ⚡ Kỹ Năng
-          </button>
-        </div>
-        <div>
-          <div v-show="inventoryTab === 'inventory'">
-            <div
-              v-if="!gameState?.inventory?.length"
-              class="empty-state"
-            >
-              <div class="empty-state-icon">
-                📦
-              </div>
-              <div class="empty-state-text">
-                Chưa có vật phẩm nào
-              </div>
-            </div>
-            <div
-              v-for="id in gameState?.inventory"
-              :key="id"
-              class="inventory-item inventory-item-owned"
-            >
-              <div class="shop-item-icon">
-                {{ gameData?.passiveItems.find((i) => i.id === id)?.name?.split(' ')[0] }}
-              </div>
-              <div class="shop-item-info">
-                <div class="shop-item-name">
-                  {{
-                    ((n) => (n ? n.substring(n.indexOf(' ') + 1) : ''))(
-                      gameData?.passiveItems.find((i) => i.id === id)?.name ?? '',
-                    )
-                  }}
-                </div>
-                <div class="shop-item-desc">
-                  {{ gameData?.passiveItems.find((i) => i.id === id)?.description }}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div v-show="inventoryTab === 'skills'">
-            <div
-              v-if="!gameState?.activeSkills?.length"
-              class="empty-state"
-            >
-              <div class="empty-state-icon">
-                ✨
-              </div>
-              <div class="empty-state-text">
-                Chưa có kỹ năng nào
-              </div>
-            </div>
-            <div
-              v-for="id in gameState?.activeSkills"
-              :key="id"
-              class="inventory-item"
-            >
-              <div class="shop-item-icon">
-                {{ gameData?.activeSkills.find((s) => s.id === id)?.name?.split(' ')[0] }}
-              </div>
-              <div class="shop-item-info">
-                <div class="shop-item-name">
-                  {{
-                    ((n) => (n ? n.substring(n.indexOf(' ') + 1) : ''))(
-                      gameData?.activeSkills.find((s) => s.id === id)?.name ?? '',
-                    )
-                  }}
-                </div>
-                <span
-                  class="skill-cooldown"
-                  :class="{ 'skill-ready': !gameState?.skillCooldowns?.[id] }"
-                >
-                  {{
-                    !gameState?.skillCooldowns?.[id]
-                      ? '✅ Sẵn sàng'
-                      : `⏱️ Còn ${gameState?.skillCooldowns?.[id]} năm`
-                  }}
-                </span>
-              </div>
-              <div class="shop-item-actions">
+            <div class="field-box">
+              <span class="field-lbl">Chọn ngành nghề khởi điểm</span>
+              <div class="career-grid">
                 <button
-                  class="btn-use"
-                  :disabled="!!gameState?.skillCooldowns?.[id]"
-                  @click="useSkillFn(id)"
+                  v-for="career in Object.values(gameData?.careers ?? {})"
+                  :key="career.id"
+                  type="button"
+                  class="pick-card"
+                  :class="{ selected: selectedCareerId === career.id }"
+                  @click="selectedCareerId = career.id"
                 >
-                  {{ !gameState?.skillCooldowns?.[id] ? '⚡ Sử dụng' : '❌ Chưa sẵn sàng' }}
+                  <span class="pick-emoji">{{ career.emoji }}</span>
+                  <strong>{{ career.name }}</strong>
                 </button>
               </div>
             </div>
+
+            <div class="field-box">
+              <span class="field-lbl">Chọn xuất thân / tính cách</span>
+              <div class="trait-grid">
+                <button
+                  v-for="trait in CHARACTER_TRAITS"
+                  :key="trait.id"
+                  type="button"
+                  class="trait-chip"
+                  :class="{ selected: selectedTraitId === trait.id }"
+                  :title="trait.description"
+                  @click="selectedTraitId = trait.id"
+                >
+                  <span>{{ trait.emoji }} {{ trait.name }}</span>
+                </button>
+              </div>
+              <p class="trait-desc">
+                {{ CHARACTER_TRAITS.find((t) => t.id === selectedTraitId)?.description }}
+              </p>
+            </div>
+          </div>
+
+          <div
+            v-if="careerPreview && previewCombinedStats"
+            class="create-preview"
+          >
+            <div class="cp-head">
+              <span class="cp-icon">{{ careerPreview.emoji }}</span>
+              <div>
+                <h3>{{ careerPreview.name }}</h3>
+                <p>{{ careerPreview.description }}</p>
+              </div>
+            </div>
+            <div class="cp-salary">
+              Lương khởi điểm: <strong>💰 {{ careerPreview.salary }} / năm</strong>
+            </div>
+            <div class="cp-stats">
+              <div
+                v-for="(val, key) in previewCombinedStats"
+                :key="String(key)"
+                class="cp-stat"
+              >
+                <span>{{ getStatName(String(key)) }}</span>
+                <strong>{{ val }}</strong>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="btn-main full"
+              :disabled="!charNameInput.trim()"
+              @click="startNewGame"
+            >
+              Bắt Đầu Cuộc Đời (Tuổi 22) →
+            </button>
           </div>
         </div>
-        <button
-          class="modal-btn modal-close"
-          @click="isInventoryOpen = false"
+      </div>
+    </div>
+
+    <!-- GAMEPLAY SCREEN -->
+    <div
+      v-else-if="currentScreen === 'game' && gameState"
+      class="game-container"
+    >
+      <header class="game-header">
+        <div class="header-left">
+          <RouterLink
+            to="/"
+            class="btn-icon"
+            title="Về Launcher"
+            aria-label="Về Launcher"
+          >
+            🏠
+          </RouterLink>
+          <div class="player-info">
+            <span class="player-name">{{ gameState.name }}</span>
+            <span
+              class="player-career"
+              :class="{ unemployed: isUnemployed }"
+              :title="nextLevelTooltip"
+            >
+              {{ gameState.careerEmoji }} {{ gameState.currentLevel }} · Lương {{ gameState.salary }}
+            </span>
+          </div>
+        </div>
+
+        <div class="header-center">
+          <div class="age-pill">
+            <span>Tuổi</span>
+            <strong>{{ gameState.age }}</strong>
+          </div>
+          <div class="age-pill">
+            <span>Năm</span>
+            <strong>{{ gameState.year }}</strong>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <button
+            type="button"
+            class="btn-icon"
+            title="Cửa hàng & Đầu tư"
+            aria-label="Mở cửa hàng và đầu tư"
+            @click="isShopOpen = true"
+          >
+            🛒
+          </button>
+          <button
+            type="button"
+            class="btn-icon"
+            title="Túi đồ & Thành tựu"
+            aria-label="Mở túi đồ và thành tựu"
+            @click="isInventoryOpen = true"
+          >
+            🎒
+          </button>
+          <button
+            type="button"
+            class="btn-icon"
+            :title="ngareStore.soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'"
+            :aria-label="ngareStore.soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'"
+            @click="ngareStore.toggleSound()"
+          >
+            {{ ngareStore.soundEnabled ? '🔊' : '🔇' }}
+          </button>
+          <button
+            type="button"
+            class="btn-icon hide-mobile"
+            :title="isSidebarCollapsed ? 'Hiện Nhật ký' : 'Ẩn Nhật ký'"
+            aria-label="Bật tắt nhật ký"
+            @click="isSidebarCollapsed = !isSidebarCollapsed"
+          >
+            📖
+          </button>
+          <button
+            type="button"
+            class="btn-icon"
+            title="Menu"
+            aria-label="Mở menu"
+            @click="isMenuOpen = true"
+          >
+            ☰
+          </button>
+        </div>
+      </header>
+
+      <div
+        class="game-layout"
+        :class="{ collapsed: isSidebarCollapsed }"
+      >
+        <div class="game-main-col">
+          <StatsDashboard
+            :game-state="gameState"
+            :stat-deltas="statDeltas"
+          />
+
+          <YearlyActionsBar
+            :money="gameState.stats.money"
+            :used-this-year="Boolean(gameState.yearlyActionUsed)"
+            @perform="handleYearlyAction"
+          />
+
+          <div
+            v-if="currentEvent"
+            class="event-card"
+          >
+            <div class="event-badges">
+              <span class="event-type">{{ currentEvent.type }}</span>
+              <span
+                v-if="currentEvent.arcLabel"
+                class="arc-badge"
+              >
+                {{ currentEvent.arcLabel }}
+              </span>
+            </div>
+            <h3 class="event-title">
+              {{ currentEvent.title }}
+            </h3>
+            <p class="event-desc">
+              {{ currentEvent.description }}
+            </p>
+            <div
+              class="event-choices"
+              :class="{
+                'is-multi': currentEvent.choices.length >= 3,
+                'is-three': currentEvent.choices.length === 3,
+              }"
+            >
+              <button
+                v-for="(choice, idx) in currentEvent.choices"
+                :key="`${currentEvent.id}-${idx}`"
+                type="button"
+                class="choice-btn"
+                @click="handleChoice(choice)"
+              >
+                <span class="choice-kbd">{{ idx + 1 }}</span>
+                <span class="choice-icon">{{ choice.icon || '👉' }}</span>
+                <div class="choice-text">
+                  <strong>{{ choice.text }}</strong>
+                  <span
+                    v-if="choice.hint"
+                    class="choice-hint"
+                  >{{ choice.hint }}</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <aside
+          v-if="!isSidebarCollapsed"
+          class="timeline-col"
         >
-          ✕ Đóng
+          <div class="timeline-card">
+            <h3>📜 Nhật Ký Cuộc Đời</h3>
+            <div class="timeline-list">
+              <div
+                v-for="(entry, idx) in gameState.history"
+                :key="`${entry.age}-${idx}`"
+                class="timeline-row"
+                :class="getMilestoneBadge(entry.text)"
+              >
+                <span class="tl-age">{{ entry.age }}t</span>
+                <span class="tl-text">{{ entry.text }}</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- END SCREEN -->
+    <div
+      v-else-if="currentScreen === 'end' && gameState && lifeRecap"
+      class="screen-center"
+    >
+      <LifeRecapScreen
+        :game-state="gameState"
+        :ending="currentEnding"
+        :recap="lifeRecap"
+        @restart="restartGame"
+      />
+    </div>
+
+    <!-- MODALS -->
+    <ShopSkillModal
+      v-if="isShopOpen && gameState && gameData"
+      :game-state="gameState"
+      :game-data="gameData"
+      @close="isShopOpen = false"
+      @buy-item="handleBuyItem"
+      @buy-skill="handleBuySkill"
+      @buy-asset="handleBuyAsset"
+      @sell-asset="handleSellAsset"
+      @switch-career="handleSwitchCareer"
+    />
+
+    <InventoryModal
+      v-if="isInventoryOpen && gameState && gameData"
+      :game-state="gameState"
+      :game-data="gameData"
+      @close="isInventoryOpen = false"
+      @use-skill="handleUseSkill"
+    />
+
+    <EndingsGalleryModal
+      v-if="isGalleryOpen"
+      :unlocked-endings="ngareStore.unlockedEndings"
+      :hall-of-fame="ngareStore.hallOfFame"
+      @close="isGalleryOpen = false"
+    />
+
+    <!-- ORACLE PREVIEW MODAL -->
+    <div
+      v-if="previewModalEvent"
+      class="modal-overlay"
+      @click.self="previewModalEvent = null"
+    >
+      <div
+        class="menu-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Nhìn trước tương lai"
+      >
+        <h3>🔮 Thần Nhãn — Sự kiện năm tới</h3>
+        <p class="preview-title">
+          {{ previewModalEvent.type }} · {{ previewModalEvent.title }}
+        </p>
+        <p class="preview-desc">
+          {{ previewModalEvent.description }}
+        </p>
+        <button
+          type="button"
+          class="btn-main full"
+          @click="previewModalEvent = null"
+        >
+          ✓ Đã nắm bắt
         </button>
       </div>
     </div>
@@ -1337,28 +890,43 @@ onUnmounted(() => {
       class="modal-overlay"
       @click.self="isMenuOpen = false"
     >
-      <div class="modal-content">
-        <h3>⚙️ Menu</h3>
+      <div
+        class="menu-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu trò chơi"
+      >
+        <h3>⚙️ Tùy Chọn</h3>
         <button
-          class="modal-btn"
+          type="button"
+          class="btn-ghost"
           @click="saveGame"
         >
-          💾 Lưu Game
+          💾 Lưu Trạng Thái
         </button>
         <button
-          class="modal-btn"
+          type="button"
+          class="btn-ghost"
+          @click="isGalleryOpen = true; isMenuOpen = false"
+        >
+          📚 Kết Cục & Bảng Vàng
+        </button>
+        <button
+          type="button"
+          class="btn-danger"
           @click="restartGame"
         >
-          {{ confirmingRestart ? '⚠️ Bấm lại để Chơi Lại' : '🔄 Chơi Lại' }}
+          {{ confirmingRestart ? '⚠️ Bấm lại để Chơi Lại' : '🔄 Chơi Lại Từ Đầu' }}
         </button>
         <RouterLink
           to="/"
-          class="modal-btn"
+          class="btn-ghost"
         >
-          🏠 Về Trang Chủ
+          🏠 Về Trang Chủ Launcher
         </RouterLink>
         <button
-          class="modal-btn modal-close"
+          type="button"
+          class="btn-ghost"
           @click="isMenuOpen = false"
         >
           ✕ Đóng
@@ -1367,1879 +935,814 @@ onUnmounted(() => {
     </div>
 
     <!-- TOASTS -->
-    <div class="toast-container">
+    <div
+      class="toast-stack"
+      aria-live="polite"
+    >
       <div
         v-for="toast in toasts"
         :key="toast.id"
-        class="toast"
+        class="toast-item"
         :class="toast.type"
       >
         {{ toast.message }}
-      </div>
-    </div>
-
-    <!-- PREVIEW MODAL -->
-    <div
-      v-if="previewModalEvent"
-      class="modal-overlay"
-      @click.self="previewModalEvent = null"
-    >
-      <div class="modal-content modal-large">
-        <h3>🔮 Nhìn Trước Tương Lai</h3>
-        <div class="preview-timeline-info">
-          <span class="preview-age">📅 Năm {{ (gameState?.year ?? 0) + 1 }} | Tuổi {{ (gameState?.age ?? 0) + 1 }}</span>
-        </div>
-        <div class="preview-event-card">
-          <div class="event-type">
-            {{ previewModalEvent.type }}
-          </div>
-          <h4 class="event-title">
-            {{ previewModalEvent.title }}
-          </h4>
-          <p class="event-desc">
-            {{ previewModalEvent.description }}
-          </p>
-          <div class="preview-choices">
-            <div
-              v-for="(choice, idx) in previewModalEvent.choices"
-              :key="idx"
-              class="preview-choice-item"
-            >
-              <div class="preview-choice-header">
-                <span class="choice-icon">{{ choice.icon || '📍' }}</span>
-                <span class="choice-text">{{ choice.text }}</span>
-              </div>
-              <div class="preview-choice-hint">
-                {{ choice.hint || '' }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <button
-          class="modal-btn modal-close"
-          @click="previewModalEvent = null"
-        >
-          ✓ Đã hiểu
-        </button>
-      </div>
-    </div>
-
-    <!-- GALLERY MODAL -->
-    <div
-      v-if="isGalleryOpen"
-      class="modal-overlay"
-      @click.self="isGalleryOpen = false"
-    >
-      <div class="modal-content modal-large">
-        <h3 style="margin-bottom: 0.5rem">
-          📚 Bộ Sưu Tập Chặng Cuối
-        </h3>
-        <p
-          style="
-            text-align: center;
-            color: var(--text-muted);
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-          "
-        >
-          Thành tựu sinh tử: {{ unlockedEndings.length }}/{{ ALL_ENDINGS.length }}
-        </p>
-        <div class="gallery-grid">
-          <div
-            v-for="ending in ALL_ENDINGS"
-            :key="ending.id"
-            class="gallery-item"
-            :class="{ locked: !unlockedEndings.includes(ending.id) }"
-          >
-            <div class="gallery-icon">
-              {{ unlockedEndings.includes(ending.id) ? ending.icon : '🔒' }}
-            </div>
-            <div class="gallery-info">
-              <h4 class="gallery-title">
-                {{ unlockedEndings.includes(ending.id) ? ending.title : '???' }}
-              </h4>
-              <p class="gallery-condition">
-                {{ ending.condition }}
-              </p>
-            </div>
-          </div>
-        </div>
-        <button
-          class="modal-btn modal-close"
-          style="margin-top: 2rem"
-          @click="isGalleryOpen = false"
-        >
-          ✕ Đóng
-        </button>
-      </div>
-    </div>
-
-    <!-- STAT CHANGE POPUP -->
-    <div
-      v-if="statChanges"
-      class="stat-change-popup"
-    >
-      <div
-        v-for="(val, key) in statChanges"
-        :key="String(key)"
-        class="stat-diff"
-        :class="[(String(key) === 'stress' ? val < 0 : val > 0) ? 'positive' : 'negative']"
-      >
-        <span class="diff-icon">{{ getStatIcon(String(key)) }}</span>
-        <span class="diff-val">{{ val > 0 ? '+' : '' }}{{ val }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* ======================================
-   CSS VARIABLES — từ ngare.txt style.css
-   ====================================== */
 .ngare-wrapper {
-  --bg-primary: #0a0e1a;
-  --bg-secondary: #111827;
-  --bg-card: rgba(17, 24, 39, 0.7);
-  --bg-glass: rgba(255, 255, 255, 0.05);
-  --text-primary: #f0f4ff;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --accent-primary: #6366f1;
-  --accent-secondary: #8b5cf6;
-  --accent-glow: rgba(99, 102, 241, 0.4);
-  --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.3);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-xl: 28px;
-  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --primary-color: #6366f1;
-
-  font-family: 'Be Vietnam Pro', 'Inter', sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  min-height: 100vh;
-  overflow-x: hidden;
-  line-height: 1.6;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
   position: relative;
+  overflow-x: hidden;
+  font-family: 'Be Vietnam Pro', 'Inter', sans-serif;
 }
 
-/* GLOBAL NAV */
-.global-nav {
+.bg-particles {
   position: fixed;
-  top: 1.5rem;
-  left: 1.5rem;
-  z-index: 100;
-  display: flex;
-  gap: 0.8rem;
-  pointer-events: none;
-}
-.btn-home {
-  pointer-events: auto;
-  background: var(--bg-glass);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  padding: 0.7rem;
-  cursor: pointer;
-  transition: var(--transition);
-  backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-.btn-home:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--text-primary);
-  transform: translateY(-2px);
-  border-color: var(--accent-primary);
-}
-.btn-back-screen {
-  background: rgba(99, 102, 241, 0.1);
-  border-color: rgba(99, 102, 241, 0.3);
-  color: var(--accent-primary);
-}
-.btn-back-screen:hover {
-  background: rgba(99, 102, 241, 0.2);
-}
-
-.btn-to-top {
-  position: fixed;
-  bottom: 2rem;
-  right: 2rem;
-  z-index: 90;
-  background: var(--bg-glass);
-  border: 1px solid var(--border-subtle);
-  border-radius: 50%;
-  width: 45px;
-  height: 45px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: var(--transition);
-  backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-.btn-to-top:hover {
-  background: var(--accent-gradient);
-  color: white;
-  transform: translateY(-3px);
-  border-color: transparent;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-.particles-canvas {
-  position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
-  z-index: 0;
   pointer-events: none;
+  z-index: 0;
 }
 
-/* SCREENS */
-.screen {
-  display: none;
+.screen-center {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
-}
-.screen.active {
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.6s ease;
-}
-#screen-game.active {
-  display: block;
-  align-items: unset;
-  justify-content: unset;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* BUTTONS */
-.btn-base {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border-radius: var(--radius-xl);
-  padding: 1rem 2.5rem;
-  font-size: 1.1rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.btn-primary {
-  background: var(--accent-gradient);
-  color: white;
-  border: none;
-  position: relative;
-  overflow: hidden;
-}
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-glow);
-}
-.btn-primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: var(--bg-glass);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-subtle);
-  backdrop-filter: blur(8px);
-}
-.btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
-}
-
-.btn-glow::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
-  animation: pulseGlow 3s ease-in-out infinite;
-}
-@keyframes pulseGlow {
-  0%,
-  100% {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-.btn-icon {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-size: 1.2rem;
-  padding: 0.5rem;
-  cursor: pointer;
-  transition: var(--transition);
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.btn-icon:hover {
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--text-primary);
-}
-.btn-icon-home {
-  color: var(--accent-primary);
-  border-color: rgba(99, 102, 241, 0.25);
-}
-.btn-icon-home:hover {
-  background: rgba(99, 102, 241, 0.15) !important;
-  border-color: var(--accent-primary);
-}
-
-/* Mobile utilities consolidated at the end of file to prevent overrides */
-.hide-mobile {
-  display: flex;
-}
-.show-mobile {
-  display: none;
+  padding: 0.85rem 1rem;
 }
 
 /* INTRO */
-.intro-container {
+.intro-card {
+  width: 100%;
+  max-width: 680px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline-strong);
+  border-radius: 24px;
+  padding: 1.75rem 1.5rem;
   text-align: center;
-  padding: 2rem;
-  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  box-shadow: var(--shadow-card);
 }
-.intro-logo {
-  margin-bottom: 1.5rem;
+
+.intro-back {
+  align-self: flex-start;
+  padding: 0.36rem 0.78rem;
+  border-radius: 10px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  color: var(--primary);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
-.logo-icon {
-  font-size: 4rem;
-  display: block;
-  margin-bottom: 0.5rem;
-  animation: float 3s ease-in-out infinite;
+
+.intro-badge {
+  padding: 0.3rem 0.8rem;
+  border-radius: 99px;
+  background: var(--primary-soft);
+  border: 1px solid var(--outline-strong);
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-12px);
-  }
-}
+
 .intro-title {
-  font-family: 'Anybody', sans-serif;
-  font-size: 3.5rem;
-  font-weight: 900;
-  line-height: 1.1;
-  letter-spacing: -1px;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  font-weight: 800;
+  color: var(--primary);
 }
-.intro-title .highlight {
-  font-size: 4rem;
-  display: block;
-}
+
 .intro-subtitle {
-  font-size: 1.15rem;
-  color: var(--text-secondary);
-  margin: 1rem 0 2rem;
-  font-style: italic;
+  font-size: 0.94rem;
+  color: var(--text-dim);
+  max-width: 540px;
+  line-height: 1.6;
 }
-.intro-features {
-  display: grid;
-  grid-template-columns: repeat(2, max-content);
-  gap: 1rem;
+
+.intro-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
   justify-content: center;
-  margin: 0 auto 2.5rem auto;
 }
-.feature-tag {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-subtle);
-  padding: 0.8rem 1.5rem;
-  border-radius: 999px;
-  font-size: 0.95rem;
-  color: var(--text-primary);
-  backdrop-filter: blur(8px);
-  text-align: left;
-  font-weight: 500;
-  min-width: 220px;
+
+.intro-pills span {
+  padding: 0.3rem 0.7rem;
+  border-radius: 99px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  font-size: 0.76rem;
+  font-weight: 600;
 }
+
 .intro-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  margin-top: 0.35rem;
+}
+
+.intro-sub-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+/* BUTTONS */
+.btn-main {
+  padding: 0.82rem 1.4rem;
+  border-radius: 14px;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--text-inverse);
+  font-size: 0.94rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.btn-main.full {
+  width: 100%;
+}
+
+.btn-main:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px var(--primary-glow);
+}
+
+.btn-main:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--outline);
+  background: var(--bg-sidebar);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-ghost:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn-danger {
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* CREATE SCREEN */
+.create-card {
+  width: 100%;
+  max-width: 960px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  border-radius: 22px;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.create-head {
+  display: flex;
   align-items: center;
-}
-.btn-danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  backdrop-filter: blur(8px);
-}
-.btn-danger:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fecaca;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
-/* CREATE */
-.create-container {
-  padding: 2rem;
-  max-width: 1000px;
-  width: 100%;
-  transition: var(--transition);
+.create-head h2 {
+  font-size: 1.2rem;
+  font-weight: 800;
 }
-.screen-title {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.8rem;
+
+.btn-icon-sm {
+  padding: 0.36rem 0.72rem;
+  border-radius: 10px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.78rem;
   font-weight: 700;
-  margin-bottom: 0.2rem;
-  text-align: center;
+  cursor: pointer;
+  text-decoration: none;
 }
-.screen-desc {
-  color: var(--text-secondary);
-  text-align: center;
-  margin-bottom: 1.2rem;
-  font-size: 0.9rem;
+
+.create-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 1rem;
+  align-items: start;
 }
-.form-group {
-  margin-bottom: 1rem;
+
+.create-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
 }
-.form-group label {
-  display: block;
-  font-weight: 600;
-  margin-bottom: 0.4rem;
-  color: var(--text-primary);
-  font-size: 0.9rem;
+
+.field-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
-.form-group input {
-  width: 100%;
-  padding: 0.7rem 1.2rem;
-  background: var(--bg-glass);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
-  font-size: 0.95rem;
-  font-family: inherit;
+
+.field-box label,
+.field-lbl {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.field-box input {
+  padding: 0.68rem 0.85rem;
+  border-radius: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.92rem;
+}
+
+.field-box input:focus {
   outline: none;
-  transition: var(--transition);
-  backdrop-filter: blur(8px);
-}
-.form-group input:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-
-.create-actions {
-  display: flex;
-  justify-content: center;
-  margin-top: 1.5rem;
-}
-.create-actions.inline-actions {
-  margin-top: 2rem;
-  width: 100%;
-}
-.create-actions.inline-actions .btn-base {
-  width: 100%;
-  padding: 0.8rem 1.5rem;
-  font-size: 1rem;
-}
-.btn-ready-pulse {
-  animation: readyPulse 2s infinite;
-}
-@keyframes readyPulse {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
-  }
-  70% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 15px rgba(99, 102, 241, 0);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
-  }
-}
-
-.create-split-layout {
-  display: flex;
-  gap: 2.5rem;
-  margin-top: 1rem;
-  align-items: stretch;
-}
-.career-selection-side {
-  flex: 1.2;
-}
-.career-preview-side {
-  flex: 0.8;
-  position: sticky;
-  top: 2rem;
+  border-color: var(--primary);
 }
 
 .career-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.8rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.48rem;
 }
-.career-card {
-  width: 100%;
-  font-family: inherit;
-  color: var(--text-primary);
-  background: var(--bg-glass);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 1.2rem 1rem;
-  text-align: center;
-  cursor: pointer;
-  transition: var(--transition);
-  backdrop-filter: blur(8px);
+
+.pick-card {
+  padding: 0.6rem 0.45rem;
+  border-radius: 12px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  color: var(--text);
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.pick-card.selected {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pick-emoji {
+  font-size: 1.4rem;
+}
+
+.trait-grid {
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.4rem;
 }
-.career-card:hover {
-  border-color: rgba(99, 102, 241, 0.4);
-  transform: translateY(-3px);
-  background: rgba(99, 102, 241, 0.08);
-}
-.career-card.selected {
-  border-color: var(--accent-primary);
-  background: rgba(99, 102, 241, 0.15);
-  box-shadow: 0 0 20px var(--accent-glow);
-}
-.career-emoji {
-  font-size: 2.2rem;
-}
-.career-label {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-primary);
+
+.trait-chip {
+  padding: 0.36rem 0.68rem;
+  border-radius: 99px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
-.career-preview {
-  background: rgba(99, 102, 241, 0.05);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  backdrop-filter: blur(12px);
-  height: 100%;
-  animation: slideUp 0.3s ease;
-  box-shadow: inset 0 0 20px rgba(99, 102, 241, 0.05);
+.trait-chip.selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
-.career-preview.placeholder {
+
+.trait-desc {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.create-preview {
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: var(--text-muted);
-  border: 2px dashed var(--border-subtle);
-  background: transparent;
-}
-.placeholder-icon {
-  font-size: 3rem;
-  display: block;
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-.placeholder-content p {
-  font-size: 0.9rem;
-  max-width: 200px;
-}
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.preview-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-.preview-icon {
-  font-size: 2.5rem;
-}
-.preview-header h3 {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.2rem;
-  margin-bottom: 0.2rem;
-}
-.preview-header p {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
-.preview-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.5rem;
-}
-.preview-stat {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: var(--radius-sm);
-  padding: 0.5rem;
-  text-align: center;
-  font-size: 0.8rem;
-}
-.ps-label {
-  color: var(--text-muted);
-  display: block;
-  margin-bottom: 0.2rem;
-}
-.ps-value {
-  font-weight: 700;
-  font-size: 1rem;
+  gap: 0.8rem;
 }
 
-/* GAME */
-.game-layout {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto 1fr;
-  min-height: 100vh;
-  gap: 0;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1rem;
+.cp-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
 }
+
+.cp-icon {
+  font-size: 2.2rem;
+}
+
+.cp-head h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.cp-head p {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-top: 0.2rem;
+}
+
+.cp-salary {
+  font-size: 0.84rem;
+  color: var(--warning);
+}
+
+.cp-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.cp-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  font-size: 0.8rem;
+}
+
+/* GAMEPLAY */
+.game-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0.65rem 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
 .game-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 1rem;
+  gap: 0.65rem;
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  padding: 0.5rem 0.8rem;
+  flex-wrap: wrap;
 }
+
 .header-left {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.6rem;
+  flex: 1 1 200px;
+  min-width: 0;
 }
+
 .player-info {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  min-width: 0;
 }
+
 .player-name {
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: 1.1rem;
-}
-.player-career {
-  font-size: 0.82rem;
-  color: var(--text-secondary);
+  font-size: 0.94rem;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 260px;
 }
+
+.player-career {
+  font-size: 0.76rem;
+  color: var(--primary);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.player-career.unemployed {
+  color: var(--danger);
+}
+
 .header-center {
   display: flex;
-  gap: 1.5rem;
-  text-align: center;
+  gap: 0.45rem;
 }
-.age-display,
-.year-display {
+
+.age-pill {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 10px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
 }
-.age-label,
-.year-label {
-  font-size: 0.7rem;
-  color: var(--text-muted);
+
+.age-pill span {
+  font-size: 0.66rem;
+  color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 1px;
 }
-.age-value,
-.year-value {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.5rem;
+
+.age-pill strong {
+  font-size: 0.95rem;
   font-weight: 800;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
+
 .header-right {
   display: flex;
-  gap: 0.5rem;
-}
-
-.game-main-split {
-  display: flex;
-  gap: 2rem;
-  align-items: stretch;
-  padding-bottom: 2rem;
-}
-.game-left-column {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-height: 600px;
-  min-width: 0;
-}
-/* Sidebar có transition thu/mở mượt mà */
-.game-timeline-sidebar {
-  flex: 0 0 220px;
-  position: sticky;
-  top: 1rem;
-  height: 600px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  backdrop-filter: blur(8px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition:
-    flex-basis 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.35s ease,
-    border-color 0.35s ease;
-  position: relative;
-}
-/* Trạng thái THU GỌN — sidebar chỉ còn nút bấm */
-.game-timeline-sidebar.sidebar-collapsed {
-  flex: 0 0 36px;
-  border-color: rgba(255, 255, 255, 0.04);
-  background: rgba(255, 255, 255, 0.01);
-}
-.game-timeline-sidebar.sidebar-collapsed .timeline-panel {
-  opacity: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-/* Nút icon active (nhật ký đang hiện) */
-.btn-icon-active {
-  color: var(--accent-primary) !important;
-  background: rgba(99, 102, 241, 0.15) !important;
-}
-/* Sidebar transition */
-.timeline-panel {
-  transition: opacity 0.25s ease;
-  padding-top: 0;
-}
-
-/* STATS */
-.stats-panel {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.6rem;
-  padding-bottom: 1.5rem;
-}
-.stat-item {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 0.7rem;
-  backdrop-filter: blur(6px);
-}
-.stat-header {
-  display: flex;
-  align-items: center;
   gap: 0.4rem;
-  margin-bottom: 0.4rem;
-}
-.stat-icon {
-  font-size: 1rem;
-}
-.stat-name {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  flex: 1;
-}
-.stat-value {
-  font-weight: 700;
-  font-size: 0.85rem;
-  font-family: 'Inter', sans-serif;
-}
-.stat-bar {
-  height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.stat-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  background: linear-gradient(90deg, #6366f1, #8b5cf6);
-}
-[data-stat='money'] .stat-fill {
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
-}
-[data-stat='skill'] .stat-fill {
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
-}
-[data-stat='happiness'] .stat-fill {
-  background: linear-gradient(90deg, #10b981, #34d399);
-}
-[data-stat='stress'] .stat-fill {
-  background: linear-gradient(90deg, #ef4444, #f87171);
-}
-[data-stat='health'] .stat-fill {
-  background: linear-gradient(90deg, #ec4899, #f472b6);
-}
-[data-stat='relationships'] .stat-fill {
-  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
-}
-
-/* STAT STATUS INDICATORS */
-.ngare-wrapper :deep(.stat-particle) {
-  position: absolute;
-  pointer-events: none;
-  z-index: 9999;
-  font-size: 1.5rem;
-  animation: particleFly 1s ease-out forwards;
-}
-@keyframes particleFly {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0);
-    opacity: 0;
-  }
-}
-
-/* Cảnh báo (Stress cao hoặc Health thấp) */
-.stat-item.stat-warning {
-  background: rgba(239, 68, 68, 0.15) !important;
-  border-color: rgba(239, 68, 68, 0.4) !important;
-  animation: pulseWarning 2s infinite;
-}
-@keyframes pulseWarning {
-  0% {
-    transform: scale(1);
-    background: rgba(239, 68, 68, 0.15);
-  }
-  50% {
-    transform: scale(1.02);
-    background: rgba(239, 68, 68, 0.25);
-  }
-  100% {
-    transform: scale(1);
-    background: rgba(239, 68, 68, 0.15);
-  }
-}
-
-/* Chúc mừng (Các chỉ số khác đạt 100) */
-.stat-item.stat-positive {
-  background: rgba(16, 185, 129, 0.15) !important;
-  border-color: rgba(16, 185, 129, 0.4) !important;
-  animation: pulsePositive 2s infinite;
-}
-@keyframes pulsePositive {
-  0% {
-    transform: scale(1);
-    background: rgba(16, 185, 129, 0.15);
-  }
-  50% {
-    transform: scale(1.02);
-    background: rgba(16, 185, 129, 0.25);
-  }
-  100% {
-    transform: scale(1);
-    background: rgba(16, 185, 129, 0.15);
-  }
-}
-
-/* EVENT */
-.event-area {
-  display: flex;
-  flex: 1;
-  padding: 0;
-}
-.event-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 2.5rem;
-  width: 100%;
-  backdrop-filter: blur(12px);
-  animation: cardEnter 0.5s ease;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  flex: 1;
-}
-.event-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--accent-gradient);
-}
-@keyframes cardEnter {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(15px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-.event-type {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  color: var(--accent-primary);
-  background: rgba(99, 102, 241, 0.12);
-  padding: 0.3rem 0.8rem;
-  border-radius: 999px;
-  margin-bottom: 1rem;
-}
-.event-title {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 0.8rem;
-  line-height: 1.3;
-}
-.event-desc {
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  line-height: 1.7;
-  margin-bottom: 1rem;
-}
-.event-choices {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-}
-.choice-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  background: var(--bg-glass);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 0.75rem 1.2rem;
-  color: var(--text-primary);
-  font-size: 0.95rem;
-  font-family: inherit;
-  cursor: pointer;
-  transition: var(--transition);
-  text-align: left;
-  line-height: 1.4;
-  width: 100%;
-}
-.choice-btn:hover {
-  border-color: var(--accent-primary);
-  background: rgba(99, 102, 241, 0.1);
-  transform: translateX(5px);
-}
-.choice-icon {
-  font-size: 1.3rem;
-  flex-shrink: 0;
-}
-.choice-text {
-  flex: 1;
-  font-weight: 500;
-}
-.choice-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  display: block;
-  margin-top: 0.2rem;
-  font-weight: 400;
-}
-
-/* TIMELINE */
-.timeline-list {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.timeline-entry {
-  position: relative;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0.8rem 0;
-  text-align: center;
-}
-.timeline-entry::before {
-  content: '';
-  position: absolute;
-  width: 1px;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  left: 50%;
-  top: 0;
-  z-index: 0;
-}
-.timeline-year {
-  font-size: 0.72rem;
-  color: #a5b4fc;
-  font-weight: 700;
-  margin-bottom: 0.1rem;
-  display: block;
-  opacity: 0.92;
-  position: relative;
-  z-index: 1;
-}
-.timeline-dot {
-  width: 4px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  margin: 4px 0;
-  position: relative;
-  z-index: 1;
-  transition: var(--transition);
-  border: 2px solid var(--bg-primary);
-  box-sizing: content-box;
-}
-.timeline-entry:hover .timeline-dot {
-  background: var(--accent-primary);
-  box-shadow: 0 0 8px var(--accent-primary);
-  transform: scale(1.5);
-}
-.timeline-content {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0 0.5rem;
-}
-.timeline-text {
-  font-size: 0.78rem;
-  color: #cbd5e1;
-  line-height: 1.45;
-  text-align: center;
-  width: 100%;
-}
-.timeline-panel {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.5rem 0 2.5rem 0;
-  scrollbar-width: thin;
-}
-.timeline-title {
-  width: 185px;
-  margin: 0 auto 3rem auto;
-  display: block;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 1.5rem;
-  text-align: center;
-}
-.title-icon {
-  display: block;
-  font-size: 1.5rem;
-  filter: grayscale(0.2);
-  opacity: 0.9;
-  margin-bottom: 0.4rem;
-  width: 100%;
-}
-.title-text {
-  display: block;
-  font-size: 0.65rem;
-  font-weight: 800;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 3px;
-  opacity: 0.8;
-  text-align: center;
-  width: 100%;
-}
-.timeline-panel::-webkit-scrollbar {
-  width: 3px;
-}
-.timeline-panel::-webkit-scrollbar-track {
-  background: transparent;
-}
-.timeline-panel::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 999px;
-}
-
-/* END SCREEN */
-.end-container {
-  padding: 2rem;
-  max-width: 700px;
-  width: 100%;
-  text-align: center;
-}
-.end-header {
-  margin-bottom: 2rem;
-}
-.end-icon {
-  font-size: 4rem;
-  display: block;
-  margin-bottom: 0.5rem;
-  animation: float 3s ease-in-out infinite;
-}
-.end-title {
-  font-family: 'Anybody', sans-serif;
-  font-size: 2.2rem;
-  font-weight: 800;
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 0.5rem;
-}
-.end-subtitle {
-  color: var(--text-secondary);
-  font-size: 1.1rem;
-  font-style: italic;
-}
-.end-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.8rem;
-  margin-bottom: 2rem;
-}
-.end-stat-card {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  backdrop-filter: blur(8px);
-}
-.es-icon {
-  font-size: 1.5rem;
-  display: block;
-  margin-bottom: 0.3rem;
-}
-.es-value {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 800;
-  display: block;
-}
-.es-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-.end-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
   flex-wrap: wrap;
 }
 
-/* MODAL — từ ngare.txt shop.css */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(8px);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  animation: fadeIn 0.3s ease;
-}
-.modal-content {
-  background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(31, 41, 55, 0.95));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  padding: 2rem;
-  position: relative;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  max-width: 500px;
-  width: 100%;
-}
-@keyframes modalSlideIn {
-  from {
-    opacity: 0;
-    transform: scale(0.9) translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-.modal-content h3 {
-  font-family: 'Inter', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 1.5rem;
-  text-align: center;
-  background: linear-gradient(135deg, #8b5cf6, #a78bfa);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.modal-btn {
-  display: block;
-  width: 100%;
-  padding: 0.75rem;
-  margin-bottom: 0.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.btn-icon {
+  width: 36px;
+  height: 36px;
   border-radius: 10px;
-  color: #fff;
-  font-size: 1rem;
-  font-family: 'Inter', sans-serif;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-.modal-btn:hover {
-  background: rgba(139, 92, 246, 0.2);
-  border-color: rgba(139, 92, 246, 0.5);
-  transform: translateX(5px);
-}
-.modal-close {
-  margin-top: 1rem;
-  color: rgba(255, 255, 255, 0.6);
-}
-.modal-close:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.5);
-  color: #fff;
-}
-.modal-large {
-  max-width: 700px;
-  width: 90%;
-  max-height: 85vh;
-  overflow-y: auto;
-}
-
-/* GALLERY CSS */
-.gallery-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  max-height: 480px;
-  overflow-y: auto;
-  padding-right: 0.5rem;
-}
-.gallery-grid::-webkit-scrollbar {
-  width: 5px;
-}
-.gallery-grid::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-}
-.gallery-item {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  transition: var(--transition);
-}
-.gallery-item:hover:not(.locked) {
-  transform: translateY(-2px);
-  border-color: rgba(99, 102, 241, 0.4);
-  background: rgba(99, 102, 241, 0.05);
-}
-.gallery-item.locked {
-  opacity: 0.4;
-  filter: grayscale(1);
-  border-style: dashed;
-}
-.gallery-icon {
-  font-size: 2.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 50px;
-  height: 50px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-}
-.gallery-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.gallery-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-.gallery-condition {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
-
-/* SHOP */
-.shop-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-}
-.shop-tab {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.6);
-  font-family: 'Inter', sans-serif;
-  font-size: 0.95rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
-}
-.shop-tab:hover {
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.05);
-}
-.shop-tab.active {
-  color: #fff;
-  border-bottom-color: var(--primary-color);
-  background: rgba(139, 92, 246, 0.1);
-}
-
-.shop-item {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  display: flex;
-  gap: 1rem;
-  transition: all 0.3s ease;
-}
-.shop-item:hover {
-  border-color: rgba(139, 92, 246, 0.5);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.2);
-}
-.shop-item-icon {
-  font-size: 2.5rem;
-  flex-shrink: 0;
-}
-.shop-item-info {
-  flex: 1;
-}
-.shop-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-.shop-item-name {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #fff;
-}
-.shop-item-price {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #fbbf24;
-}
-.shop-item-desc {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin-bottom: 0.75rem;
-  line-height: 1.4;
-}
-.shop-item-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-.btn-buy {
-  flex: 1;
-  padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-family: 'Inter', sans-serif;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-.btn-buy:hover:not(:disabled) {
-  transform: scale(1.05);
-  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
-}
-.btn-buy:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.inventory-item {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05));
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  border-radius: 12px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  display: flex;
-  gap: 1rem;
-}
-.inventory-item-owned {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05));
-  border-color: rgba(59, 130, 246, 0.3);
-}
-.skill-cooldown {
-  display: inline-block;
-  padding: 0.25rem 0.6rem;
-  background: rgba(239, 68, 68, 0.2);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: 20px;
-  font-size: 0.75rem;
-  color: #fca5a5;
-  margin-top: 0.5rem;
-}
-.skill-ready {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: rgba(34, 197, 94, 0.4);
-  color: #86efac;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-.empty-state-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-}
-.empty-state-text {
-  font-size: 1.1rem;
-}
-
-/* TOASTS */
-.toast-container {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-.toast {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 0.8rem 1.2rem;
-  font-size: 0.9rem;
-  backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  animation: toastIn 0.4s ease;
-  max-width: 350px;
-}
-.toast-positive {
-  border-left: 3px solid #10b981;
-}
-.toast-negative {
-  border-left: 3px solid #ef4444;
-}
-.toast-info {
-  border-left: 3px solid #3b82f6;
-}
-@keyframes toastIn {
-  from {
-    opacity: 0;
-    transform: translateX(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* STAT CHANGE POPUP */
-.stat-change-popup {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 500;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem 2rem;
-  backdrop-filter: blur(15px);
-  animation: popIn 0.4s ease;
-  text-align: center;
-  min-width: 280px;
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.stat-diff {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1.2rem;
-  font-weight: bold;
-}
-.stat-diff.positive {
-  color: #10b981;
-}
-.stat-diff.negative {
-  color: #ef4444;
-}
-
-@keyframes popIn {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -40%) scale(0.8);
-  }
-  20% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1.1);
-  }
-  40% {
-    transform: translate(-50%, -50%) scale(1);
-  }
-  80% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(-50%, -60%) scale(0.9);
-  }
-}
-
-/* ======================================
-   Xử lý Mobile (Consolidated)
-   Dùng mã lực tối đa !important để ghi đè các style cũ
-   ====================================== */
-@media (max-width: 768px) {
-  .hide-mobile {
-    display: none !important;
-  }
-  .show-mobile {
-    display: flex !important;
-  }
-
-  /* Căn chỉnh màn hình */
-  .screen.active {
-    align-items: flex-start !important;
-    padding-top: 1rem !important;
-  }
-  .create-container {
-    padding-top: 8rem !important;
-  } /* Tăng mạnh để tránh đè icon */
-  .intro-container {
-    padding-top: 3rem !important;
-  }
-
-  /* Header Game gọn nhẹ */
-  .game-layout {
-    padding: 0 0.75rem !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    overflow-x: hidden !important;
-  }
-  .game-main-split,
-  .game-left-column,
-  .event-card {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-  }
-  .game-header {
-    padding: 0.5rem 0 !important;
-    gap: 0.35rem !important;
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-  .header-left {
-    flex: 1 1 0 !important;
-    gap: 0.45rem !important;
-    min-width: 0 !important;
-    overflow: hidden !important;
-  }
-  .player-info {
-    flex: 1 !important;
-    min-width: 0 !important;
-  }
-  .header-center {
-    gap: 0.5rem !important;
-    flex-shrink: 0 !important;
-  }
-  .header-right {
-    gap: 0.3rem !important;
-    flex-shrink: 0 !important;
-  }
-  .player-name {
-    font-size: 0.94rem !important;
-  }
-  .player-career {
-    max-width: 100% !important;
-    font-size: 0.68rem !important;
-  }
-  .age-value,
-  .year-value {
-    font-size: 1rem !important;
-  }
-  .age-label,
-  .year-label {
-    font-size: 0.58rem !important;
-  }
-  .btn-icon {
-    width: 32px !important;
-    height: 32px !important;
-    font-size: 0.9rem !important;
-    padding: 0.2rem !important;
-  }
-
-  /* Chỉ số Stats: Chia lưới 2 cột và GIỮ TÊN CHỈ SỐ để người chơi dễ hiểu */
-  .stats-panel {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.45rem !important;
-    padding: 0.65rem 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    overflow-x: visible !important;
-  }
-  .stat-item {
-    width: 100% !important;
-    padding: 0.48rem 0.6rem !important;
-    flex: none !important;
-  }
-  .stat-name {
-    display: inline-block !important;
-    font-size: 0.7rem !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .stat-bar {
-    height: 4px !important;
-  }
-  .stat-value {
-    font-size: 0.85rem !important;
-  }
-  .stat-icon {
-    font-size: 0.95rem !important;
-  }
-  .stat-header {
-    margin-bottom: 0.25rem !important;
-    gap: 0.3rem !important;
-  }
-
-  /* CREATE SCREEN: QUAY LẠI LAYOUT DỌC */
-  .create-split-layout {
-    flex-direction: column !important;
-    gap: 0.5rem !important;
-  }
-  .career-selection-side,
-  .career-preview-side {
-    flex: none !important;
-    width: 100% !important;
-    position: static !important;
-  }
-  .career-preview.placeholder {
-    display: none !important;
-  }
-  .create-actions.inline-actions {
-    margin-top: 1rem !important;
-  }
-  .create-actions.inline-actions .btn-base {
-    font-size: 0.9rem !important;
-    padding: 0.8rem !important;
-  }
-
-  /* NGHỀ NGHIỆP: CHIA 2 CỘT !IMPORTANT */
-  .career-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.5rem !important;
-  }
-  .career-card {
-    padding: 0.8rem !important;
-  }
-  .career-emoji {
-    font-size: 1.5rem !important;
-  }
-  .career-label {
-    font-size: 0.8rem !important;
-  }
-  .career-preview {
-    margin: 1rem 0 !important;
-  }
-
-  /* TRANG GAME: QUAY LẠI LAYOUT DỌC */
-  .game-main-split {
-    flex-direction: column !important;
-    gap: 1rem !important;
-  }
-  .game-left-column,
-  .game-timeline-sidebar {
-    flex: none !important;
-    width: 100% !important;
-    position: static !important;
-  }
-  .game-timeline-sidebar {
-    border-top: 1px solid var(--border-subtle) !important;
-    padding: 1rem 0 !important;
-    background: transparent !important;
-    border: none !important;
-  }
-  .timeline-panel {
-    max-height: 300px !important;
-  }
-  .timeline-title {
-    display: block !important;
-    margin-bottom: 0.5rem !important;
-  }
-  /* Event & Lựa chọn */
-  .event-area {
-    padding: 0.5rem 0 !important;
-    min-height: unset !important;
-  }
-  .event-card {
-    padding: 1.2rem !important;
-    width: 100% !important;
-  }
-  .event-title {
-    font-size: 1.1rem !important;
-    margin-bottom: 0.4rem !important;
-  }
-  .event-desc {
-    font-size: 0.9rem !important;
-    line-height: 1.4 !important;
-  }
-  .choice-btn {
-    padding: 0.7rem !important;
-    gap: 0.7rem !important;
-    border-radius: 12px !important;
-  }
-  .choice-icon {
-    width: 30px !important;
-    height: 30px !important;
-    font-size: 1.1rem !important;
-  }
-  .choice-text {
-    font-size: 0.9rem !important;
-  }
-
-  /* Khác */
-  .intro-title {
-    font-size: 2.5rem !important;
-  }
-  .intro-features {
-    grid-template-columns: 1fr !important;
-    gap: 0.5rem !important;
-  }
-  .feature-tag {
-    min-width: unset !important;
-    width: 100% !important;
-    padding: 0.6rem 1rem !important;
-  }
-  .modal-content {
-    width: 95% !important;
-    padding: 1.2rem !important;
-  }
-  .shop-tabs {
-    flex-direction: row !important;
-    overflow-x: auto;
-    gap: 0.5rem;
-  } /* Vẫn giữ tab nằm ngang mobile */
-}
-
-.choice-kbd {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  background: var(--bg-elevated);
   border: 1px solid var(--outline);
-  color: var(--text-dim);
-  font-size: 0.76rem;
-  font-weight: 700;
-  font-family: monospace;
+  background: var(--bg-sidebar);
+  color: var(--text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 1rem;
 }
 
-.recap-highlights {
+.btn-icon:hover {
+  border-color: var(--primary);
+}
+
+.game-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 0.95rem;
+  align-items: start;
+}
+
+.game-layout.collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.game-main-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.event-card {
+  background: var(--bg-card);
+  border: 1px solid var(--outline-strong);
+  border-radius: 20px;
+  padding: 0.95rem 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  max-width: 100%;
+}
+
+.event-badges {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.55rem;
-  margin-bottom: 1.25rem;
+  gap: 0.45rem;
 }
 
-.recap-chip {
-  padding: 0.42rem 0.85rem;
-  border-radius: 999px;
+.event-type {
+  padding: 0.22rem 0.65rem;
+  border-radius: 99px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.arc-badge {
+  padding: 0.22rem 0.65rem;
+  border-radius: 99px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.event-title {
+  font-size: 1.18rem;
+  font-weight: 800;
+}
+
+.event-desc {
+  font-size: 0.92rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.event-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.event-choices.is-multi {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.48rem;
+}
+
+.event-choices.is-multi.is-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.choice-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.62rem 0.8rem;
+  min-width: 0;
+  border-radius: 14px;
+  background: var(--bg-sidebar);
+  border: 1px solid var(--outline);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.event-choices.is-multi.is-three .choice-btn {
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem 0.72rem;
+}
+
+.choice-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.choice-btn:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.choice-kbd {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
   background: var(--bg-card);
   border: 1px solid var(--outline);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.choice-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.choice-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.choice-text strong {
+  font-size: 0.9rem;
+}
+
+.event-choices.is-multi.is-three .choice-text strong {
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.choice-hint {
+  font-size: 0.76rem;
   color: var(--text-dim);
-  font-size: 0.84rem;
 }
 
-.recap-chip strong {
+/* TIMELINE */
+.timeline-card {
+  background: var(--bg-card);
+  border: 1px solid var(--outline);
+  border-radius: 18px;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: clamp(460px, calc(100dvh - 108px), 620px);
+}
+
+.timeline-card h3 {
+  font-size: 0.94rem;
+  font-weight: 800;
+}
+
+.timeline-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-right: 0.2rem;
+}
+
+.timeline-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  padding: 0.45rem 0.6rem;
+  border-radius: 10px;
+  background: var(--bg-sidebar);
+  font-size: 0.78rem;
+}
+
+.timeline-row.ms-promo {
+  border-left: 3px solid var(--primary);
+}
+
+.timeline-row.ms-ach {
+  border-left: 3px solid var(--warning);
+}
+
+.timeline-row.ms-shield {
+  border-left: 3px solid var(--success);
+}
+
+.tl-age {
+  font-weight: 800;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.tl-text {
   color: var(--text);
+  line-height: 1.4;
 }
 
-.recap-chip.best {
-  border-color: var(--primary);
+/* MENU & PREVIEW MODALS */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  background: rgba(4, 9, 20, 0.72);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.menu-modal {
+  width: 100%;
+  max-width: 390px;
+  max-height: 86dvh;
+  overflow-y: auto;
+  background: var(--bg-modal);
+  border: 1px solid var(--outline-strong);
+  border-radius: 20px;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.menu-modal h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin-bottom: 0.2rem;
+}
+
+.preview-title {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 0.92rem;
+}
+
+.preview-desc {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* TOASTS */
+.toast-stack {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1rem;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-width: min(360px, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.toast-item {
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  background: var(--bg-modal);
+  border: 1px solid var(--outline-strong);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+}
+
+.toast-item.positive {
+  border-color: var(--success);
+}
+
+.toast-item.negative {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+@media (max-width: 960px) {
+  .event-choices.is-multi.is-three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .create-grid,
+  .game-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .timeline-card {
+    max-height: 300px;
+  }
+}
+
+@media (max-width: 680px) {
+  .event-choices.is-multi {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .career-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hide-mobile {
+    display: none;
+  }
+
+  .game-container {
+    padding: 0.65rem 0.65rem 4.2rem;
+  }
 }
 </style>

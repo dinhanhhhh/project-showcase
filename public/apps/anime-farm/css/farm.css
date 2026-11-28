@@ -875,17 +875,32 @@
   100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2); }
 }
 
-/* Hiệu ứng mưa nhẹ khi thời tiết Mưa Rào */
+/* Hiệu ứng mưa rào tự nhiên kết hợp lớp canvas 60fps */
 body.weather-rain .bg-vignette-overlay {
   background:
-    repeating-linear-gradient(
-      108deg,
-      transparent 0px,
-      transparent 28px,
-      rgba(125, 211, 252, 0.16) 29px,
-      rgba(125, 211, 252, 0.16) 30px
-    ),
-    radial-gradient(circle at 50% 50%, rgba(14, 116, 144, 0.12) 0%, rgba(15, 23, 42, 0.32) 100%);
+    linear-gradient(180deg, rgba(15, 23, 42, 0.28) 0%, rgba(14, 116, 144, 0.1) 48%, rgba(15, 23, 42, 0.26) 100%),
+    radial-gradient(circle at 50% 45%, rgba(186, 230, 253, 0.06) 0%, rgba(15, 23, 42, 0.24) 100%);
+}
+
+.weather-rain-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 28;
+  opacity: 0;
+  transition: opacity 0.65s ease;
+}
+
+body.weather-rain .weather-rain-canvas {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-rain-canvas {
+    display: none !important;
+  }
 }
 
 body.weather-rainbow .bg-vignette-overlay {

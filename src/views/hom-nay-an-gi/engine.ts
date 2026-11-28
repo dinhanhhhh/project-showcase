@@ -11,6 +11,16 @@ export interface FoodAdvancedFilterOptions {
   mealTime: MealTimeFilter
   priceTier: PriceTierFilter
   favoriteIds: readonly string[]
+  searchQuery?: string
+}
+
+function normalizeSearchText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
 }
 
 export function filterFoods(
@@ -50,6 +60,11 @@ export function filterFoodsAdvanced(
       if (item.priceTier) return item.priceTier === options.priceTier
       return Boolean(item.isCustom)
     })
+  }
+
+  if (options.searchQuery && options.searchQuery.trim().length > 0) {
+    const q = normalizeSearchText(options.searchQuery)
+    pool = pool.filter((item) => normalizeSearchText(item.name).includes(q))
   }
 
   return pool
@@ -180,4 +195,24 @@ export function generateDailyMealPlan(
     toi: pickFor('toi'),
     anVat: pickFor('an-vat'),
   }
+}
+
+export function formatDailyMealPlanText(plan: DailyMealPlan): string {
+  const slots: Array<{ label: string; food: FoodItem | null }> = [
+    { label: '🌅 Sáng', food: plan.sang },
+    { label: '☀️ Trưa', food: plan.trua },
+    { label: '🌙 Tối', food: plan.toi },
+    { label: '🧋 Ăn vặt', food: plan.anVat },
+  ]
+  const filled = slots.filter((slot) => slot.food !== null)
+  if (filled.length === 0) return ''
+
+  const lines = slots.map((slot) => {
+    const food = slot.food
+    if (!food) return `- ${slot.label}: (Chưa chọn)`
+    const price = food.priceLabel ? ` (${food.priceLabel})` : ''
+    return `- ${slot.label}: ${food.emoji} ${food.name}${price}`
+  })
+
+  return ['🍽️ Thực đơn Hôm Nay Ăn Gì:', ...lines].join('\n')
 }

@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useHomNayAnGiStore } from '@/stores/homNayAnGi'
+import { copyTextWithFallback } from '@/utils/clipboard'
+import FoodAddForm from './components/FoodAddForm.vue'
 import { useFoodAudio } from './composables/useFoodAudio'
 import {
   FOOD_CATEGORY_LABELS,
@@ -11,6 +13,7 @@ import {
 } from './data'
 import {
   filterFoodsAdvanced,
+  formatDailyMealPlanText,
   generateDailyMealPlan,
   getSpinDelays,
   pickRandomFood,
@@ -33,10 +36,12 @@ const { playTick, playReveal, cleanup: cleanupAudio } = useFoodAudio()
 const activeFilter = ref<FoodFilter>('all')
 const activeMealTime = ref<MealTimeFilter>('all')
 const activePriceTier = ref<PriceTierFilter>('all')
+const searchQuery = ref('')
 const currentFood = ref<FoodItem | null>(null)
 const isRolling = ref(false)
 const brokenImageIds = ref<Record<string, boolean>>({})
 const dailyPlan = ref<DailyMealPlan | null>(null)
+const copiedDailyPlan = ref(false)
 
 const newName = ref('')
 const newImage = ref('')
@@ -50,6 +55,7 @@ const formSuccess = ref('')
 
 let rollTimer: ReturnType<typeof setTimeout> | null = null
 let successTimer: ReturnType<typeof setTimeout> | null = null
+let copyPlanTimer: ReturnType<typeof setTimeout> | null = null
 
 const FILTER_ORDER: FoodFilter[] = ['all', 'nuoc', 'kho', 'an-vat', 'favorite', 'custom']
 const MEAL_TIME_ORDER: MealTimeFilter[] = ['all', 'sang', 'trua', 'toi', 'an-vat']
@@ -86,6 +92,7 @@ const filteredFoods = computed<FoodItem[]>(() =>
     mealTime: activeMealTime.value,
     priceTier: activePriceTier.value,
     favoriteIds: store.favoriteIds,
+    searchQuery: searchQuery.value,
   }),
 )
 
@@ -128,6 +135,7 @@ function resetAllFilters() {
   activeFilter.value = 'all'
   activeMealTime.value = 'all'
   activePriceTier.value = 'all'
+  searchQuery.value = ''
   syncSpotlightToPool()
 }
 
@@ -261,6 +269,19 @@ function selectPlanDish(food: FoodItem | null) {
   pickFromMenu(food)
 }
 
+async function copyDailyPlan() {
+  if (!dailyPlan.value) return
+  const text = formatDailyMealPlanText(dailyPlan.value)
+  if (!text) return
+  const copied = await copyTextWithFallback(text)
+  if (!copied) return
+  copiedDailyPlan.value = true
+  if (copyPlanTimer) clearTimeout(copyPlanTimer)
+  copyPlanTimer = setTimeout(() => {
+    copiedDailyPlan.value = false
+  }, 2000)
+}
+
 onMounted(() => {
   currentFood.value = pickRandomFood(allFoods.value)
 })
@@ -268,6 +289,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (rollTimer) clearTimeout(rollTimer)
   if (successTimer) clearTimeout(successTimer)
+  if (copyPlanTimer) clearTimeout(copyPlanTimer)
   cleanupAudio()
 })
 </script>
@@ -479,13 +501,22 @@ onUnmounted(() => {
           >
             <div class="history-head">
               <h3>📅 Thực đơn gợi ý cả ngày</h3>
-              <button
-                type="button"
-                class="link-btn"
-                @click="buildDailyPlan"
-              >
-                🔄 Đổi thực đơn
-              </button>
+              <div class="plan-head-actions">
+                <button
+                  type="button"
+                  class="link-btn copy-plan-btn"
+                  @click="copyDailyPlan"
+                >
+                  {{ copiedDailyPlan ? '✅ Đã chép' : '📋 Chép thực đơn' }}
+                </button>
+                <button
+                  type="button"
+                  class="link-btn"
+                  @click="buildDailyPlan"
+                >
+                  🔄 Đổi thực đơn
+                </button>
+              </div>
             </div>
             <div class="daily-plan-grid">
               <button
@@ -540,100 +571,41 @@ onUnmounted(() => {
         </section>
 
         <aside class="side-panel">
-          <form
-            class="add-form"
-            @submit.prevent="handleAddFood"
-          >
-            <h2>✨ Thêm món của riêng bạn</h2>
-
-            <label class="field">
-              <span>Tên món ăn *</span>
-              <input
-                v-model="newName"
-                type="text"
-                placeholder="Ví dụ: Cơm gà xối mỡ, Mì cay..."
-                maxlength="60"
-              >
-            </label>
-
-            <label class="field">
-              <span>Link ảnh (tùy chọn)</span>
-              <input
-                v-model="newImage"
-                type="url"
-                placeholder="https://..."
-              >
-            </label>
-
-            <div class="form-row">
-              <label class="field">
-                <span>Phân loại</span>
-                <select v-model="newCategory">
-                  <option value="nuoc">Món nước</option>
-                  <option value="kho">Món khô</option>
-                  <option value="an-vat">Ăn vặt</option>
-                  <option value="custom">Món của tôi</option>
-                </select>
-              </label>
-
-              <label class="field">
-                <span>Biểu tượng</span>
-                <select v-model="newEmoji">
-                  <option
-                    v-for="em in EMOJI_OPTIONS"
-                    :key="em"
-                    :value="em"
-                  >
-                    {{ em }}
-                  </option>
-                </select>
-              </label>
-            </div>
-
-            <div class="form-row">
-              <label class="field">
-                <span>Buổi phù hợp</span>
-                <select v-model="newMealTime">
-                  <option value="sang">Sáng</option>
-                  <option value="trua">Trưa</option>
-                  <option value="toi">Tối</option>
-                  <option value="an-vat">Ăn vặt</option>
-                </select>
-              </label>
-
-              <label class="field">
-                <span>Mức giá</span>
-                <select v-model="newPriceTier">
-                  <option value="tiet-kiem">Dưới 40k</option>
-                  <option value="vua-tui">40k – 80k</option>
-                  <option value="sang-chanh">Trên 80k</option>
-                </select>
-              </label>
-            </div>
-
-            <p
-              v-if="formError"
-              class="msg-error"
-            >
-              {{ formError }}
-            </p>
-            <p
-              v-if="formSuccess"
-              class="msg-success"
-            >
-              {{ formSuccess }}
-            </p>
-
-            <button
-              type="submit"
-              class="submit-btn"
-            >
-              + Thêm vào thực đơn
-            </button>
-          </form>
+          <FoodAddForm
+            v-model:name="newName"
+            v-model:image="newImage"
+            v-model:category="newCategory"
+            v-model:emoji="newEmoji"
+            v-model:meal-time="newMealTime"
+            v-model:price-tier="newPriceTier"
+            :emoji-options="EMOJI_OPTIONS"
+            :form-error="formError"
+            :form-success="formSuccess"
+            @submit="handleAddFood"
+          />
 
           <div class="menu-panel">
             <h3>Danh sách món ({{ filteredFoods.length }})</h3>
+            <div class="menu-search-box">
+              <span class="menu-search-icon">🔍</span>
+              <input
+                v-model="searchQuery"
+                type="search"
+                class="menu-search-input"
+                placeholder="Tìm món theo tên (vd: phở, cơm tấm)..."
+                aria-label="Tìm món ăn theo tên"
+              >
+              <button
+                v-if="searchQuery"
+                type="button"
+                class="menu-search-clear"
+                title="Xóa tìm kiếm"
+                aria-label="Xóa từ khóa tìm món"
+                @click="searchQuery = ''"
+              >
+                ✕
+              </button>
+            </div>
             <div class="menu-list">
               <div
                 v-for="food in filteredFoods"
@@ -1196,78 +1168,10 @@ onUnmounted(() => {
   gap: 1rem;
 }
 
-.add-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.add-form h2,
 .menu-panel h3 {
   font-family: 'Manrope', sans-serif;
   font-size: 1.05rem;
   font-weight: 800;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.field span {
-  font-size: 0.8rem;
-  color: var(--text-dim);
-  font-weight: 600;
-}
-
-.field input,
-.field select {
-  width: 100%;
-  padding: 0.65rem 0.8rem;
-  border-radius: 12px;
-  background: var(--bg-sidebar);
-  border: 1px solid var(--outline);
-  color: var(--text);
-  font-size: 0.9rem;
-  outline: none;
-}
-
-.field input:focus,
-.field select:focus {
-  border-color: var(--primary);
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.65rem;
-}
-
-.msg-error {
-  color: var(--danger);
-  font-size: 0.82rem;
-}
-
-.msg-success {
-  color: var(--property-group-a);
-  font-size: 0.82rem;
-}
-
-.submit-btn {
-  padding: 0.78rem;
-  border-radius: 12px;
-  background: var(--bg-sidebar);
-  border: 1px solid var(--primary);
-  color: var(--primary);
-  font-weight: 700;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.submit-btn:hover {
-  background: var(--primary);
-  color: var(--text-inverse);
 }
 
 .menu-panel {
@@ -1427,6 +1331,59 @@ onUnmounted(() => {
 .plan-slot-price {
   font-size: 0.74rem;
   color: var(--text-dim);
+}
+
+.plan-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.copy-plan-btn {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.menu-search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--outline);
+}
+
+.menu-search-box:focus-within {
+  border-color: var(--primary);
+}
+
+.menu-search-icon {
+  font-size: 0.85rem;
+}
+
+.menu-search-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.menu-search-clear {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0.1rem 0.25rem;
+}
+
+.menu-search-clear:hover {
+  color: var(--danger);
 }
 
 @media (max-width: 820px) {

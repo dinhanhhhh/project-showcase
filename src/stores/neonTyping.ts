@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { getDailyDateKey, upsertDailyBest } from '@/utils/daily-seed'
 import { calculateTypingRank } from '@/views/neon-typing/engine'
 import type { TypingRunRecord, WordPackId } from '@/views/neon-typing/types'
 
@@ -9,6 +10,7 @@ interface NeonTypingState {
   soundEnabled: boolean
   preferredPack: WordPackId
   history: TypingRunRecord[]
+  dailyBestByDate: Record<string, number>
 }
 
 export const useNeonTypingStore = defineStore('neon-typing', {
@@ -19,6 +21,7 @@ export const useNeonTypingStore = defineStore('neon-typing', {
     soundEnabled: true,
     preferredPack: 'dev',
     history: [],
+    dailyBestByDate: {},
   }),
 
   actions: {
@@ -34,6 +37,34 @@ export const useNeonTypingStore = defineStore('neon-typing', {
           accuracy,
           rank: calculateTypingRank(wpm, accuracy),
           mode: 'timed' as const,
+          pack: pack ?? this.preferredPack,
+          timestamp: new Date().toLocaleTimeString('vi-VN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        },
+        ...(this.history ?? []),
+      ].slice(0, 10)
+    },
+
+    recordDailyResult(
+      wpm: number,
+      accuracy = 100,
+      pack?: WordPackId,
+      dateKey: string = getDailyDateKey(),
+    ) {
+      this.totalGamesPlayed += 1
+      if (wpm > this.bestWpm) {
+        this.bestWpm = wpm
+      }
+      this.dailyBestByDate = upsertDailyBest(this.dailyBestByDate, dateKey, wpm)
+      this.history = [
+        {
+          id: `daily-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          wpm,
+          accuracy,
+          rank: calculateTypingRank(wpm, accuracy),
+          mode: 'daily_seed' as const,
           pack: pack ?? this.preferredPack,
           timestamp: new Date().toLocaleTimeString('vi-VN', {
             hour: '2-digit',
@@ -97,6 +128,7 @@ export const useNeonTypingStore = defineStore('neon-typing', {
       'soundEnabled',
       'preferredPack',
       'history',
+      'dailyBestByDate',
     ],
   },
 })

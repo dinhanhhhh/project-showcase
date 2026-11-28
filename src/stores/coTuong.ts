@@ -53,15 +53,19 @@ export const useCoTuongStore = defineStore('co-tuong', {
     },
 
     markPuzzleSolved(puzzleId: string) {
-      if (!this.solvedPuzzleIds.includes(puzzleId)) {
-        this.solvedPuzzleIds = [...this.solvedPuzzleIds, puzzleId]
+      const solved = Array.isArray(this.solvedPuzzleIds) ? this.solvedPuzzleIds : []
+      if (!solved.includes(puzzleId)) {
+        this.solvedPuzzleIds = [...solved, puzzleId]
       }
     },
 
     recordResult(outcome: 'win' | 'loss' | 'draw') {
-      if (outcome === 'win') this.stats.wins += 1
-      else if (outcome === 'loss') this.stats.losses += 1
-      else this.stats.draws += 1
+      if (!this.stats || typeof this.stats !== 'object') {
+        this.stats = { wins: 0, losses: 0, draws: 0 }
+      }
+      if (outcome === 'win') this.stats.wins = (this.stats.wins ?? 0) + 1
+      else if (outcome === 'loss') this.stats.losses = (this.stats.losses ?? 0) + 1
+      else this.stats.draws = (this.stats.draws ?? 0) + 1
     },
 
     toggleSound() {

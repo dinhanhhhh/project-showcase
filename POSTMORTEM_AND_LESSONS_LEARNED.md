@@ -230,3 +230,264 @@ Tài liệu ghi nhận các lỗi đã phát hiện, nguyên nhân gốc rễ v�
 - **Giải pháp & Quy tắc phòng ngừa:**
   - Giữ nguyên bố cục gốc (`chess-header`, `status-banner`, `eval-widget`, `captured-strip`), chỉ thu gọn kích thước bàn cờ từ `548px` xuống `max-width: 420px` (cùng `.chess-shell` `max-width: 980px` và padding/gap vừa phải) để vừa vặn khung màn hình mà không làm thay đổi thiết kế quen thuộc.
   - Trong `XiangqiBoard.vue`, dùng `container-type: inline-size`, đệm khung gỗ `8px clamp(18px, 6.5cqi, 30px)`, khóa quân cờ & vòng highlight bằng `aspect-ratio: 1`, căn tâm dãy số `1–9` theo tọa độ `0%..100%` để quân biên luôn nằm gọn trong khung gỗ.
+
+---
+
+## 17. Sửa chuỗi 6 lỗi logic gốc & đồng bộ Pinia trong `Ngã Rẽ Cuộc Đời` (`ngare`)
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:**
+  1. Chỉ số tiền (`money`) bị `Math.min(100, ...)` kẹp trần về `100` mỗi khi chọn lựa chọn có `effects.money` hoặc dùng vật phẩm tài chính.
+  2. Thành tựu `survivor` mở khóa sai ngay từ đầu game tuổi 22 vì chỉ kiểm tra `health >= 50`; thành tựu `zen_master` kích hoạt ngay năm đầu thay vì đòi hỏi 5 năm `stress <= 10` liên tiếp.
+  3. Kỹ năng `skill_shield` gán `duration: 255` và được `_isEventImmune` kiểm tra nhưng không hề trừ đi sau khi chặn sự kiện nguy hiểm (gây bất tử suốt game).
+  4. Mua vật phẩm/kỹ năng trong UI gọi thẳng `ngareStore.engine.buyItem/buySkill` mà không đồng bộ lại `ngareStore.gameState`, làm UI/Pinia có thể lệch state hoặc mất khi reload nếu chưa qua lượt mới; `usedEvents` không nằm trong state Pinia nên bị reset về rỗng mỗi khi F5; `ngare_endings` còn ghi trực tiếp vào `localStorage` ngoài Pinia.
+  5. Hàm `calculateEnding()` bị viết trùng giữa `engine.ts` và `index.vue`.
+- **Nguyên nhân gốc rễ:** Kẹp chung `money` với 5 chỉ số `[0, 100]`, thiếu tracker trạng thái quá khứ (`hadCriticalHealth`, `lowStressStreak`), thiếu helper `_syncFromEngine()` sau mọi action cửa hàng/kỹ năng trên store, và gom toàn bộ UI/logic 3.245 dòng trong một file `index.vue` tự định nghĩa biến màu tối cứng thay vì dùng CSS Variables của nền tảng.
+- **Giải pháp & Quy tắc phòng ngừa:**
+  - Tách helper `clampStatValue(key, val)`: chỉ kẹp `[0, 100]` với 5 chỉ số tâm sinh lý, giữ `money >= 0` không giới hạn trần.
+  - Theo dõi `hadCriticalHealth` & `lowStressStreak` trong `GameState`, tiêu thụ đúng 1 buff `immunity_danger` khi `skill_shield` đỡ biến cố nguy hiểm (`_consumeDangerShield`), lưu `usedEventIds`, `unlockedEndings`, `hallOfFame`, `soundEnabled` qua `useNgareStore` với `_syncFromEngine()`.
+  - Tái cấu trúc `ngare` thành 6 component con theo chuẩn `AGENTS.md` và chuyển toàn bộ màu sang CSS Variables (`--bg`, `--bg-card`, `--text`, `--primary`,...) tương thích 100% cả 4 theme.
+
+---
+
+## 18. Thiếu `rewardCoins` khi lên cấp trong `anime-farm` & sót tiền tố backup `FAM_FARM_` / `FAM_ORDERS_`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:**
+  1. Trong `public/apps/anime-farm/js/bundle.js`, mỗi lần người chơi lên cấp (`addExp()`), vàng thưởng lên cấp không được cộng vào `this.coins` và modal lên cấp bị rỗng phần thưởng.
+  2. Công cụ sao lưu JSON (`src/utils/backup.ts`) khai báo tiền tố `'anime_farm_'` nhưng `anime-farm` thực tế lưu dưới khóa `'FAM_FARM_GAME_SAVE_V6_3PLOTS'` và `'FAM_ORDERS_SAVE_V4'`, làm sao lưu bị bỏ qua dữ liệu nông trại.
+- **Nguyên nhân gốc rễ:**
+  1. Hàm `getLevelInfo(totalExp)` trả về thiếu trường `rewardCoins: currentLevel.rewardCoins`, khiến `cur.rewardCoins` trong `addExp()` luôn là `undefined`; ngoài ra `addExp()` không cộng dồn phần thưởng nếu người chơi vượt 2 cấp trở lên trong một đơn hàng lớn.
+  2. Whitelist `ALLOWED_STORAGE_PREFIXES` trong `src/utils/backup.ts` đặt theo slug thay vì tiền tố khóa `localStorage` thực tế của embed app.
+- **Giải pháp & Quy tắc phòng ngừa:**
+  - Trả về `rewardCoins` trong `getLevelInfo`, cộng dồn thưởng từ `prev + 1` đến `cur.level` trong `addExp()`, và khóa hành vi bằng `tests/anime-farm-engine.spec.ts`.
+  - Bổ sung `'FAM_FARM_'` và `'FAM_ORDERS_'` vào `ALLOWED_STORAGE_PREFIXES` cùng test xác nhận trong `tests/backup-and-launcher.spec.ts`.
+
+---
+
+## 19. Lỗi thẻ `REPAIR_HOUSES` không tính phí bảo trì nhà/khách sạn trong `saigon-tycoon` & sót khóa backup `monopoly_`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:**
+  1. Trong `public/apps/saigon-tycoon/shared/engine.js`, khi người chơi rút thẻ Cơ Hội *"Tu Sửa Nhà Cửa"* (`REPAIR_HOUSES`), hệ thống luôn tính `totalCost = 0đ` dù người chơi đang sở hữu nhiều nhà xanh và khách sạn đỏ.
+  2. Dữ liệu bàn cờ, thành tựu (`monopoly_saigon_achievements`), và ván chơi (`monopoly_saigon_save`) chưa nằm trong whitelist backup JSON (`src/utils/backup.ts`).
+- **Nguyên nhân gốc rễ:**
+  1. Hàm `executeCard` (dòng 216) kiểm tra nhầm `if (prop.ownerId === player.id)` trong khi mọi entry của `state.properties` đều lưu khóa chủ sở hữu là `prop.owner`.
+  2. Các module của `saigon-tycoon` dùng tiền tố `monopoly_` thay vì `saigon_tycoon_`.
+- **Giải pháp & Quy tắc phòng ngừa:**
+  - Sửa thành `if (prop.owner === player.id)` và rà soát toàn bộ `public/apps/saigon-tycoon/` để đảm bảo không còn lỗi gõ nhầm `ownerId`.
+  - Bổ sung test hồi quy `REPAIR_HOUSES` cùng 6 nhóm kiểm thử (`BotAI`, Đấu giá, Thế chấp/Chuộc, Giao dịch, Phá sản/Tối đa vòng) vào `tests/saigon-tycoon-engine.spec.ts`, và thêm `'monopoly_'` vào `ALLOWED_STORAGE_PREFIXES`.
+
+---
+
+## 20. Rò rỉ `requestAnimationFrame` chưa hủy trong `oop-flashcards` & trùng lặp fallback Clipboard
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:**
+  1. Trong `src/views/oop-flashcards/index.vue`, `triggerShake()` gọi `requestAnimationFrame(...)` mà không lưu ID để gọi `cancelAnimationFrame` trong `onUnmounted`, dễ kích hoạt callback đổi reactive ref sau khi rời trang.
+  2. Ba view (`oracle-tarot`, `co-tuong`, `oop-flashcards`) tự cài đặt hoặc thiếu `<textarea>` fallback cho `navigator.clipboard.writeText`.
+- **Nguyên nhân gốc rễ:** Thiếu biến theo dõi `shakeRafId` và thiếu helper dùng chung trong `src/utils/`.
+- **Giải pháp & Quy tắc phòng ngừa:**
+  - Lưu `shakeRafId`, hủy ở cả lần gọi kế tiếp và trong `onUnmounted`.
+  - Gom logic Clipboard + `Promise.race` + timeout cleanup + `<textarea>` fallback về `src/utils/clipboard.ts` (`copyTextWithFallback`) để tái sử dụng thống nhất.
+
+---
+
+## 21. Rò rỉ `requestAnimationFrame` trong `neon-typing` & chuẩn hóa `copyTargetCode` của `color-game`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Trong `src/views/neon-typing/index.vue`, `triggerInputShake()` gọi `requestAnimationFrame` không hủy trong `onUnmounted`; trong `src/views/color-game/index.vue`, `copyTargetCode()` chưa dùng `copyTextWithFallback`.
+- **Nguyên nhân gốc rễ:** Thiếu biến `shakeRafId` và còn giữ lời gọi `navigator.clipboard.writeText` riêng lẻ.
+- **Giải pháp & Quy tắc phòng ngừa:** Lưu `shakeRafId` và hủy qua `cancelAnimationFrame` trong `onUnmounted`; chuyển `color-game` sang dùng chung `copyTextWithFallback`.
+
+---
+
+## 22. Thiếu tương phản viền/track trắng trên giao diện sáng `Arctic Light` ở `color-game` & `ChessHistoryPanel`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:**
+  1. Trong `src/views/color-game/index.vue`, `.ch-track` (`rgba(255, 255, 255, 0.08)`), `.color-tile` (`rgba(255, 255, 255, 0.14)`), và `.color-tile.winner` (`#ffffff` / halo trắng) bị mờ hoặc chìm hẳn trên nền card trắng của `Arctic Light`.
+  2. Trong `ChessHistoryPanel.vue`, `.move-side.red` dùng mã màu cứng `#f87171` kém tương phản trên nền sáng.
+- **Nguyên nhân gốc rễ:** Còn sót giá trị `rgba(255, 255, 255, ...)` và hex sáng cố định từ bản Dark theme đầu tiên thay vì map vào CSS Variables nền tảng.
+- **Giải pháp & Quy tắc phòng ngừa:** Thay bằng `var(--bg-elevated)`, `var(--outline)`, `var(--primary)`, `var(--success)`, `var(--primary-glow)` và `var(--danger)`; khóa hồi quy chuyển đổi 4 theme trong `tests/resilience-and-a11y.spec.ts`.
+
+---
+
+## 23. Thuộc tính `slot.card.numeral` không tồn tại khi xuất lời giải `oracle-tarot`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Hàm `formatReadingShareText` tại `src/views/oracle-tarot/engine.ts` chèn `${slot.card.numeral}`, khiến chuỗi sao chép in ra `undefined · Tên lá bài` thay vì số La Mã (`0`–`XXI`).
+- **Nguyên nhân gốc rễ:** Model `OracleCard` trong `data.ts` định nghĩa trường `roman`, nhưng hàm format trước đây viết nhầm tên trường `numeral` và test chỉ assert `text` chứa `card.name`.
+- **Giải pháp & Quy tắc phòng ngừa:** Sửa sang `${slot.card.roman}` và bổ sung assertion kiểm tra `${spread[0].card.roman} · ${spread[0].card.name}` đồng thời cấm chuỗi `undefined ·` trong `tests/oracle-tarot-engine.spec.ts`.
+
+---
+
+## 24. Thiếu chặn số lượng âm/không nguyên ở `buySeeds` / `sellCrop` (`anime-farm`) & thiếu cộng `jackpotPot` khi hết lượt tù (`saigon-tycoon`)
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:**
+  1. Trong `public/apps/anime-farm/js/bundle.js`, `buySeeds(cropId, -5)` hoặc `sellCrop(cropId, -5)` vượt qua kiểm tra `available < quantity` và cộng tiền/nông sản âm dấu sai logic.
+  2. Trong `public/apps/saigon-tycoon/shared/engine.js`, nhánh `JAIL_FORCED_PAY` trừ tiền phạt tù `500K` của người chơi nhưng quên cộng vào `this.state.jackpotPot` như nhánh `PAY_JAIL_FINE`.
+- **Nguyên nhân gốc rễ:** Thiếu guard `!Number.isInteger(quantity) || quantity <= 0` ở API giao dịch nông trại và quên đồng bộ dòng tiền vào hũ phạt chung giữa 2 đường ra tù.
+- **Giải pháp & Quy tắc phòng ngừa:** Bổ sung kiểm tra `INVALID_QUANTITY` cho cả `buySeeds`/`sellCrop`, cộng `GAME_CONSTANTS.JAIL_FINE` vào `jackpotPot` tại `JAIL_FORCED_PAY`, và khóa hồi quy trong `tests/anime-farm-engine.spec.ts` + `tests/saigon-tycoon-engine.spec.ts`.
+
+---
+
+## 25. Trùng ID sự kiện `med_promote` giữa ngành `media` và `medical` trong `ngare`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Khi kiểm toán đồ thị toàn bộ sự kiện tại `tests/ngare-engine.spec.ts`, hai sự kiện thuộc 2 ngành khác nhau (`Head of Marketing` ở `media` và `Trưởng khoa` ở `medical`) cùng dùng `id: 'med_promote'`, có thể đè `seenEvents` khi người chơi chuyển ngành sau tuổi 28.
+- **Nguyên nhân gốc rễ:** Dùng chung tiền tố viết tắt `med_` cho cả hai mảng `media` và `medical` trong `src/views/ngare/data/events-career.ts`.
+- **Giải pháp & Quy tắc phòng ngừa:** Đổi ID của sự kiện ngành `media` sang `'media_promote'` và khóa kiểm tra unique ID toàn đồ thị sự kiện trong `tests/ngare-engine.spec.ts`.
+
+---
+
+## 26. Số tổng thẻ OOP hiển thị cứng `/27` trên `DailyHubCard` sau khi mở rộng bộ thẻ lên 32
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Thẻ tóm tắt *Thẻ OOP thuộc* trong `src/views/home/DailyHubCard.vue` vẫn hiển thị `.../27` thay vì `.../32` sau Sprint 9 mở rộng `OOP_FLASHCARDS`.
+- **Nguyên nhân gốc rễ:** Hardcode số lượng `27` trong chuỗi hiển thị thay vì đọc trực tiếp từ `OOP_FLASHCARDS.length`.
+- **Giải pháp & Quy tắc phòng ngừa:** Import `OOP_FLASHCARDS` từ `@/views/oop-flashcards/data` để tính động `${OOP_FLASHCARDS.length}` và kiểm tra qua unit test tại `tests/daily-challenge.spec.ts`.
+
+---
+
+## 27. Lỗ hổng biên giá đấu giá khởi điểm (`BID_AUCTION`), giao dịch âm tiền/tự giao dịch (`EXECUTE_TRADE`) & đọc ghi `localStorage` chưa bọc `try/catch` trong `saigon-tycoon`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:**
+  1. Trong `public/apps/saigon-tycoon/shared/engine.js` (`BID_AUCTION`), điều kiện kiểm tra giá đấu chỉ bật khi `highestBidder !== null`, khiến lượt đấu giá đầu tiên chấp nhận giá `0`, số âm hoặc thấp hơn `currentBid` (giá khởi điểm).
+  2. Nhánh `EXECUTE_TRADE` không chặn `sender.id === receiver.id` và chỉ kiểm tra `sender.money < offerMoney` khi `offerMoney > 0`, cho phép truyền `offerMoney`/`requestMoney` âm hoặc `NaN` để trừ ngược tiền đối phương.
+  3. Hai module âm thanh `LoFiSynthesizer.js` và `SoundEffects.js` gọi trực tiếp `localStorage.getItem/setItem` và `parseFloat` chưa có `try/catch`, có thể ném ngoại lệ ở môi trường iframe hạn chế Storage.
+- **Nguyên nhân gốc rễ:** Kiểm tra biên đầu vào thiếu đồng nhất giữa nhánh đầu tiên và các nhánh kế tiếp của state machine đấu giá/giao dịch, cùng việc truy cập Storage trần ở tiện ích client.
+- **Giải pháp & Quy tắc phòng ngừa:** Chặn `bidAmount <= 0 || !Number.isFinite(bidAmount)` và áp ngưỡng `bidAmount < currentBid` cho lượt đặt đầu trong `BID_AUCTION`; cấm `sender.id === receiver.id` và số tiền âm/`NaN` trong `EXECUTE_TRADE`; bọc `try/catch` đọc/ghi `localStorage` ở `LoFiSynthesizer.js` + `SoundEffects.js`; khóa lưới `.bid-buttons-row` & `.token-choice-grid` với `minmax(0, 1fr)`; bổ sung regression test tại `tests/saigon-tycoon-engine.spec.ts`.
+
+---
+
+## 28. Phím tắt ứng dụng con (`oop-flashcards`, `mini-piano`, `ngare`) rò rỉ xuyên Modal (`role="dialog"`) hoặc kích hoạt khi giữ `Ctrl+1` / focus `<select>` / `contentEditable`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:**
+  1. Khi mở Command Palette (`Ctrl+K`) trên `oop-flashcards` hoặc `mini-piano`, nhấn `Space`/`ArrowRight` vẫn lật/chấm thẻ bên dưới và nhấn `A/S/D/F/G/H/J/K` vẫn phát nốt đàn bên dưới do `handleKeydown` không kiểm tra `[role="dialog"]`.
+  2. Trong `ngare`, nhấn tổ hợp trình duyệt `Ctrl+1..4` không bị chặn ở `handleKeydown`, vô tình kích hoạt lựa chọn cốt truyện.
+  3. Các handler chỉ kiểm tra `HTMLInputElement`/`HTMLTextAreaElement`, bỏ sót `HTMLSelectElement` và vùng `isContentEditable`.
+- **Nguyên nhân gốc rễ:** Logic bảo vệ sự kiện phím tắt lặp lại thủ công không đồng đều ở từng view thay vì dùng helper dùng chung.
+- **Giải pháp & Quy tắc phòng ngừa:** Tạo helper [keyboard.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/utils/keyboard.ts) (`isEditableEventTarget`, `hasOpenDialog`), áp dụng đồng bộ trên `oop-flashcards`, `mini-piano`, `ngare`, `color-game`, `home` và `neon-typing`, và khóa hồi quy trong `tests/resilience-and-a11y.spec.ts`.
+
+---
+
+## 29. Store Pinia & `backup.ts` dễ ném `TypeError` / `QuotaExceededError` khi nạp save thiếu trường hoặc ghi Storage đầy
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:**
+  1. Nếu `localStorage` chứa save cũ/thiếu trường (ví dụ `stats: undefined` trong `coTuong`, `masteredIds`/`reviewIds` null trong `oopFlashcards`, `history`/`favoriteIds`/`customFoods` thiếu trong `homNayAnGi`/`oracleTarot`/`miniPiano`), việc gọi action sẽ ném `TypeError` (`Cannot read properties of undefined` / `is not iterable`).
+  2. `restoreBackupPayload` & `buildBackupPayload` trong `src/utils/backup.ts` và `useHomeSettings` gọi thẳng `localStorage.getItem/setItem` chưa bọc `try/catch`, có thể văng lỗi khi quota trình duyệt đầy hoặc Storage bị chặn.
+- **Nguyên nhân gốc rễ:** Giả định mọi khóa Pinia/Storage luôn có cấu trúc hoàn hảo và không bao giờ ném `DOMException`.
+- **Giải pháp & Quy tắc phòng ngừa:** Chuẩn hóa `Array.isArray(...)` và default object an toàn tại toàn bộ action trong 5 store (`coTuong`, `oopFlashcards`, `homNayAnGi`, `oracleTarot`, `miniPiano`), bọc `try/catch` đọc/ghi Storage trong `backup.ts` & `useHomeSettings.ts`, và bổ sung test hồi quy tại `tests/backup-and-launcher.spec.ts` + `tests/resilience-and-a11y.spec.ts`.
+
+---
+
+## 30. Khởi tạo / đóng `AudioContext` chưa có `try/catch` đồng nhất ở `useColorAudio`, `useTypingAudio`, `useCoTuongAudio` & `mini-piano`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Nhiều composable âm thanh lặp lại đoạn khởi tạo `window.AudioContext || webkitAudioContext` mà không bọc `try/catch` cho `new AudioContext()`, `resume()`, `close()` hay lúc tạo oscillator; nếu trình duyệt chặn autoplay hoặc không hỗ trợ phần cứng âm thanh, hàm phát hiệu ứng có thể ném exception ra UI handler.
+- **Nguyên nhân gốc rễ:** Thiếu utility Web Audio dùng chung nên mỗi module tự sao chép logic vòng đời `AudioContext` với mức độ phòng thủ khác nhau.
+- **Giải pháp & Quy tắc phòng ngừa:** Trích xuất helper dùng chung [audio.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/utils/audio.ts) (`createSafeAudioManager`), gom trọn 5 module (`useColorAudio`, `useTypingAudio`, `useFoodAudio`, `useNgareAudio`, `useCoTuongAudio`, `mini-piano`) về một đường dẫn chuẩn hóa và kiểm thử trong `tests/resilience-and-a11y.spec.ts`.
+
+---
+
+## 31. `upsertDailyBest` thiếu chặn `Infinity` / `score < 0` và `maxEntries <= 0` trong `daily-seed.ts`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Khi kiểm toán `upsertDailyBest` tại [daily-seed.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/utils/daily-seed.ts), giá trị `Infinity` vượt qua điều kiện `score > prev`, và `maxEntries <= 0` khiến vòng `while` xóa sạch toàn bộ lịch sử kỷ lục.
+- **Nguyên nhân gốc rễ:** Thiếu kiểm tra `Number.isFinite(score) && score >= 0` và giới hạn dưới cho `maxEntries`.
+- **Giải pháp & Quy tắc phòng ngừa:** Chuẩn hóa điều kiện `Number.isFinite(score) && score >= 0 && score > prev` cùng `Math.max(1, Math.floor(maxEntries))` và khóa hồi quy tại `tests/daily-challenge.spec.ts`.
+
+---
+
+## 32. `oracle-tarot` bật cờ "Đã chép lời giải" trước khi kiểm tra kết quả `copyTextWithFallback`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Hàm `copyReadingText` trong [oracle-tarot/index.vue](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/views/oracle-tarot/index.vue) gán `copiedReading.value = true` và đặt timer reset trước khi gọi `await copyTextWithFallback(text)`, khiến UI vẫn báo đã sao chép thành công ngay cả khi trình duyệt từ chối quyền clipboard (`false`).
+- **Nguyên nhân gốc rễ:** Đặt hiệu ứng phản hồi UI theo kiểu lạc quan trước lệnh bất đồng bộ mà không kiểm tra cờ trả về boolean.
+- **Giải pháp & Quy tắc phòng ngừa:** Đổi sang `const ok = await copyTextWithFallback(text); if (!ok) return` trước khi bật `copiedReading`, đồng nhất với `neon-typing` và `mini-piano`, kèm kiểm thử luồng tại `tests/native-views-flow.spec.ts`.
+
+---
+
+## 33. Engine `ngare` (`buyItem` & `buySkill`) thiếu kiểm tra `unlockAge` khớp với UI `ShopSkillModal`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Giao diện `ShopSkillModal.vue` khóa nút mua khi `age < unlockAge`, nhưng phương thức `buyItem` và `buySkill` trong [ngare/engine.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/views/ngare/engine.ts) không kiểm tra ngưỡng tuổi mở khóa (chỉ có `buyAsset` kiểm tra `this.state.age < def.unlockAge`).
+- **Nguyên nhân gốc rễ:** Đặt validation điều kiện mở khóa ở lớp UI thay vì chốt invariant ở Pure Engine.
+- **Giải pháp & Quy tắc phòng ngừa:** Bổ sung guard `this.state.age < item.unlockAge` & `this.state.age < skill.unlockAge` trong `ngare/engine.ts`, cập nhật các unit test mua item/skill theo đúng tuổi mở khóa và bổ sung test từ chối dưới tuổi trong `tests/ngare-engine.spec.ts`.
+
+---
+
+## 34. Buff `double_positive` (`✨ Khoảnh khắc vàng`) nhân đôi nhầm cả `stress > 0` gây phạt ngược trong `ngare`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Khi kích hoạt kỹ năng `skill_double_power` ("DOUBLE toàn bộ hiệu ứng tích cực") rồi chọn phương án có `{ skill: 6, stress: 5 }`, `engine.ts` nhân đôi cả `stress` lên `+10` thay vì giữ `+5`.
+- **Nguyên nhân gốc rễ:** Điều kiện `val > 0 && doubleBuff` tại [ngare/engine.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/views/ngare/engine.ts) đồng nhất `val > 0` là tích cực, bỏ qua việc `stress` là chỉ số nghịch đảo (tích cực khi `val < 0`).
+- **Giải pháp & Quy tắc phòng ngừa:** Định nghĩa rõ `const isBeneficial = key === 'stress' ? val < 0 : val > 0` trước khi áp hệ số `doubleBuff`, đồng thời khóa kiểm thử tại `tests/ngare-engine.spec.ts`.
+
+---
+
+## 35. `createSwatch` & `rgbToHsl` trong `color-game/engine.ts` không kẹp biên kênh RGB `[0..255]` nhất quán với `toHexChannel`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Hàm `createSwatch(-5, 300, 128)` tạo mã `hex: "#00FF80"` nhưng vẫn giữ `rgb: "rgb(-5, 300, 128)"` và tính `rgbToHsl` từ giá trị ngoài miền `[0..255]` / `NaN`.
+- **Nguyên nhân gốc rễ:** Chỉ áp logic kẹp `[0, 255]` bên trong `toHexChannel` thay vì tách hàm `clampChannel` áp dụng ngay ở đầu chuỗi biến đổi màu.
+- **Giải pháp & Quy tắc phòng ngừa:** Tách helper `clampChannel(n)` (`!Number.isFinite(n)` trả `0`, kẹp `[0, 255]`) dùng thống nhất cho `toHexChannel`, `rgbToHsl` và `createSwatch`; bổ sung unit test biên tại `tests/color-game-engine.spec.ts`.
+
+---
+
+## 36. Sự kiện sa thải (`danger_job_loss`) trong `ngare` không xóa chức danh cũ và vẫn cộng lương hàng năm
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Khi người chơi gặp biến cố *"Công ty sa thải hàng loạt"* (`danger_job_loss`) và chọn *"Chấp nhận gói thôi việc"* hoặc *"Hoảng loạn, không làm gì"*, nhân vật vẫn giữ nguyên chức danh cũ (ví dụ `Giám đốc công nghệ (CTO)`) và tiếp tục nhận đủ lương hàng năm thay vì rơi vào trạng thái thất nghiệp.
+- **Nguyên nhân gốc rễ:** Lựa chọn thua/mất việc trong [events-dangerous.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/views/ngare/data/events-dangerous.ts) chỉ trừ/cộng chỉ số một lần mà không gắn cờ trạng thái `'unemployed'`, còn `applyChoice` tại [ngare/engine.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/views/ngare/engine.ts) luôn tính lại `currentLevel` & `salary` từ `skill` mỗi lượt bất kể hoàn cảnh việc làm.
+- **Giải pháp & Quy tắc phòng ngừa:** Gắn `setFlags: ['unemployed']` + hẹn sự kiện tái tuyển dụng `arc_job_recovery` (trong [events-arcs.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/views/ngare/data/events-arcs.ts)), kiểm tra cờ `'unemployed'` trong `engine.ts` để đặt `currentLevel = 'Đang thất nghiệp'` và `salary = 0`, cho phép ứng tuyển lại trong `ShopSkillModal.vue`, hiển thị badge cảnh báo trong `StatsDashboard.vue`, và khóa regression test tại `tests/ngare-engine.spec.ts`.
+
+---
+
+## 37. Cột trái gameplay `ngare` bị tràn mép dưới màn hình laptop (~720px) khi sự kiện có 3 lựa chọn
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Khi gặp sự kiện có 3 lựa chọn (như cột mốc tuổi 50), nút lựa chọn thứ 3 bị đẩy lố xuống dưới mép dưới khung nhìn laptop dù cột Nhật ký bên phải vẫn gọn.
+- **Nguyên nhân gốc rễ:** Header, `StatsDashboard.vue`, `YearlyActionsBar.vue` và `.event-card` trong [ngare/index.vue](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/views/ngare/index.vue) cộng dồn khoảng cách dọc (~390px phần trên) kết hợp danh sách `.event-choices` xếp dọc 1 cột với `padding` lớn.
+- **Giải pháp & Quy tắc phòng ngừa:** Nén padding/gap hợp lý ở các khối trên, đồng thời chuyển `.event-choices.is-multi` sang lưới đều 3 cột (`.is-three`) cho 3 lựa chọn hoặc 2 cột cho `>= 4` lựa chọn (mobile tự xếp 1 cột) và kiểm thử class `.is-multi` / `.is-three` tại `tests/ngare-store.spec.ts`.
+
+---
+
+## 38. Nút lựa chọn số 1 bị lệch viền trái 4px và mất cân đối hàng 2+1 trong `ngare`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Khi sự kiện có 3 lựa chọn, nút số 1 nhô viền cam sang trái ~4px so với nút số 3 bên dưới, còn nút số 3 kéo dài toàn chiều ngang 100% gây lệch bố cục so với hàng 2 nút phía trên.
+- **Nguyên nhân gốc rễ:** `v-for` dùng `:key="idx"` khiến Vue tái sử dụng nguyên DOM `<button>` đầu tiên qua các lượt và giữ lại `:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }` toàn cục từ [App.vue](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/App.vue), đồng thời rule `grid-column: 1 / -1` ép nút thứ 3 thành hàng dài đơn độc.
+- **Giải pháp & Quy tắc phòng ngừa:** Dùng `:key="`${currentEvent.id}-${idx}`"` để ngắt rò rỉ focus qua lượt mới, đặt `.choice-btn:focus-visible { outline-offset: -2px; }` để viền focus nằm gọn trong khung, và chuyển bố cục 3 lựa chọn sang 3 cột bằng nhau (`repeat(3, minmax(0, 1fr))` trên desktop `> 960px`).
+
+---
+
+## 39. Màn kết thúc `LifeRecapScreen.vue` bị tràn dọc laptop vì chỉ vá từng màn rời rạc mà thiếu kiểm toán `100dvh` toàn bộ 4 màn
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Sau khi sửa tràn dọc ở màn gameplay `ngare`, sang màn kết thúc `LifeRecapScreen.vue` hàng chỉ số thứ 2 và cụm nút *Chơi Lại / Chép hồ sơ / Về Trang Chủ* vẫn bị tràn ra ngoài mép dưới màn hình laptop (`~720px`).
+- **Nguyên nhân gốc rễ:** (1) Vá UI theo triệu chứng ở màn đang thấy mà không rà đồng bộ tất cả state screen (`intro`, `create`, `game`, `end`) theo ngân sách chiều cao `<= 680px`; (2) `.screen-center` (`padding-bottom: 3rem`) chồng thêm padding với `.end-container` (`padding: 1.5rem 1rem 3rem`) mất ~140px khoảng trống chết; (3) Toàn bộ `end-header`, chips, biểu đồ và 6 thẻ chỉ số xếp dọc 1 cột hẹp `max-width: 780px` (~915px).
+- **Giải pháp & Quy tắc phòng ngừa:** Tối ưu `.screen-center` còn `padding: 0.85rem 1rem`, thu gọn banner đầu, ghép `.chart-card` + `.end-stats` thành lưới 2 cột `.end-body-grid` (`max-width: 1080px`) giảm tổng chiều cao xuống ~520px; từ nay mọi sửa đổi layout màn hình phải kiểm toán toàn bộ các screen của app theo chuẩn `<= 680px` desktop và không chồng padding giữa container cha/con.
+
+---
+
+## 40. Sprite `cucumber.png` có khung giàn gỗ lệch bộ & hiệu ứng mưa dùng kẻ sọc tĩnh trong `anime-farm`
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Cây dưa leo chín trong `anime-farm` hiển thị khung giàn gỗ cồng kềnh khác hẳn dạng bụi tự đứng của cà tím/ớt/cà rốt/ngô, đồng thời thời tiết Mưa Rào chỉ phủ lớp sọc `repeating-linear-gradient` đứng yên nhìn giả tạo.
+- **Nguyên nhân gốc rễ:** Prompt vẽ sprite `cucumber.png` trước đây mô tả dạng giàn leo gỗ thay vì dạng bụi cây độc lập đồng bộ với bộ 8 sprite còn lại; còn hiệu ứng mưa chỉ dùng CSS gradient tĩnh mà chưa có chuyển động hạt mưa + độ sâu + gợn nước mặt đất.
+- **Giải pháp & Quy tắc phòng ngừa:** Vẽ lại sprite bụi dưa leo tự đứng không giàn theo phong cách gouache nét mực nâu ấm, tách nền sạch bằng flood-fill BFS từ biên (`280x340` ARGB); thay `repeating-linear-gradient` bằng `RainWeatherRenderer` trên `<canvas id="weather-rain-canvas">` (`z-index: 28`, 3 tầng độ sâu, góc gió nhẹ biến thiên, vòng gợn elip khi rơi xuống đất, zero-allocation trong vòng lặp `requestAnimationFrame` và tự tắt/cleanup khi đổi thời tiết hoặc `beforeunload`).
+
+---
+
+## 41. Sự kiện đi làm thuê (`danger_job_loss`, sếp ép tăng ca, đề bạt cấp trung) vẫn xuất hiện khi nhân vật là Tech Founder / CEO (`ngare`)
+
+- **Ngày ghi nhận:** 2026-11-28
+- **Triệu chứng:** Nhân vật đã đạt chức danh **Nhà Sáng Lập Công Nghệ (Tech Founder)** (`salary: 135`) ở tuổi 37 nhưng vẫn gặp sự kiện *"Công ty sa thải hàng loạt"* kêu *"Đề xuất phương án phục hồi với sếp"*.
+- **Nguyên nhân gốc rễ:** `_isEventValid` trong [ngare/engine.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/views/ngare/engine.ts) chỉ lọc theo độ tuổi, cờ Story Arc và ngưỡng `stats`, không phân biệt nhân vật đang làm nhân viên, đã lên cấp Chủ / Lãnh đạo (`isExecutive`), hay đang thất nghiệp.
+- **Giải pháp & Quy tắc phòng ngừa:** Gắn `isExecutive: true` cho các cấp đỉnh ở [careers.ts](file:///c:/Users/Admin/Documents/CV_Truong%20Dinh%20Anh/CV/project-showcase/src/views/ngare/data/careers.ts), bổ sung cờ `excludeExecutive` / `onlyExecutive` / `excludeUnemployed` trên `GameEvent`, lọc ngay trong `_isEventValid`, chặn 9 sự kiện nhân viên (`danger_job_loss`, `prog_deadline`, `prog_startup_offer`, 6 event `*_promote`, `edu_student`), đồng thời bổ sung biến cố `danger_executive_crisis` dành riêng cho lãnh đạo cấp cao và khóa unit test tại `tests/ngare-engine.spec.ts`.

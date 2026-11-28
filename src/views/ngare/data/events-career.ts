@@ -8,6 +8,8 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Deadline gấp',
       description: 'Dự án cần hoàn thành trong 1 tuần. Sếp yêu cầu tăng ca liên tục.',
       weight: 8,
+      excludeExecutive: true,
+      excludeUnemployed: true,
       choices: [
         {
           text: 'Tăng ca hết sức',
@@ -86,6 +88,8 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Lời mời từ startup',
       description: 'Startup công nghệ mời bạn làm CTO. Lương thấp hơn nhưng có cổ phần.',
       weight: 4,
+      excludeExecutive: true,
+      excludeUnemployed: true,
       choices: [
         {
           text: 'Nhảy sang startup',
@@ -132,6 +136,9 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Đề xuất thăng chức',
       description: 'Sếp đề xuất bạn lên vị trí quản lý. Ít code hơn, nhiều họp hơn.',
       weight: 5,
+      oneTime: true,
+      excludeExecutive: true,
+      excludeUnemployed: true,
       condition: (s: Stats) => s.skill >= 50,
       choices: [
         {
@@ -234,6 +241,9 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Lên Giám đốc',
       description: 'Ban lãnh đạo đánh giá cao và đề bạt bạn lên vị trí giám đốc.',
       weight: 4,
+      oneTime: true,
+      excludeExecutive: true,
+      excludeUnemployed: true,
       condition: (s: Stats) => s.skill >= 50,
       choices: [
         {
@@ -313,6 +323,9 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Art Director',
       description: 'Được đề xuất lên vị trí Art Director, dẫn dắt team thiết kế.',
       weight: 4,
+      oneTime: true,
+      excludeExecutive: true,
+      excludeUnemployed: true,
       condition: (s: Stats) => s.skill >= 50,
       choices: [
         {
@@ -380,11 +393,14 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       ],
     },
     {
-      id: 'med_promote',
+      id: 'media_promote',
       type: '⬆️ Thăng tiến',
       title: 'Head of Marketing',
       description: 'Công ty mời lên vị trí Head of Marketing.',
       weight: 4,
+      oneTime: true,
+      excludeExecutive: true,
+      excludeUnemployed: true,
       condition: (s: Stats) => s.skill >= 50,
       choices: [
         {
@@ -457,6 +473,9 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Trưởng khoa',
       description: 'Được đề cử làm Trưởng khoa. Trách nhiệm lớn.',
       weight: 4,
+      oneTime: true,
+      excludeExecutive: true,
+      excludeUnemployed: true,
       condition: (s: Stats) => s.skill >= 55,
       choices: [
         {
@@ -483,6 +502,8 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Học trò khó bảo',
       description: 'Có học sinh liên tục phá rối lớp học. Bạn rất đau đầu.',
       weight: 7,
+      excludeExecutive: true,
+      excludeUnemployed: true,
       choices: [
         {
           text: 'Kiên nhẫn, tìm hiểu nguyên nhân',
@@ -544,6 +565,9 @@ export const CAREER_EVENTS: Record<string, GameEvent[]> = {
       title: 'Phó Hiệu trưởng',
       description: 'Được đề cử Phó Hiệu trưởng nhờ thành tích giảng dạy.',
       weight: 4,
+      oneTime: true,
+      excludeExecutive: true,
+      excludeUnemployed: true,
       condition: (s: Stats) => s.skill >= 50,
       choices: [
         {

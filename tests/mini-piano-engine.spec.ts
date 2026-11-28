@@ -8,6 +8,8 @@ import {
   calculateChallengeAccuracy,
   formatMelodyDuration,
   formatPitchForOctave,
+  formatRecordedMelodyText,
+  getDailyFeaturedSong,
   getKeysForOctave,
   getOctaveMultiplier,
   getSynthReleaseSeconds,
@@ -40,8 +42,8 @@ describe('Mini Piano Engine', () => {
     expect(formatPitchForOctave('A#', 5)).toBe('A#5')
   })
 
-  it('validates all 5 song presets map cleanly onto the 13-key keyboard', () => {
-    expect(SONG_PRESETS).toHaveLength(5)
+  it('validates all 8 song presets map cleanly onto the 13-key keyboard', () => {
+    expect(SONG_PRESETS).toHaveLength(8)
     const validPitches = new Set(getKeysForOctave(4).allKeys.map((k) => k.pitchClass))
 
     for (const song of SONG_PRESETS) {
@@ -60,16 +62,24 @@ describe('Mini Piano Engine', () => {
     expect(scoreChallengeHit(20)).toBe(250) // capped bonus at combo 10
   })
 
-  it('computes sustain release times and melody durations cleanly', () => {
+  it('computes sustain release times, melody durations, and copyable note notation cleanly', () => {
     expect(getSynthReleaseSeconds(false)).toBe(0.92)
     expect(getSynthReleaseSeconds(true)).toBe(1.85)
     expect(formatMelodyDuration([])).toBe('0.0s')
+    expect(formatRecordedMelodyText('Empty', [])).toBe('')
     expect(
       formatMelodyDuration([
         { pitchClass: 'C', octave: 4, offsetMs: 0 },
         { pitchClass: 'E', octave: 4, offsetMs: 1450 },
       ]),
     ).toBe('1.5s')
+
+    const noteText = formatRecordedMelodyText('Sáng tạo', [
+      { pitchClass: 'C', octave: 4, offsetMs: 0 },
+      { pitchClass: 'C_HIGH', octave: 4, offsetMs: 900 },
+    ])
+    expect(noteText).toContain('🎹 Sáng tạo (2 nốt · 0.9s):')
+    expect(noteText).toContain('C4 · C5')
   })
 
   it('persists synth settings, best song scores, and caps saved melodies at 5 via Pinia store', async () => {
@@ -99,5 +109,17 @@ describe('Mini Piano Engine', () => {
 
     store.deleteMelody(store.savedMelodies[0].id)
     expect(store.savedMelodies).toHaveLength(4)
+
+    // Also verifies Daily Featured Song determinism & highest Daily PB retention
+    const song1 = getDailyFeaturedSong('2026-11-28')
+    const song2 = getDailyFeaturedSong('2026-11-28')
+    expect(song1.id).toBe(song2.id)
+    expect(SONG_PRESETS.some((s) => s.id === song1.id)).toBe(true)
+
+    store.recordDailyScore(1400, '2026-11-28')
+    store.recordDailyScore(950, '2026-11-28')
+    await nextTick()
+
+    expect(store.dailyBestByDate['2026-11-28']).toBe(1400)
   })
 })

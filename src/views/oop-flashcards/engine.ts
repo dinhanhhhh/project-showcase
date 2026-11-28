@@ -1,5 +1,6 @@
 import type {
   CodeToken,
+  DifficultyFilter,
   Flashcard,
   KnowledgeGroupProgress,
   QuizOption,
@@ -60,6 +61,7 @@ export function buildDeck(
   shuffle: boolean,
   rng: () => number = Math.random,
   masteredIds: readonly string[] = [],
+  difficulty: DifficultyFilter = 'all',
 ): Flashcard[] {
   let filtered: Flashcard[]
 
@@ -73,6 +75,10 @@ export function buildDeck(
     filtered = allCards.filter((card) => !masteredSet.has(card.id))
   } else {
     filtered = allCards.filter((card) => card.topicId === filter)
+  }
+
+  if (difficulty !== 'all') {
+    filtered = filtered.filter((card) => card.difficulty === difficulty)
   }
 
   if (shuffle) {

@@ -2,6 +2,9 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useOopFlashcardsStore } from '@/stores/oopFlashcards'
+import { copyTextWithFallback } from '@/utils/clipboard'
+import { hasOpenDialog, isEditableEventTarget } from '@/utils/keyboard'
+import OopQuizPanel from './components/OopQuizPanel.vue'
 import { OOP_FLASHCARDS, OOP_TOPICS } from './data'
 import {
   buildDeck,
@@ -11,11 +14,26 @@ import {
   getCompletionTitle,
   tokenizeJavaCode,
 } from './engine'
-import type { Flashcard, QuizOption, QuizQuestion, StudyMode, TopicFilter } from './types'
+import type {
+  DifficultyFilter,
+  Flashcard,
+  QuizOption,
+  QuizQuestion,
+  StudyMode,
+  TopicFilter,
+} from './types'
 
 const store = useOopFlashcardsStore()
 
+const DIFFICULTY_OPTIONS: ReadonlyArray<{ id: DifficultyFilter; label: string }> = [
+  { id: 'all', label: 'Mọi độ khó' },
+  { id: 'Cơ bản', label: '🟢 Cơ bản' },
+  { id: 'Trung bình', label: '🟡 Trung bình' },
+  { id: 'Nâng cao', label: '🔴 Nâng cao' },
+]
+
 const studyMode = ref<StudyMode>('flashcard')
+const selectedDifficulty = ref<DifficultyFilter>('all')
 const deck = ref<Flashcard[]>([])
 const currentIndex = ref(0)
 const isFlipped = ref(false)
@@ -38,6 +56,7 @@ const isConfirmingReset = ref(false)
 let touchStartX = 0
 let rateTimer: ReturnType<typeof setTimeout> | null = null
 let shakeTimer: ReturnType<typeof setTimeout> | null = null
+let shakeRafId: number | null = null
 let copyTimer: ReturnType<typeof setTimeout> | null = null
 let resetConfirmTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -103,6 +122,7 @@ function rebuildDeck(shuffle = isShuffled.value) {
     shuffle,
     Math.random,
     store.masteredIds,
+    selectedDifficulty.value,
   )
   const q = searchKeyword.value.trim().toLowerCase()
   deck.value = q
@@ -126,6 +146,11 @@ function rebuildDeck(shuffle = isShuffled.value) {
 
 function selectTopic(filter: TopicFilter) {
   store.setSelectedTopic(filter)
+  rebuildDeck(false)
+}
+
+function selectDifficulty(level: DifficultyFilter) {
+  selectedDifficulty.value = level
   rebuildDeck(false)
 }
 
@@ -215,7 +240,12 @@ function goPrev() {
 function triggerShake() {
   isShaking.value = false
   if (shakeTimer) clearTimeout(shakeTimer)
-  requestAnimationFrame(() => {
+  if (shakeRafId !== null) {
+    cancelAnimationFrame(shakeRafId)
+    shakeRafId = null
+  }
+  shakeRafId = requestAnimationFrame(() => {
+    shakeRafId = null
     isShaking.value = true
     shakeTimer = setTimeout(() => {
       isShaking.value = false
@@ -226,16 +256,12 @@ function triggerShake() {
 async function copyCode() {
   const card = currentCard.value
   if (!card?.codeExample) return
-  try {
-    await navigator.clipboard.writeText(card.codeExample)
-    copiedCardId.value = card.id
-    if (copyTimer) clearTimeout(copyTimer)
-    copyTimer = setTimeout(() => {
-      copiedCardId.value = null
-    }, 1800)
-  } catch {
-    // Clipboard có thể không khả dụng trên môi trường không bảo mật
-  }
+  copiedCardId.value = card.id
+  if (copyTimer) clearTimeout(copyTimer)
+  copyTimer = setTimeout(() => {
+    copiedCardId.value = null
+  }, 1800)
+  await copyTextWithFallback(card.codeExample)
 }
 
 function handleTouchStart(e: TouchEvent) {
@@ -252,7 +278,8 @@ function handleTouchEnd(e: TouchEvent) {
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+  if (e.ctrlKey || e.metaKey || e.altKey) return
+  if (isEditableEventTarget(e.target) || hasOpenDialog()) return
   if (studyMode.value !== 'flashcard') return
 
   if (isDone.value) {
@@ -307,6 +334,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
   if (rateTimer) clearTimeout(rateTimer)
   if (shakeTimer) clearTimeout(shakeTimer)
+  if (shakeRafId !== null) cancelAnimationFrame(shakeRafId)
   if (copyTimer) clearTimeout(copyTimer)
   if (resetConfirmTimer) clearTimeout(resetConfirmTimer)
 })
@@ -497,100 +525,41 @@ onUnmounted(() => {
             {{ topic.title }} ({{ countByTopic(topic.id) }})
           </button>
         </div>
+
+        <div
+          class="difficulty-bar"
+          role="group"
+          aria-label="Lọc theo độ khó"
+        >
+          <button
+            v-for="diff in DIFFICULTY_OPTIONS"
+            :key="diff.id"
+            type="button"
+            class="topic-pill diff-pill"
+            :class="{ active: selectedDifficulty === diff.id }"
+            @click="selectDifficulty(diff.id)"
+          >
+            {{ diff.label }}
+          </button>
+        </div>
       </section>
 
       <!-- CHẾ ĐỘ QUIZ TRẮC NGHIỆM NHANH -->
-      <main
+      <OopQuizPanel
         v-if="studyMode === 'quiz'"
-        class="stage"
-      >
-        <div
-          v-if="quizDone"
-          class="done-card"
-        >
-          <div class="done-trophy">
-            ⚡
-          </div>
-          <h2 class="done-title">
-            {{ getCompletionTitle(quizCorrect, quizQuestions.length) }}
-          </h2>
-          <p class="done-sub">
-            Bạn trả lời đúng <strong>{{ quizCorrect }} / {{ quizQuestions.length }}</strong> câu ({{ quizAccuracyPercent }}%)
-          </p>
-          <div class="done-actions">
-            <button
-              type="button"
-              class="primary-cta"
-              @click="startQuiz"
-            >
-              Làm bài Quiz mới
-            </button>
-            <button
-              type="button"
-              class="secondary-cta"
-              @click="switchStudyMode('flashcard')"
-            >
-              Về chế độ Thẻ lật
-            </button>
-          </div>
-        </div>
-
-        <div
-          v-else-if="currentQuiz"
-          class="quiz-card"
-        >
-          <div class="face-meta">
-            <span class="topic-badge">{{ currentTopicTitle }}</span>
-            <span class="diff-badge">{{ currentQuiz.difficulty }}</span>
-            <span class="index-badge">Câu {{ quizIndex + 1 }} / {{ quizQuestions.length }}</span>
-          </div>
-
-          <h2 class="quiz-question">
-            {{ currentQuiz.question }}
-          </h2>
-
-          <div class="quiz-options">
-            <button
-              v-for="(opt, idx) in currentQuiz.options"
-              :key="opt.id"
-              type="button"
-              class="quiz-opt-btn"
-              :class="{
-                selected: selectedOptionId === opt.id,
-                correct: selectedOptionId !== null && opt.isCorrect,
-                wrong: selectedOptionId === opt.id && !opt.isCorrect,
-              }"
-              :disabled="selectedOptionId !== null"
-              @click="selectQuizOption(opt)"
-            >
-              <span class="opt-letter">{{ String.fromCharCode(65 + idx) }}</span>
-              <span class="opt-text">{{ opt.text }}</span>
-            </button>
-          </div>
-
-          <div
-            v-if="selectedOptionId !== null"
-            class="quiz-feedback"
-          >
-            <strong>Đáp án chuẩn · {{ currentQuiz.answerTitle }}</strong>
-            <ul>
-              <li
-                v-for="(line, idx) in currentQuiz.explanation"
-                :key="idx"
-              >
-                {{ line }}
-              </li>
-            </ul>
-            <button
-              type="button"
-              class="primary-cta quiz-next-btn"
-              @click="nextQuizQuestion"
-            >
-              {{ quizIndex + 1 >= quizQuestions.length ? 'Xem tổng kết Quiz →' : 'Câu tiếp theo →' }}
-            </button>
-          </div>
-        </div>
-      </main>
+        :quiz-done="quizDone"
+        :quiz-correct="quizCorrect"
+        :quiz-questions-length="quizQuestions.length"
+        :quiz-accuracy-percent="quizAccuracyPercent"
+        :current-quiz="currentQuiz"
+        :current-topic-title="currentTopicTitle"
+        :quiz-index="quizIndex"
+        :selected-option-id="selectedOptionId"
+        @start-quiz="startQuiz"
+        @switch-flashcard="switchStudyMode('flashcard')"
+        @select-option="selectQuizOption"
+        @next-question="nextQuizQuestion"
+      />
 
       <!-- CHẾ ĐỘ THẺ LẬT 3D -->
       <main
@@ -1116,7 +1085,7 @@ onUnmounted(() => {
 
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.65rem;
 }
 
@@ -1205,13 +1174,24 @@ onUnmounted(() => {
 }
 
 .topic-review {
-  border-color: rgba(255, 85, 85, 0.35);
+  border-color: var(--danger-border);
   color: var(--danger);
 }
 
 .topic-unmastered {
   border-color: var(--outline-strong);
   color: var(--primary);
+}
+
+.difficulty-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.diff-pill {
+  padding: 0.34rem 0.78rem;
+  font-size: 0.78rem;
 }
 
 .quiz-card {
@@ -1366,7 +1346,7 @@ onUnmounted(() => {
 
 .card-back {
   transform: rotateY(180deg);
-  border-color: rgba(109, 221, 255, 0.35);
+  border-color: var(--outline-strong);
 }
 
 .face-meta,
@@ -1558,9 +1538,9 @@ onUnmounted(() => {
 
 .ctrl-know {
   flex: 1;
-  background: rgba(139, 195, 74, 0.14);
-  border-color: rgba(139, 195, 74, 0.4);
-  color: var(--property-group-a);
+  background: var(--primary-soft);
+  border-color: var(--outline-strong);
+  color: var(--success);
 }
 
 .ctrl-know:hover {

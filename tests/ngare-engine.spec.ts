@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { GameEngine, computeLifeRecap } from '../src/views/ngare/engine'
-import type { Choice } from '../src/views/ngare/types'
+import {
+  GameEngine,
+  UNEMPLOYED_TITLE,
+  computeLifeRecap,
+  computeNetWorth,
+  formatLifeRecapShareText,
+} from '../src/views/ngare/engine'
+import { loadGameData } from '../src/views/ngare/game-data'
+import type { Choice, GameEvent } from '../src/views/ngare/types'
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -222,9 +229,13 @@ describe('GameEngine - Ngã Rẽ Cuộc Đời', () => {
     expect(engine.state?.gameOverInfo?.message).toContain('Ngã rẽ bất ngờ')
   })
 
-  it('handles buyItem with sufficient funds, duplicate prevention, and insufficient money', async () => {
+  it('handles buyItem with sufficient funds, unlockAge guard, duplicate prevention, and insufficient money', async () => {
     await engine.newGame('Shopper', 'programmer')
-    // Start money = 45
+    // Start age = 22, money = 45
+    const failAgeLock = await engine.buyItem('meditation_app') // unlockAge 25
+    expect(failAgeLock.success).toBe(false)
+
+    engine.state!.age = 28
     const failExpensive = await engine.buyItem('wedding_ring') // cost 50
     expect(failExpensive.success).toBe(false)
 
@@ -237,10 +248,12 @@ describe('GameEngine - Ngã Rẽ Cuộc Đời', () => {
     expect(dup.success).toBe(false)
   })
 
-  it('supports buying and activating Oracle Preview & Time Rewind skills with cooldowns', async () => {
+  it('supports buying and activating Oracle Preview & Time Rewind skills with unlockAge and cooldowns', async () => {
     await engine.newGame('Strategist', 'programmer')
     engine.state!.stats.money = 100
+    expect((await engine.buySkill('skill_time_rewind')).success).toBe(false) // unlockAge 30
 
+    engine.state!.age = 30
     const boughtOracle = await engine.buySkill('skill_oracle')
     expect(boughtOracle.success).toBe(true)
     const usedOracle = await engine.useSkill('skill_oracle')
@@ -288,5 +301,428 @@ describe('GameEngine - Ngã Rẽ Cuộc Đời', () => {
     expect(recap.milestonesCount).toBe(2)
     expect(recap.strongestStat).toEqual({ key: 'skill', value: 95 })
     expect(recap.weakestStat).toEqual({ key: 'health', value: 40 })
+  })
+
+  it('does not cap money at 100 when gaining cash via choices or passive items', async () => {
+    await engine.newGame('Wealthy', 'programmer')
+    engine.state!.stats.money = 120
+    engine.state!.inventory.push('finance_advisor') // +4 money/year
+    await engine.applyChoice({
+      text: 'Dự án lớn',
+      effects: { money: 35 },
+      result: 'Thành công',
+    })
+    // 120 + 35 (choice) + 4 (finance_advisor) + 25 (salary lv1: skill 35) - 0 (age 23 < 26)
+    expect(engine.state!.stats.money).toBeGreaterThan(150)
+  })
+
+  it('consumes skill_shield after blocking a single dangerous event instead of granting permanent immunity', async () => {
+    await engine.newGame('Shielded', 'programmer')
+    engine.state!.age = 27
+    engine.state!.stats.money = 100
+    await engine.buySkill('skill_shield')
+    await engine.useSkill('skill_shield')
+    expect(engine.state!.activeBuffs.some((b) => b.type === 'immunity_danger')).toBe(true)
+
+    const blockedFirst = engine._consumeDangerShield('Cám dỗ thử nghiệm')
+    expect(blockedFirst).toBe(true)
+    expect(engine.state!.activeBuffs.some((b) => b.type === 'immunity_danger')).toBe(false)
+    expect(engine.state!.lastNotice).toContain('Khiên bảo vệ')
+
+    const blockedSecond = engine._consumeDangerShield('Lần hai')
+    expect(blockedSecond).toBe(false)
+  })
+
+  it('tracks survivor and zen_master achievements accurately instead of unlocking on game start', async () => {
+    await engine.newGame('Ach Accuracy', 'programmer')
+    engine.state!.stats.stress = 5
+    await engine.applyChoice({ text: 'Năm 1 nhẹ nhàng', effects: { stress: -2 }, result: null })
+    expect(engine.state!.unlockedAchievements).not.toContain('survivor')
+    expect(engine.state!.unlockedAchievements).not.toContain('zen_master')
+
+    for (let i = 0; i < 4; i++) {
+      await engine.applyChoice({ text: 'Tiếp tục tĩnh tâm', effects: { stress: -5 }, result: null })
+    }
+    expect(engine.state!.unlockedAchievements).toContain('zen_master')
+
+    await engine.applyChoice({ text: 'Tai nạn nhẹ', effects: { health: -60 }, result: null })
+    expect(engine.state!.hadCriticalHealth).toBe(true)
+    await engine.applyChoice({ text: 'Hồi phục tốt', effects: { health: 40 }, result: null })
+    expect(engine.state!.unlockedAchievements).toContain('survivor')
+  })
+
+  it('executes Story Arc flags, schedules follow-up events, and filters by requiredFlags', async () => {
+    await engine.newGame('Arc Runner', 'programmer')
+    engine.state!.age = 25
+    await engine.applyChoice({
+      text: 'Khởi nghiệp',
+      effects: { money: -10 },
+      setFlags: ['startup_exploring'],
+      scheduleEvent: { eventId: 'arc_startup_seed', delayYears: 2 },
+      result: 'Bắt đầu',
+    })
+    expect(engine.state!.flags).toContain('startup_exploring')
+    expect(engine.state!.pendingEvents).toHaveLength(1)
+
+    engine.state!.age = 27
+    const nextEvt = engine.getNextEvent()
+    expect(nextEvt?.id).toBe('arc_startup_seed')
+  })
+
+  it('enforces one yearly action per year and resets availability on next year', async () => {
+    await engine.newGame('Actor', 'programmer')
+    const first = await engine.performYearlyAction('study_course')
+    expect(first.success).toBe(true)
+    expect(engine.state!.yearlyActionUsed).toBe(true)
+
+    const second = await engine.performYearlyAction('networking_dinner')
+    expect(second.success).toBe(false)
+
+    await engine.applyChoice({ text: 'Qua năm', effects: {}, result: null })
+    expect(engine.state!.yearlyActionUsed).toBe(false)
+  })
+
+  it('supports buying/selling investment assets, computing net worth, and switching careers at 28+', async () => {
+    await engine.newGame('Investor', 'programmer')
+    engine.state!.stats.money = 160
+    const tooYoungSwitch = await engine.switchCareer('business')
+    expect(tooYoungSwitch.success).toBe(false)
+
+    const tooYoungStock = await engine.buyAsset('stocks')
+    expect(tooYoungStock.success).toBe(false)
+
+    engine.state!.age = 24
+    const buyStock = await engine.buyAsset('stocks')
+    expect(buyStock.success).toBe(true)
+    expect(computeNetWorth(engine.state!)).toBe(160) // 120 cash + 40 stock at neutral
+
+    engine.state!.age = 28
+    const switched = await engine.switchCareer('business')
+    expect(switched.success).toBe(true)
+    expect(engine.state!.careerId).toBe('business')
+    expect(engine.state!.careerSwitches).toBe(1)
+
+    const sold = await engine.sellAsset('stocks')
+    expect(sold.success).toBe(true)
+    expect(engine.state!.assets).toHaveLength(0)
+  })
+
+  it('triggers special endings (ty_phu_tu_than, an_si_binh_yen) and formats share text', async () => {
+    await engine.newGame('Special Rich', 'business')
+    engine.state!.age = 60
+    engine.state!.stats = {
+      money: 520,
+      skill: 80,
+      happiness: 75,
+      stress: 30,
+      health: 70,
+      relationships: 60,
+    }
+    const richEnding = engine.calculateEnding()
+    expect(richEnding.id).toBe('ty_phu_tu_than')
+
+    engine.state!.stats.money = 150
+    engine.state!.stats.happiness = 90
+    engine.state!.stats.health = 85
+    engine.state!.stats.stress = 10
+    const zenEnding = engine.calculateEnding()
+    expect(zenEnding.id).toBe('an_si_binh_yen')
+
+    const share = formatLifeRecapShareText(engine.state!, zenEnding, computeLifeRecap(engine.state!))
+    expect(share).toContain('Ẩn Sĩ Bình Yên')
+    expect(share).toContain('Tài sản ròng')
+  })
+
+  it('validates entire ngare data graph: unique IDs, valid stat keys, sorted careers, and valid scheduleEvent targets', async () => {
+    const data = await loadGameData()
+    const validStats = new Set(['money', 'skill', 'happiness', 'stress', 'health', 'relationships'])
+
+    const careerEventsFlat: GameEvent[] = Object.values(data.careerEvents).flat()
+    const allEvents: GameEvent[] = [
+      ...data.commonEvents,
+      ...data.arcEvents,
+      ...careerEventsFlat,
+      ...data.dangerousEvents,
+      ...data.milestoneEvents,
+    ]
+
+    expect(allEvents.length).toBeGreaterThanOrEqual(80)
+    const eventIds = new Set<string>()
+    for (const evt of allEvents) {
+      expect(evt.id.trim().length).toBeGreaterThan(0)
+      expect(eventIds.has(evt.id)).toBe(false)
+      eventIds.add(evt.id)
+      expect(evt.choices.length).toBeGreaterThanOrEqual(1)
+      if (evt.minAge !== undefined && evt.maxAge !== undefined) {
+        expect(evt.minAge).toBeLessThanOrEqual(evt.maxAge)
+      }
+    }
+
+    for (const evt of allEvents) {
+      for (const ch of evt.choices) {
+        expect(ch.text.trim().length).toBeGreaterThan(0)
+        for (const statKey of Object.keys(ch.effects)) {
+          expect(validStats.has(statKey)).toBe(true)
+        }
+        if (ch.scheduleEvent) {
+          expect(eventIds.has(ch.scheduleEvent.eventId)).toBe(true)
+          expect(ch.scheduleEvent.delayYears).toBeGreaterThanOrEqual(1)
+        }
+      }
+    }
+
+    const careers = Object.values(data.careers)
+    expect(careers.length).toBeGreaterThanOrEqual(5)
+    for (const career of careers) {
+      expect(career.levels.length).toBeGreaterThanOrEqual(3)
+      for (let i = 1; i < career.levels.length; i++) {
+        expect(career.levels[i].minSkill).toBeGreaterThanOrEqual(career.levels[i - 1].minSkill)
+        expect(career.levels[i].salary).toBeGreaterThan(0)
+      }
+    }
+
+    const endingIds = new Set(data.endings.map((e) => e.id))
+    expect(data.endings).toHaveLength(15)
+    expect(endingIds.size).toBe(15)
+
+    for (const trait of data.traits) {
+      for (const key of Object.keys(trait.statModifiers)) {
+        expect(validStats.has(key)).toBe(true)
+      }
+    }
+  })
+
+  it('simulates multi-decade life from age 22 to 60 retirement with promotions, actions, assets, and career switch', async () => {
+    const startState = await engine.newGame('Marathon Runner', 'programmer', 'privileged')
+    expect(startState).not.toBeNull()
+
+    let switchedCareer = false
+    let soldOneAsset = false
+
+    for (let step = 0; step < 45; step++) {
+      if (!engine.state || engine.state.gameOver) break
+
+      // Yearly action management to sustain health/stress/skill across decades
+      if (!engine.state.yearlyActionUsed) {
+        if (engine.state.stats.stress >= 60 && engine.state.stats.money >= 15) {
+          await engine.performYearlyAction('travel')
+        } else if (engine.state.stats.health <= 55 && engine.state.stats.money >= 12) {
+          await engine.performYearlyAction('health_check')
+        } else if (engine.state.stats.money >= 10) {
+          await engine.performYearlyAction('upskill')
+        } else {
+          await engine.performYearlyAction('side_hustle')
+        }
+      }
+
+      // Buy & sell investment assets once unlocked
+      if (engine.state.stats.money >= 80 && (engine.state.assets?.length ?? 0) === 0) {
+        const bought = await engine.buyAsset('savings')
+        expect(bought.success).toBe(true)
+      } else if (!soldOneAsset && (engine.state.assets?.some((a) => a.units > 0) ?? false) && engine.state.age >= 30) {
+        const sold = await engine.sellAsset('savings')
+        expect(sold.success).toBe(true)
+        soldOneAsset = true
+      }
+
+      // Exercise mid-career switch after age 28
+      if (!switchedCareer && engine.state.age >= 28 && engine.state.stats.money >= 40) {
+        const sw = await engine.switchCareer('business')
+        expect(sw.success).toBe(true)
+        switchedCareer = true
+      }
+
+      const evt = engine.getNextEvent()
+      expect(evt).not.toBeNull()
+      if (!evt) break
+
+      // Pick the safest positive choice without ending the game early
+      const safeChoices = evt.choices.filter((c) => !c.isGameOver)
+      const picked =
+        safeChoices.sort((a, b) => {
+          const score = (c: Choice) =>
+            (c.effects.health ?? 0) * 2 +
+            (c.effects.money ?? 0) +
+            (c.effects.happiness ?? 0) +
+            (c.effects.skill ?? 0) -
+            (c.effects.stress ?? 0) * 1.5
+          return score(b) - score(a)
+        })[0] ?? evt.choices[0]
+
+      await engine.applyChoice(picked)
+    }
+
+    expect(engine.state?.gameOver).toBe(true)
+    expect(engine.state?.age).toBeGreaterThanOrEqual(25)
+    expect(switchedCareer).toBe(true)
+    expect(soldOneAsset).toBe(true)
+    expect((engine.state?.statSnapshots?.length ?? 0)).toBeGreaterThan(10)
+
+    const ending = engine.calculateEnding()
+    expect(ending.id.length).toBeGreaterThan(0)
+    expect(ending.title.length).toBeGreaterThan(0)
+  })
+
+  it('exercises zen_master, double_positive buff + cooldown decay, item danger immunity, and Story Arc scheduling', async () => {
+    await engine.newGame('Arc Strategist', 'programmer')
+    engine.state!.age = 28
+    engine.state!.stats.money = 200
+    engine.state!.stats.stress = 75
+
+    // 1. skill_zen_master resets stress to 0 and applies 5-year cooldown that decays each turn
+    expect((await engine.buySkill('skill_zen_master')).success).toBe(true)
+    expect((await engine.useSkill('skill_zen_master')).success).toBe(true)
+    expect(engine.state!.stats.stress).toBe(0)
+    expect(engine.state!.skillCooldowns['skill_zen_master']).toBe(5)
+
+    // 2. skill_double_power doubles positive gains only and expires after 1 choice
+    expect((await engine.buySkill('skill_double_power')).success).toBe(true)
+    expect((await engine.useSkill('skill_double_power')).success).toBe(true)
+    const skillBefore = engine.state!.stats.skill
+    await engine.applyChoice({
+      text: 'Đào tạo chuyên sâu',
+      effects: { skill: 6, stress: 5 },
+      result: 'Tăng tốc',
+    })
+    expect(engine.state!.stats.skill).toBe(skillBefore + 12)
+    expect(engine.state!.stats.stress).toBe(5)
+    expect(engine.state!.activeBuffs.some((b) => b.type === 'double_positive')).toBe(false)
+    expect(engine.state!.skillCooldowns['skill_zen_master']).toBe(4)
+
+    // 3. Passive item immunity blocks danger_scam_investment
+    expect((await engine.buyItem('investment_course')).success).toBe(true)
+    expect(engine._isEventImmuneByItem('danger_scam_investment')).toBe(true)
+    expect(engine._isEventImmuneByItem('danger_affair')).toBe(false)
+
+    // 4. Story Arc setFlags, removeFlags & pendingEvents delivery after delayYears
+    const ideaEvent = engine._findEventById('arc_startup_idea')
+    expect(ideaEvent).not.toBeNull()
+    const currentAge = engine.state!.age
+    await engine.applyChoice(ideaEvent!.choices[0]) // +startup_exploring, schedules arc_startup_seed at +2
+    expect(engine.state!.flags).toContain('startup_exploring')
+    expect(engine.state!.pendingEvents?.some((p) => p.eventId === 'arc_startup_seed')).toBe(true)
+
+    // Advance 1 more year so age reaches triggerAge (currentAge + 2)
+    await engine.applyChoice({
+      text: 'Chuẩn bị pitch deck',
+      effects: { happiness: 2 },
+      removeFlags: ['temp_flag'],
+      result: null,
+    })
+    expect(engine.state!.age).toBe(currentAge + 2)
+    const scheduled = engine.getNextEvent()
+    expect(scheduled?.id).toBe('arc_startup_seed')
+  })
+
+  it('handles layoff (unemployed flag, salary 0, UNEMPLOYED_TITLE) and recovers via arc_job_recovery or free same-career reapply', async () => {
+    await engine.newGame('Layoff Survivor', 'programmer')
+    engine.state!.age = 36
+    engine.state!.stats.skill = 60
+    engine.state!.stats.money = 100
+    engine.state!.currentLevel = 'Lập trình viên cao cấp'
+    engine.state!.salary = 40
+
+    const dangerEvt = engine._findEventById('danger_job_loss')
+    expect(dangerEvt).not.toBeNull()
+
+    // Choice 2 ("Hoảng loạn, không làm gì") -> money -20, cost of living at age 36 is -4 -> 76, NO salary added
+    await engine.applyChoice(dangerEvt!.choices[2])
+    expect(engine.state!.flags).toContain('unemployed')
+    expect(engine.state!.currentLevel).toBe(UNEMPLOYED_TITLE)
+    expect(engine.state!.salary).toBe(0)
+    expect(engine.state!.stats.money).toBe(76)
+    expect(engine.state!.pendingEvents?.some((p) => p.eventId === 'arc_job_recovery')).toBe(true)
+
+    // Re-applying to same career while unemployed costs 0 and keeps 100% skill
+    const skillWhileUnemployed = engine.state!.stats.skill
+    const reapply = await engine.switchCareer('programmer')
+    expect(reapply.success).toBe(true)
+    expect(engine.state!.flags).not.toContain('unemployed')
+    expect(engine.state!.stats.money).toBe(76)
+    expect(engine.state!.stats.skill).toBe(skillWhileUnemployed)
+    expect(engine.state!.currentLevel).toBe('Lập trình viên cao cấp')
+    expect(engine.state!.salary).toBe(40)
+
+    // Layoff choice 1 ("Chấp nhận gói thôi việc") -> +15 money -4 living = +11 net, then arc_job_recovery restores job
+    engine.state!.stats.money = 100
+    await engine.applyChoice(dangerEvt!.choices[1])
+    expect(engine.state!.flags).toContain('unemployed')
+    expect(engine.state!.currentLevel).toBe(UNEMPLOYED_TITLE)
+    expect(engine.state!.salary).toBe(0)
+    expect(engine.state!.stats.money).toBe(111)
+
+    const recoveryEvt = engine.getNextEvent()
+    expect(recoveryEvt?.id).toBe('arc_job_recovery')
+    await engine.applyChoice(recoveryEvt!.choices[0])
+    expect(engine.state!.flags).not.toContain('unemployed')
+    expect(engine.state!.currentLevel).toBe('Lập trình viên cao cấp')
+    expect(engine.state!.salary).toBe(40)
+  })
+
+  it('unlocks prestige career ranks above CTO only when skill, relationships, and netWorth thresholds are all met', async () => {
+    await engine.newGame('Tech Legend', 'programmer')
+    engine.state!.age = 38
+
+    // Skill 100 but low relationships (40) & low netWorth (150) -> stays at CTO
+    engine.state!.stats.skill = 100
+    engine.state!.stats.relationships = 40
+    engine.state!.stats.money = 150
+    await engine.applyChoice({ text: 'Duy trì chuyên môn', effects: {}, result: null })
+    expect(engine.state!.currentLevel).toBe('Giám đốc công nghệ (CTO)')
+    expect(engine.state!.salary).toBe(100)
+    expect(engine.state!.unlockedAchievements).toContain('cto_master')
+
+    // Meet Tech Founder thresholds: skill >= 98, relationships >= 70, netWorth >= 300
+    engine.state!.stats.relationships = 75
+    engine.state!.stats.money = 320
+    await engine.applyChoice({ text: 'Mở rộng hệ sinh thái', effects: {}, result: null })
+    expect(engine.state!.currentLevel).toBe('Nhà Sáng Lập Công Nghệ (Tech Founder)')
+    expect(engine.state!.salary).toBe(135)
+
+    // Meet Tech Group Chairman thresholds: skill >= 100, relationships >= 85, netWorth >= 800
+    engine.state!.stats.relationships = 88
+    engine.state!.stats.money = 820
+    await engine.applyChoice({ text: 'Niêm yết tập đoàn', effects: {}, result: null })
+    expect(engine.state!.currentLevel).toBe('Chủ Tịch Tập Đoàn Công Nghệ')
+    expect(engine.state!.salary).toBe(180)
+  })
+
+  it('filters employee-only events out for executives/unemployed and unlocks executive crisis for executives', async () => {
+    await engine.newGame('Exec Guard', 'programmer')
+    engine.state!.age = 37
+    engine.state!.stats.skill = 60
+    engine.state!.currentLevel = 'Lập trình viên cao cấp'
+
+    const jobLoss = engine._findEventById('danger_job_loss')
+    const execCrisis = engine._findEventById('danger_executive_crisis')
+    const deadline = engine._findEventById('prog_deadline')
+    const promote = engine._findEventById('prog_promote')
+
+    expect(jobLoss).not.toBeNull()
+    expect(execCrisis).not.toBeNull()
+    expect(deadline).not.toBeNull()
+    expect(promote).not.toBeNull()
+
+    // Non-executive employed: sees job loss / deadline / promote, NOT executive crisis
+    expect(engine._isEventValid(jobLoss!)).toBe(true)
+    expect(engine._isEventValid(deadline!)).toBe(true)
+    expect(engine._isEventValid(promote!)).toBe(true)
+    expect(engine._isEventValid(execCrisis!)).toBe(false)
+
+    // Tech Founder (executive): blocked from job loss, deadline, promote; allowed executive crisis
+    engine.state!.stats.skill = 98
+    engine.state!.stats.relationships = 75
+    engine.state!.stats.money = 350
+    engine.state!.currentLevel = 'Nhà Sáng Lập Công Nghệ (Tech Founder)'
+    expect(engine._isEventValid(jobLoss!)).toBe(false)
+    expect(engine._isEventValid(deadline!)).toBe(false)
+    expect(engine._isEventValid(promote!)).toBe(false)
+    expect(engine._isEventValid(execCrisis!)).toBe(true)
+
+    // Unemployed: blocked from both job loss and executive crisis
+    engine.state!.flags = ['unemployed']
+    engine.state!.currentLevel = UNEMPLOYED_TITLE
+    expect(engine._isEventValid(jobLoss!)).toBe(false)
+    expect(engine._isEventValid(execCrisis!)).toBe(false)
   })
 })

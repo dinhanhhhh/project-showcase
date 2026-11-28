@@ -1,4 +1,5 @@
 export type Difficulty = 'Cơ bản' | 'Trung bình' | 'Nâng cao'
+export type DifficultyFilter = 'all' | Difficulty
 
 export interface Flashcard {
   id: string

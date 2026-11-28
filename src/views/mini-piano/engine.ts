@@ -1,3 +1,4 @@
+import { getDailyDateKey, pickSeededItems } from '@/utils/daily-seed'
 import type { NotePitchClass, OctaveNumber, PianoKey, RecordedNoteEvent, SongPreset } from './types'
 
 interface BaseKeyDef {
@@ -110,6 +111,33 @@ export const SONG_PRESETS: readonly SongPreset[] = [
       'A#', 'A#', 'A', 'F', 'G', 'F',
     ],
   },
+  {
+    id: 'fur-elise',
+    title: '🎹 Für Elise',
+    difficulty: 'Trung bình',
+    notes: [
+      'E', 'D#', 'E', 'D#', 'E', 'B', 'D', 'C', 'A',
+      'C', 'E', 'A', 'B', 'E', 'G#', 'B', 'C_HIGH',
+    ],
+  },
+  {
+    id: 'canon',
+    title: '🎻 Canon in C',
+    difficulty: 'Trung bình',
+    notes: [
+      'E', 'D', 'C', 'B', 'A', 'G', 'A', 'B',
+      'C_HIGH', 'B', 'A', 'G', 'F', 'E', 'F', 'G',
+    ],
+  },
+  {
+    id: 'beo-dat',
+    title: '🪷 Bèo Dạt Mây Trôi',
+    difficulty: 'Khó',
+    notes: [
+      'G', 'A', 'C_HIGH', 'A', 'G', 'E', 'G', 'A',
+      'E', 'D', 'C', 'D', 'E', 'G', 'A', 'G',
+    ],
+  },
 ]
 
 export function calculateChallengeAccuracy(hits: number, misses: number): number {
@@ -126,8 +154,24 @@ export function getSynthReleaseSeconds(sustainEnabled: boolean): number {
   return sustainEnabled ? 1.85 : 0.92
 }
 
+export function getDailyFeaturedSong(dateKey: string = getDailyDateKey()): SongPreset {
+  return pickSeededItems(SONG_PRESETS, 1, `mini-piano-${dateKey}`)[0] ?? SONG_PRESETS[0]
+}
+
 export function formatMelodyDuration(notes: readonly RecordedNoteEvent[]): string {
   if (notes.length === 0) return '0.0s'
   const lastOffset = notes[notes.length - 1]?.offsetMs ?? 0
   return `${Math.max(0.1, Math.round(lastOffset / 100) / 10).toFixed(1)}s`
+}
+
+export function formatRecordedMelodyText(
+  title: string,
+  notes: readonly RecordedNoteEvent[],
+): string {
+  if (notes.length === 0) return ''
+  const cleanTitle = title.trim() || 'Giai điệu tự thu'
+  const sequence = notes
+    .map((ev) => formatPitchForOctave(ev.pitchClass, ev.octave))
+    .join(' · ')
+  return `🎹 ${cleanTitle} (${notes.length} nốt · ${formatMelodyDuration(notes)}):\n${sequence}`
 }

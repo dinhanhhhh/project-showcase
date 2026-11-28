@@ -22,16 +22,14 @@ export const useOopFlashcardsStore = defineStore('oop-flashcards', {
 
   actions: {
     markCardResult(cardId: string, known: boolean) {
+      const mastered = Array.isArray(this.masteredIds) ? this.masteredIds : []
+      const review = Array.isArray(this.reviewIds) ? this.reviewIds : []
       if (known) {
-        if (!this.masteredIds.includes(cardId)) {
-          this.masteredIds = [...this.masteredIds, cardId]
-        }
-        this.reviewIds = this.reviewIds.filter((id) => id !== cardId)
+        this.masteredIds = mastered.includes(cardId) ? mastered : [...mastered, cardId]
+        this.reviewIds = review.filter((id) => id !== cardId)
       } else {
-        if (!this.reviewIds.includes(cardId)) {
-          this.reviewIds = [...this.reviewIds, cardId]
-        }
-        this.masteredIds = this.masteredIds.filter((id) => id !== cardId)
+        this.reviewIds = review.includes(cardId) ? review : [...review, cardId]
+        this.masteredIds = mastered.filter((id) => id !== cardId)
       }
     },
 

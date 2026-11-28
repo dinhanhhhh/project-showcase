@@ -74,9 +74,18 @@ export class LoFiSynthesizer {
 
     this.isPlaying = false;
     this.currentStationIndex = 0;
-    this.volume = parseFloat(
-      localStorage.getItem("monopoly_radio_volume") ?? 0.45,
-    );
+    let savedVolume = 0.45;
+    try {
+      const parsedVol = parseFloat(
+        localStorage.getItem("monopoly_radio_volume") ?? "0.45",
+      );
+      if (Number.isFinite(parsedVol) && parsedVol >= 0 && parsedVol <= 1) {
+        savedVolume = parsedVol;
+      }
+    } catch {
+      savedVolume = 0.45;
+    }
+    this.volume = savedVolume;
     this.isMuted = false;
 
     this.stepIndex = 0;
@@ -291,8 +300,12 @@ export class LoFiSynthesizer {
    * Điều chỉnh âm lượng từ 0.0 đến 1.0
    */
   setVolume(val) {
-    this.volume = Math.max(0, Math.min(1, parseFloat(val)));
-    localStorage.setItem("monopoly_radio_volume", this.volume);
+    this.volume = Math.max(0, Math.min(1, parseFloat(val) || 0));
+    try {
+      localStorage.setItem("monopoly_radio_volume", String(this.volume));
+    } catch {
+      // Ignore storage quota / restricted iframe errors
+    }
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setTargetAtTime(
         this.isMuted ? 0 : this.volume,

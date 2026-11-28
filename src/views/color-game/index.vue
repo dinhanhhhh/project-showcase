@@ -2,15 +2,23 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useColorGameStore } from '@/stores/colorGame'
+import { copyTextWithFallback } from '@/utils/clipboard'
+import { getDailyDateKey } from '@/utils/daily-seed'
+import { hasOpenDialog, isEditableEventTarget } from '@/utils/keyboard'
+import ColorChannelBars from './components/ColorChannelBars.vue'
 import { useColorAudio } from './composables/useColorAudio'
 import {
+  DAILY_COLOR_ROUNDS,
   MAX_LIFELINES,
+  MAX_PALETTE_HISTORY,
   TIME_ATTACK_BONUS_SECONDS,
   TIME_ATTACK_PENALTY_SECONDS,
   TIME_ATTACK_START_SECONDS,
   applyFiftyFifty,
   buildColorRound,
+  buildDailyColorRound,
   createSwatch,
+  formatColorPaletteSummary,
   formatColorSwatch,
   getComboMultiplier,
   getFormatAccuracy,
@@ -20,6 +28,7 @@ import type { ColorFormat, ColorGameMode, ColorSwatch, GridSize } from './types'
 
 const store = useColorGameStore()
 const { playCorrect, playWrong, playLifeline, playTimeUp } = useColorAudio()
+const todayKey = getDailyDateKey()
 
 const gameMode = ref<ColorGameMode>('classic')
 const colorFormat = ref<ColorFormat>('rgb')
@@ -32,6 +41,8 @@ const score = ref(0)
 const streak = ref(0)
 const sessionMaxStreak = ref(0)
 const roundsCleared = ref(0)
+const dailyRoundNumber = ref(1)
+const isDailyOver = ref(false)
 const lifelinesLeft = ref(MAX_LIFELINES)
 const usedLifelineThisRound = ref(false)
 
@@ -48,14 +59,20 @@ let nextRoundTimer: ReturnType<typeof setTimeout> | null = null
 let timeAttackInterval: ReturnType<typeof setInterval> | null = null
 let deltaHintTimer: ReturnType<typeof setTimeout> | null = null
 let copyTimer: ReturnType<typeof setTimeout> | null = null
+let paletteTimer: ReturnType<typeof setTimeout> | null = null
 
 const isCopied = ref(false)
+const isCopiedPalette = ref(false)
+const solvedSwatches = ref<ColorSwatch[]>([])
 
 const displayCode = computed(() => formatColorSwatch(target.value, colorFormat.value))
 
-const currentBestScore = computed(() =>
-  gameMode.value === 'classic' ? store.bestClassicScore : store.bestTimeAttackScore,
-)
+const dailyBestScore = computed(() => store.dailyBestByDate?.[todayKey] ?? 0)
+
+const currentBestScore = computed(() => {
+  if (gameMode.value === 'daily_seed') return dailyBestScore.value
+  return gameMode.value === 'classic' ? store.bestClassicScore : store.bestTimeAttackScore
+})
 
 const activeMultiplier = computed(() => getComboMultiplier(streak.value))
 
@@ -81,6 +98,7 @@ const canUseLifeline = computed(
   () =>
     !isRoundWon.value &&
     !isTimeAttackOver.value &&
+    !isDailyOver.value &&
     lifelinesLeft.value > 0 &&
     !usedLifelineThisRound.value,
 )
@@ -102,19 +120,31 @@ function clearTimers() {
     clearTimeout(copyTimer)
     copyTimer = null
   }
+  if (paletteTimer) {
+    clearTimeout(paletteTimer)
+    paletteTimer = null
+  }
 }
 
 async function copyTargetCode() {
-  try {
-    await navigator.clipboard?.writeText(displayCode.value)
-    isCopied.value = true
-    if (copyTimer) clearTimeout(copyTimer)
-    copyTimer = setTimeout(() => {
-      isCopied.value = false
-    }, 1600)
-  } catch {
-    // Trình duyệt không cấp quyền clipboard
-  }
+  isCopied.value = true
+  if (copyTimer) clearTimeout(copyTimer)
+  copyTimer = setTimeout(() => {
+    isCopied.value = false
+  }, 1600)
+  await copyTextWithFallback(displayCode.value)
+}
+
+async function copySolvedPalette() {
+  const text = formatColorPaletteSummary(solvedSwatches.value, score.value, gameMode.value)
+  if (!text) return
+  const ok = await copyTextWithFallback(text)
+  if (!ok) return
+  isCopiedPalette.value = true
+  if (paletteTimer) clearTimeout(paletteTimer)
+  paletteTimer = setTimeout(() => {
+    isCopiedPalette.value = false
+  }, 1800)
 }
 
 function flashTimeDelta(label: string) {
@@ -149,7 +179,10 @@ function startNewRound() {
     clearTimeout(nextRoundTimer)
     nextRoundTimer = null
   }
-  const round = buildColorRound(gridSize.value)
+  const round =
+    gameMode.value === 'daily_seed'
+      ? buildDailyColorRound(todayKey, dailyRoundNumber.value, gridSize.value)
+      : buildColorRound(gridSize.value)
   target.value = round.target
   options.value = round.options
   eliminatedHexes.value = {}
@@ -157,7 +190,10 @@ function startNewRound() {
   isRoundWon.value = false
   isCopied.value = false
   statusType.value = 'neutral'
-  statusText.value = 'Chọn ô màu khớp với mã bên trên (hoặc nhấn phím 1–9)!'
+  statusText.value =
+    gameMode.value === 'daily_seed'
+      ? `Thử thách Hôm Nay · Câu ${dailyRoundNumber.value}/${DAILY_COLOR_ROUNDS} (Phím 1–9)`
+      : 'Chọn ô màu khớp với mã bên trên (hoặc nhấn phím 1–9)!'
 }
 
 function resetSession() {
@@ -166,11 +202,15 @@ function resetSession() {
   streak.value = 0
   sessionMaxStreak.value = 0
   roundsCleared.value = 0
+  dailyRoundNumber.value = 1
+  isDailyOver.value = false
   lifelinesLeft.value = MAX_LIFELINES
   timeLeft.value = TIME_ATTACK_START_SECONDS
   isTimeAttackRunning.value = false
   isTimeAttackOver.value = false
   timeDeltaHint.value = null
+  solvedSwatches.value = []
+  isCopiedPalette.value = false
   startNewRound()
 }
 
@@ -200,7 +240,7 @@ function useLifeline() {
 }
 
 function handlePick(choice: ColorSwatch) {
-  if (isRoundWon.value || isTimeAttackOver.value || eliminatedHexes.value[choice.hex]) return
+  if (isRoundWon.value || isTimeAttackOver.value || isDailyOver.value || eliminatedHexes.value[choice.hex]) return
 
   if (gameMode.value === 'time_attack' && !isTimeAttackRunning.value) {
     startTimeAttackTicker()
@@ -208,6 +248,7 @@ function handlePick(choice: ColorSwatch) {
 
   if (choice.hex === target.value.hex) {
     store.recordAttempt(colorFormat.value, true)
+    solvedSwatches.value = [target.value, ...solvedSwatches.value].slice(0, MAX_PALETTE_HISTORY)
     isRoundWon.value = true
     streak.value += 1
     roundsCleared.value += 1
@@ -223,6 +264,15 @@ function handlePick(choice: ColorSwatch) {
       timeLeft.value = Math.min(60, timeLeft.value + TIME_ATTACK_BONUS_SECONDS)
       flashTimeDelta(`+${TIME_ATTACK_BONUS_SECONDS}s`)
       store.recordTimeAttack(score.value, sessionMaxStreak.value)
+    } else if (gameMode.value === 'daily_seed') {
+      store.recordDailyScore(score.value, sessionMaxStreak.value, todayKey)
+      if (dailyRoundNumber.value >= DAILY_COLOR_ROUNDS) {
+        isDailyOver.value = true
+        statusType.value = 'win'
+        statusText.value = `🎉 Hoàn thành Daily Seed ${todayKey}: ${score.value} điểm!`
+        return
+      }
+      dailyRoundNumber.value += 1
     } else {
       store.recordClassic(score.value, sessionMaxStreak.value)
     }
@@ -234,7 +284,7 @@ function handlePick(choice: ColorSwatch) {
         ? `Chính xác! +${earned} điểm (Combo x${mult} · Chuỗi ${streak.value} 🔥)`
         : `Chính xác! +${earned} điểm (Chuỗi thắng ${streak.value} 🔥)`
 
-    const delayMs = gameMode.value === 'time_attack' ? 650 : 1200
+    const delayMs = gameMode.value === 'time_attack' ? 650 : 1000
     nextRoundTimer = setTimeout(startNewRound, delayMs)
   } else {
     store.recordAttempt(colorFormat.value, false)
@@ -259,8 +309,7 @@ function handlePick(choice: ColorSwatch) {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.ctrlKey || e.metaKey || e.altKey) return
-  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-  if (document.querySelector('[role="dialog"]')) return
+  if (isEditableEventTarget(e.target) || hasOpenDialog()) return
 
   if (e.key >= '1' && e.key <= '9') {
     const idx = Number(e.key) - 1
@@ -343,12 +392,19 @@ onUnmounted(() => {
             >{{ timeDeltaHint }}</em>
           </strong>
         </div>
+        <div
+          v-if="gameMode === 'daily_seed'"
+          class="metric-pill"
+        >
+          <span>Tiến độ Daily</span>
+          <strong>{{ Math.min(dailyRoundNumber, DAILY_COLOR_ROUNDS) }} / {{ DAILY_COLOR_ROUNDS }}</strong>
+        </div>
         <div class="metric-pill streak">
           <span>Streak</span>
           <strong>{{ streak }} 🔥 <em v-if="activeMultiplier > 1">x{{ activeMultiplier }}</em></strong>
         </div>
         <div class="metric-pill best">
-          <span>Kỷ lục</span>
+          <span>{{ gameMode === 'daily_seed' ? 'Daily PB' : 'Kỷ lục' }}</span>
           <strong>{{ currentBestScore }} 🏆</strong>
         </div>
       </section>
@@ -381,6 +437,13 @@ onUnmounted(() => {
             @click="setMode('time_attack')"
           >
             ⏱️ Time Attack 45s
+          </button>
+          <button
+            type="button"
+            :class="{ active: gameMode === 'daily_seed' }"
+            @click="setMode('daily_seed')"
+          >
+            📅 Daily Seed
           </button>
         </div>
 
@@ -433,13 +496,13 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <!-- Màn hình tổng kết Time Attack -->
+      <!-- Màn hình tổng kết Time Attack / Daily Seed -->
       <section
-        v-if="isTimeAttackOver"
+        v-if="isTimeAttackOver || isDailyOver"
         class="studio-card summary-card"
       >
         <div class="summary-badge">
-          ⏱️ HẾT GIỜ TIME ATTACK!
+          {{ isDailyOver ? `📅 HOÀN THÀNH DAILY SEED ${todayKey}!` : '⏱️ HẾT GIỜ TIME ATTACK!' }}
         </div>
         <h2 class="summary-score">
           {{ score }} <span>điểm</span>
@@ -454,8 +517,8 @@ onUnmounted(() => {
             <strong>{{ sessionMaxStreak }} 🔥</strong>
           </div>
           <div class="sum-box">
-            <span>Kỷ lục Time Attack</span>
-            <strong>{{ store.bestTimeAttackScore }} 🏆</strong>
+            <span>{{ isDailyOver ? 'Daily PB hôm nay' : 'Kỷ lục Time Attack' }}</span>
+            <strong>{{ isDailyOver ? dailyBestScore : store.bestTimeAttackScore }} 🏆</strong>
           </div>
         </div>
         <button
@@ -463,7 +526,7 @@ onUnmounted(() => {
           class="replay-btn"
           @click="resetSession"
         >
-          ⚡ Chơi lại Time Attack
+          {{ isDailyOver ? '🔄 Chơi lại Daily Seed' : '⚡ Chơi lại Time Attack' }}
         </button>
       </section>
 
@@ -501,95 +564,10 @@ onUnmounted(() => {
             </span>
           </div>
 
-          <!-- Phân tích kênh HSL khi chọn hệ màu HSL -->
-          <div
-            v-if="colorFormat === 'hsl'"
-            class="channel-bars"
-          >
-            <div class="channel-item">
-              <div class="ch-label">
-                <span>H (Tông màu)</span>
-                <strong>{{ target.hslValue.h }}°</strong>
-              </div>
-              <div class="ch-track">
-                <div
-                  class="ch-fill hue"
-                  :style="{ width: `${(target.hslValue.h / 360) * 100}%` }"
-                />
-              </div>
-            </div>
-
-            <div class="channel-item">
-              <div class="ch-label">
-                <span>S (Độ bão hòa)</span>
-                <strong>{{ target.hslValue.s }}%</strong>
-              </div>
-              <div class="ch-track">
-                <div
-                  class="ch-fill sat"
-                  :style="{ width: `${target.hslValue.s}%` }"
-                />
-              </div>
-            </div>
-
-            <div class="channel-item">
-              <div class="ch-label">
-                <span>L (Độ sáng)</span>
-                <strong>{{ target.hslValue.l }}%</strong>
-              </div>
-              <div class="ch-track">
-                <div
-                  class="ch-fill light"
-                  :style="{ width: `${target.hslValue.l}%` }"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Phân tích kênh RGB -->
-          <div
-            v-else
-            class="channel-bars"
-          >
-            <div class="channel-item">
-              <div class="ch-label">
-                <span>R (Đỏ)</span>
-                <strong>{{ Math.round((target.r / 255) * 100) }}%</strong>
-              </div>
-              <div class="ch-track">
-                <div
-                  class="ch-fill red"
-                  :style="{ width: `${(target.r / 255) * 100}%` }"
-                />
-              </div>
-            </div>
-
-            <div class="channel-item">
-              <div class="ch-label">
-                <span>G (Lục)</span>
-                <strong>{{ Math.round((target.g / 255) * 100) }}%</strong>
-              </div>
-              <div class="ch-track">
-                <div
-                  class="ch-fill green"
-                  :style="{ width: `${(target.g / 255) * 100}%` }"
-                />
-              </div>
-            </div>
-
-            <div class="channel-item">
-              <div class="ch-label">
-                <span>B (Lam)</span>
-                <strong>{{ Math.round((target.b / 255) * 100) }}%</strong>
-              </div>
-              <div class="ch-track">
-                <div
-                  class="ch-fill blue"
-                  :style="{ width: `${(target.b / 255) * 100}%` }"
-                />
-              </div>
-            </div>
-          </div>
+          <ColorChannelBars
+            :color-format="colorFormat"
+            :target="target"
+          />
         </div>
 
         <div
@@ -643,6 +621,31 @@ onUnmounted(() => {
               {{ gameMode === 'time_attack' ? '🔄 Làm mới' : '🔄 Đổi màu' }}
             </button>
           </div>
+        </div>
+
+        <div
+          v-if="solvedSwatches.length > 0"
+          class="palette-strip"
+        >
+          <div class="palette-strip-left">
+            <span class="palette-label">🎨 Bảng màu đã giải ({{ solvedSwatches.length }}):</span>
+            <div class="palette-dots">
+              <span
+                v-for="(sw, idx) in solvedSwatches"
+                :key="`${sw.hex}-${idx}`"
+                class="palette-dot"
+                :style="{ backgroundColor: sw.rgb }"
+                :title="sw.hex"
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            class="copy-code-btn"
+            @click="copySolvedPalette"
+          >
+            {{ isCopiedPalette ? '✅ Đã chép' : '📋 Chép bảng màu' }}
+          </button>
         </div>
       </main>
     </div>
@@ -866,7 +869,7 @@ onUnmounted(() => {
 .summary-grid {
   width: 100%;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
@@ -925,74 +928,35 @@ onUnmounted(() => {
   margin: 0.35rem 0 1rem;
 }
 
-.channel-bars {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.85rem;
-}
-
-.channel-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.ch-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-}
-
-.ch-track {
-  height: 7px;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-
-.ch-fill {
-  height: 100%;
-  border-radius: 99px;
-  transition: width 0.3s ease;
-}
-
-.ch-fill.red { background: #ff5555; }
-.ch-fill.green { background: #34d399; }
-.ch-fill.blue { background: #38bdf8; }
-.ch-fill.hue { background: linear-gradient(90deg, #ff5555, #fbbf24, #34d399, #38bdf8, #a855f7, #ff5555); }
-.ch-fill.sat { background: var(--accent); }
-.ch-fill.light { background: var(--primary); }
-
 .color-grid {
   display: grid;
   gap: 1rem;
 }
 
 .color-grid.cols-2 {
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .color-grid.cols-3 {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .color-tile {
   height: 118px;
   border-radius: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.14);
+  border: 2px solid var(--outline);
   cursor: pointer;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   padding: 0.65rem;
   transition: transform 0.18s ease, opacity 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-card);
 }
 
 .color-tile:hover:not(.eliminated) {
   transform: translateY(-4px) scale(1.02);
-  border-color: rgba(255, 255, 255, 0.55);
+  border-color: var(--primary);
 }
 
 .color-tile.eliminated {
@@ -1002,8 +966,8 @@ onUnmounted(() => {
 }
 
 .color-tile.winner {
-  border-color: #ffffff;
-  box-shadow: 0 0 28px rgba(255, 255, 255, 0.6);
+  border-color: var(--success);
+  box-shadow: 0 0 28px var(--primary-glow);
   transform: scale(1.03);
 }
 
@@ -1158,7 +1122,7 @@ onUnmounted(() => {
   }
 
   .color-grid.cols-3 {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .color-tile {
@@ -1239,5 +1203,44 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(4px);
+}
+
+.palette-strip {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--outline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.palette-strip-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.palette-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-dim);
+}
+
+.palette-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.palette-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1px solid var(--outline);
+  display: inline-block;
 }
 </style>

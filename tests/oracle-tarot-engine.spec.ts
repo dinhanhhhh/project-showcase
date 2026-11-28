@@ -11,6 +11,7 @@ import {
   drawSpread,
   formatReadingShareText,
   getCardAdvice,
+  getDailyOracleCard,
   shuffleCards,
   synthesizeSpreadSummary,
 } from '@/views/oracle-tarot/engine'
@@ -25,10 +26,25 @@ describe('Oracle Tarot Engine & Store', () => {
     setActivePinia(pinia)
   })
 
-  it('provides at least 18 distinct oracle cards with complete metadata', () => {
-    expect(ORACLE_CARDS.length).toBeGreaterThanOrEqual(18)
+  it('provides full 22 Major Arcana cards (0..XXI) with unique ids and roman numerals', () => {
+    expect(ORACLE_CARDS).toHaveLength(22)
     const ids = new Set(ORACLE_CARDS.map((c) => c.id))
-    expect(ids.size).toBe(ORACLE_CARDS.length)
+    const romans = new Set(ORACLE_CARDS.map((c) => c.roman))
+    expect(ids.size).toBe(22)
+    expect(romans.size).toBe(22)
+    expect(romans.has('0')).toBe(true)
+    expect(romans.has('XXI')).toBe(true)
+    expect(
+      ORACLE_CARDS.every(
+        (c) =>
+          c.name.trim().length > 0 &&
+          c.element.trim().length > 0 &&
+          c.keyword.trim().length > 0 &&
+          c.message.trim().length > 0 &&
+          c.advice.trim().length > 0 &&
+          c.image.trim().length > 0,
+      ),
+    ).toBe(true)
   })
 
   it('draws 3 unique cards for the 3-card time spread', () => {
@@ -136,7 +152,19 @@ describe('Oracle Tarot Engine & Store', () => {
     expect(text).toContain('🔮 Trải bài Oracle (3 lá)')
     expect(text).toContain('Câu hỏi: "Sự nghiệp tháng này?"')
     expect(text).toContain('Lá Ngược')
-    expect(text).toContain(spread[0].card.name)
+    expect(text).toContain(`${spread[0].card.roman} · ${spread[0].card.name}`)
+    expect(text).not.toContain('undefined ·')
     expect(text).toContain(`Tổng hợp: ${summary}`)
+  })
+
+  it('draws a deterministic daily oracle card per YYYY-MM-DD seed', () => {
+    const d1 = getDailyOracleCard('2026-11-28', true)
+    const d2 = getDailyOracleCard('2026-11-28', true)
+    expect(d1.card.id).toBe(d2.card.id)
+    expect(d1.reversed).toBe(d2.reversed)
+    expect(d1.slotLabel).toContain('2026-11-28')
+
+    const noRev = getDailyOracleCard('2026-11-28', false)
+    expect(noRev.reversed).toBe(false)
   })
 })

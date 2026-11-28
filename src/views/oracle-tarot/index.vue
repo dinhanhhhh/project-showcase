@@ -2,11 +2,15 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { type OracleReadingRecord, type OracleSpreadMode, useOracleTarotStore } from '@/stores/oracleTarot'
+import { copyTextWithFallback } from '@/utils/clipboard'
+import { getDailyDateKey } from '@/utils/daily-seed'
+import OracleJournalSection from './components/OracleJournalSection.vue'
 import { ORACLE_CARDS, type OracleCard } from './data'
 import {
   drawOracleReading,
   formatReadingShareText,
   getCardAdvice,
+  getDailyOracleCard,
   synthesizeSpreadSummary,
 } from './engine'
 
@@ -153,24 +157,6 @@ function selectSlot(idx: number) {
   activeSlotIndex.value = idx
 }
 
-function fallbackCopyToClipboard(text: string): boolean {
-  try {
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    textarea.setAttribute('readonly', '')
-    textarea.style.position = 'fixed'
-    textarea.style.top = '-9999px'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.select()
-    const ok = document.execCommand('copy')
-    document.body.removeChild(textarea)
-    return ok
-  } catch {
-    return false
-  }
-}
-
 async function copyReadingText() {
   const flippedSlots = drawnSlots.value.filter((s) => s.flipped)
   if (flippedSlots.length === 0) return
@@ -185,23 +171,13 @@ async function copyReadingText() {
   )
   if (!text) return
 
+  const ok = await copyTextWithFallback(text)
+  if (!ok) return
+
   copiedReading.value = true
   schedule(() => {
     copiedReading.value = false
   }, 2200)
-
-  try {
-    if (navigator.clipboard?.writeText) {
-      await Promise.race([
-        navigator.clipboard.writeText(text),
-        new Promise<void>((resolve) => schedule(resolve, 350)),
-      ])
-    } else {
-      fallbackCopyToClipboard(text)
-    }
-  } catch {
-    fallbackCopyToClipboard(text)
-  }
 }
 
 function resetReading() {
@@ -211,6 +187,25 @@ function resetReading() {
   activeSlotIndex.value = 0
   viewingSavedId.value = null
   copiedReading.value = false
+}
+
+function drawDailyCard() {
+  if (isShuffling.value) return
+  clearAllTimers()
+  const todayKey = getDailyDateKey()
+  const daily = getDailyOracleCard(todayKey, store.includeReversed)
+  spreadMode.value = 1
+  viewingSavedId.value = null
+  copiedReading.value = false
+  drawnSlots.value = [
+    {
+      slotLabel: daily.slotLabel,
+      card: daily.card,
+      reversed: daily.reversed,
+      flipped: true,
+    },
+  ]
+  activeSlotIndex.value = 0
 }
 
 onUnmounted(() => {
@@ -350,14 +345,24 @@ onUnmounted(() => {
             </div>
           </button>
 
-          <button
-            type="button"
-            class="draw-cta"
-            :disabled="isShuffling"
-            @click="performDraw"
-          >
-            {{ isShuffling ? '✨ Đang kết nối năng lượng...' : (spreadMode === 1 ? '🔮 Xáo bài & Rút 1 lá' : '🔮 Trải bộ 3 lá (Quá khứ · Hiện tại · Tương lai)') }}
-          </button>
+          <div class="draw-cta-group">
+            <button
+              type="button"
+              class="draw-cta"
+              :disabled="isShuffling"
+              @click="performDraw"
+            >
+              {{ isShuffling ? '✨ Đang kết nối năng lượng...' : (spreadMode === 1 ? '🔮 Xáo bài & Rút 1 lá' : '🔮 Trải bộ 3 lá (Quá khứ · Hiện tại · Tương lai)') }}
+            </button>
+            <button
+              type="button"
+              class="reversed-toggle"
+              :disabled="isShuffling"
+              @click="drawDailyCard"
+            >
+              📅 Lá Hôm Nay
+            </button>
+          </div>
         </div>
 
         <!-- Trạng thái đã trải bài -->
@@ -475,42 +480,12 @@ onUnmounted(() => {
       </section>
 
       <!-- Nhật ký trải bài lưu bền vững qua Pinia (tối đa 10 lần) -->
-      <section
-        v-if="store.history.length > 0"
-        class="journal-box glass-card"
-      >
-        <div class="journal-head">
-          <h3>📜 Nhật ký trải bài ({{ store.history.length }}/10 lần gần nhất)</h3>
-          <button
-            type="button"
-            class="clear-journal-btn"
-            @click="store.clearHistory()"
-          >
-            Xóa nhật ký
-          </button>
-        </div>
-        <div class="journal-list">
-          <button
-            v-for="entry in store.history"
-            :key="entry.id"
-            type="button"
-            class="journal-row"
-            :class="{ active: viewingSavedId === entry.id }"
-            @click="restoreReading(entry)"
-          >
-            <span class="j-time">{{ entry.timestamp }}</span>
-            <span class="j-mode">{{ entry.mode }} lá</span>
-            <span
-              v-if="entry.question"
-              class="j-question"
-            >“{{ entry.question }}”</span>
-            <span class="j-cards">
-              {{ entry.cards.map((c) => `${c.image} ${c.name}${c.reversed ? ' (Ngược)' : ''}`).join('  ·  ') }}
-            </span>
-            <span class="j-restore">Xem lại →</span>
-          </button>
-        </div>
-      </section>
+      <OracleJournalSection
+        :history="store.history"
+        :viewing-saved-id="viewingSavedId"
+        @restore="restoreReading"
+        @clear="store.clearHistory()"
+      />
     </div>
   </main>
 </template>
@@ -713,6 +688,14 @@ onUnmounted(() => {
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--text-dim);
+}
+
+.draw-cta-group {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .draw-cta {
@@ -963,98 +946,6 @@ onUnmounted(() => {
 
 .reset-btn:hover {
   border-color: var(--primary);
-  color: var(--primary);
-}
-
-.journal-box {
-  padding: 1.15rem 1.35rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.7rem;
-}
-
-.journal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.journal-box h3 {
-  font-family: 'Manrope', sans-serif;
-  font-size: 0.95rem;
-}
-
-.clear-journal-btn {
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.clear-journal-btn:hover {
-  color: var(--danger);
-}
-
-.journal-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-.journal-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  font-size: 0.82rem;
-  padding: 0.55rem 0.75rem;
-  border-radius: 10px;
-  background: var(--bg-sidebar);
-  border: 1px solid var(--outline);
-  flex-wrap: wrap;
-  text-align: left;
-  cursor: pointer;
-  color: var(--text);
-  transition: var(--transition-fast);
-}
-
-.journal-row:hover,
-.journal-row.active {
-  border-color: var(--primary);
-}
-
-.j-time {
-  color: var(--text-muted);
-  font-family: monospace;
-}
-
-.j-mode {
-  padding: 0.12rem 0.45rem;
-  border-radius: 99px;
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-weight: 700;
-  font-size: 0.72rem;
-}
-
-.j-question {
-  color: var(--accent);
-  font-style: italic;
-}
-
-.j-cards {
-  color: var(--text);
-  font-weight: 500;
-  flex: 1;
-}
-
-.j-restore {
-  font-size: 0.75rem;
-  font-weight: 700;
   color: var(--primary);
 }
 

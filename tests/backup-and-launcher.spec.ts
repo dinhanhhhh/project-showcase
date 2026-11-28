@@ -29,10 +29,15 @@ describe('Launcher & Backup Utils', () => {
 
   it('isAllowedBackupKey and buildBackupPayload whitelist only Vibe Platform keys', () => {
     expect(isAllowedBackupKey('vibe:theme')).toBe(true)
+    expect(isAllowedBackupKey('vibe:daily-challenges')).toBe(true)
     expect(isAllowedBackupKey('vibe_co_tuong')).toBe(true)
     expect(isAllowedBackupKey('ngare_game_state')).toBe(true)
     expect(isAllowedBackupKey('saigon_tycoon_save')).toBe(true)
+    expect(isAllowedBackupKey('monopoly_saigon_save')).toBe(true)
+    expect(isAllowedBackupKey('monopoly_saigon_achievements')).toBe(true)
     expect(isAllowedBackupKey('anime_farm_save')).toBe(true)
+    expect(isAllowedBackupKey('FAM_FARM_GAME_SAVE_V6_3PLOTS')).toBe(true)
+    expect(isAllowedBackupKey('FAM_ORDERS_SAVE_V4')).toBe(true)
     expect(isAllowedBackupKey('third_party_secret')).toBe(false)
 
     localStorage.setItem('vibe:theme', 'arctic')
@@ -76,5 +81,36 @@ describe('Launcher & Backup Utils', () => {
     expect(count).toBe(2)
     expect(localStorage.getItem('vibe:theme')).toBe('emerald')
     expect(localStorage.getItem('evil_injection')).toBeNull()
+  })
+
+  it('survives QuotaExceededError during restoreBackupPayload and strips prototype-like keys', () => {
+    const rawWithProto = '{"version":1,"exportedAt":"2026-11-28","entries":{"__proto__":"bad","constructor":"bad","vibe:theme":"sunset","vibe_color_game":"{}"}}'
+    const validated = parseAndValidateBackup(rawWithProto)
+    expect(validated.ok).toBe(true)
+    if (!validated.ok) return
+
+    expect(Object.keys(validated.data.entries).sort()).toEqual(['vibe:theme', 'vibe_color_game'])
+
+    let calls = 0
+    const flakyStorage = {
+      ...localStorage,
+      length: 0,
+      key: () => null,
+      getItem: () => null,
+      removeItem: () => {},
+      clear: () => {},
+      setItem: (k: string, v: string) => {
+        calls += 1
+        if (k === 'vibe_color_game') {
+          throw new Error('QuotaExceededError')
+        }
+        localStorage.setItem(k, v)
+      },
+    } as Storage
+
+    const restored = restoreBackupPayload(flakyStorage, validated.data)
+    expect(calls).toBe(2)
+    expect(restored).toBe(1)
+    expect(localStorage.getItem('vibe:theme')).toBe('sunset')
   })
 })

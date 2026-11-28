@@ -29,6 +29,11 @@ export function useParticlesBackground(
       window.removeEventListener('resize', resizeHandler)
       resizeHandler = null
     }
+    const canvas = canvasRef.value
+    if (canvas) {
+      const ctx = canvas.getContext('2d')
+      ctx?.clearRect(0, 0, canvas.width, canvas.height)
+    }
     isAnimating = false
   }
 

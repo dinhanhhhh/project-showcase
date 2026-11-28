@@ -1,6 +1,6 @@
 export type ColorFormat = 'rgb' | 'hex' | 'hsl'
 
-export type ColorGameMode = 'classic' | 'time_attack'
+export type ColorGameMode = 'classic' | 'time_attack' | 'daily_seed'
 
 export type GridSize = 4 | 6 | 9
 

@@ -1,3 +1,4 @@
+import { createDailyRng, getDailyDateKey, pickSeededItems } from '@/utils/daily-seed'
 import { ORACLE_CARDS } from './data'
 import type { OracleCard } from './data'
 
@@ -98,11 +99,25 @@ export function formatReadingShareText(
   for (const slot of slots) {
     const orientation = slot.reversed ? 'Lá Ngược' : 'Xuôi'
     lines.push(
-      `- ${slot.slotLabel}: ${slot.card.numeral} · ${slot.card.name} (${orientation}) — ${getCardAdvice(slot.card, slot.reversed)}`,
+      `- ${slot.slotLabel}: ${slot.card.roman} · ${slot.card.name} (${orientation}) — ${getCardAdvice(slot.card, slot.reversed)}`,
     )
   }
   if (summary.trim()) {
     lines.push(`Tổng hợp: ${summary.trim()}`)
   }
   return lines.join('\n')
+}
+
+export function getDailyOracleCard(
+  dateKey: string = getDailyDateKey(),
+  includeReversed = true,
+): DrawnOracleCard {
+  const picked = pickSeededItems(ORACLE_CARDS, 1, `oracle-daily-${dateKey}`)[0] ?? ORACLE_CARDS[0]
+  const rng = createDailyRng(`oracle-daily-rev-${dateKey}-${picked.id}`)
+  const reversed = includeReversed ? rng() < 0.28 : false
+  return {
+    slotLabel: `Thông Điệp ${dateKey}`,
+    card: picked,
+    reversed,
+  }
 }

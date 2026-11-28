@@ -5,7 +5,10 @@ export const ALLOWED_STORAGE_PREFIXES = [
   'vibe_',
   'ngare_',
   'saigon_tycoon_',
+  'monopoly_',
   'anime_farm_',
+  'FAM_FARM_',
+  'FAM_ORDERS_',
 ] as const
 
 export function isAllowedBackupKey(key: string): boolean {
@@ -22,13 +25,17 @@ export type VibeBackupPayload = z.infer<typeof VibeBackupSchema>
 
 export function buildBackupPayload(storage: Storage): VibeBackupPayload {
   const entries: Record<string, string> = {}
-  for (let i = 0; i < storage.length; i++) {
-    const key = storage.key(i)
-    if (!key || !isAllowedBackupKey(key)) continue
-    const val = storage.getItem(key)
-    if (typeof val === 'string') {
-      entries[key] = val
+  try {
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i)
+      if (!key || !isAllowedBackupKey(key)) continue
+      const val = storage.getItem(key)
+      if (typeof val === 'string') {
+        entries[key] = val
+      }
     }
+  } catch {
+    // Ignore storage read restrictions cleanly
   }
 
   return {
@@ -55,7 +62,7 @@ export function parseAndValidateBackup(
 
   const filteredEntries: Record<string, string> = {}
   for (const [k, v] of Object.entries(check.data.entries)) {
-    if (isAllowedBackupKey(k)) {
+    if (Object.prototype.hasOwnProperty.call(check.data.entries, k) && isAllowedBackupKey(k)) {
       filteredEntries[k] = v
     }
   }
@@ -72,9 +79,13 @@ export function parseAndValidateBackup(
 export function restoreBackupPayload(storage: Storage, payload: VibeBackupPayload): number {
   let restored = 0
   for (const [key, value] of Object.entries(payload.entries)) {
-    if (!isAllowedBackupKey(key)) continue
-    storage.setItem(key, value)
-    restored += 1
+    if (!isAllowedBackupKey(key) || typeof value !== 'string') continue
+    try {
+      storage.setItem(key, value)
+      restored += 1
+    } catch {
+      // Skip keys that exceed browser storage quota without aborting partial restore
+    }
   }
   return restored
 }

@@ -1,3 +1,4 @@
+import { createDailyRng, getDailyDateKey } from '@/utils/daily-seed'
 import type { GameState, TypingRank, TypingRunRecord, WordPackId, WordPackMeta } from './types'
 
 export const WORD_PACKS: Record<WordPackId, WordPackMeta> = {
@@ -125,15 +126,25 @@ export function calculateTypingRank(wpm: number, accuracy: number): TypingRank {
   return 'C'
 }
 
+export function createDailyWords(
+  dateKey: string = getDailyDateKey(),
+  pack: WordPackId = 'dev',
+  count = 40,
+): string[] {
+  const rng = createDailyRng(`neon-typing-${dateKey}-${pack}`)
+  return getRandomWords(count, pack, rng)
+}
+
 export function createInitialState(
   wordCount: number = 30,
   pack: WordPackId = 'dev',
   durationSeconds: number = 30,
+  wordsOverride?: readonly string[],
 ): GameState {
   return {
     isActive: false,
     isFinished: false,
-    words: getRandomWords(wordCount, pack),
+    words: wordsOverride ? [...wordsOverride] : getRandomWords(wordCount, pack),
     currentIndex: 0,
     inputValue: '',
     timeLeft: durationSeconds,
@@ -150,4 +161,28 @@ export function computeAverageWpm(runs: readonly TypingRunRecord[]): number {
   if (runs.length === 0) return 0
   const total = runs.reduce((acc, run) => acc + run.wpm, 0)
   return Math.round(total / runs.length)
+}
+
+export interface TypingSummaryInput {
+  mode: TypingMode
+  wpm: number
+  accuracy: number
+  rank: TypingRank
+  maxCombo: number
+  pack: WordPackId
+  durationSeconds?: number
+  elapsedSeconds?: number
+  dateKey?: string
+}
+
+export function formatTypingSummaryText(input: TypingSummaryInput): string {
+  const packLabel = WORD_PACKS[input.pack]?.label ?? input.pack
+  const modeLabel =
+    input.mode === 'daily_seed'
+      ? `Daily Seed (${input.dateKey ?? getDailyDateKey()})`
+      : input.mode === 'sudden_death'
+        ? `Sudden Death (${input.elapsedSeconds ?? 0}s)`
+        : `Tính giờ ${input.durationSeconds ?? 30}s`
+
+  return `⌨️ Neon Speed Typist [${modeLabel}]: ${input.wpm} WPM · ${input.accuracy}% chính xác · Hạng ${input.rank} · Max Combo ${input.maxCombo} 🔥 · Bộ từ: ${packLabel}`
 }

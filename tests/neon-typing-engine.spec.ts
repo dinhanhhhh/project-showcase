@@ -10,7 +10,9 @@ import {
   calculateTypingRank,
   calculateWPM,
   computeAverageWpm,
+  createDailyWords,
   createInitialState,
+  formatTypingSummaryText,
   getRandomWords,
 } from '@/views/neon-typing/engine'
 
@@ -95,5 +97,65 @@ describe('Neon Typing Engine & Store', () => {
 
     store.clearHistory()
     expect(store.history).toEqual([])
+  })
+
+  it('produces deterministic daily words per YYYY-MM-DD seed and caps dailyBestByDate at 14 days', async () => {
+    const wordsA = createDailyWords('2026-11-28', 'dev', 25)
+    const wordsB = createDailyWords('2026-11-28', 'dev', 25)
+    const wordsNextDay = createDailyWords('2026-11-29', 'dev', 25)
+
+    expect(wordsA).toEqual(wordsB)
+    expect(wordsA).not.toEqual(wordsNextDay)
+    expect(wordsA).toHaveLength(25)
+
+    const store = useNeonTypingStore()
+    store.recordDailyResult(68, 96, 'dev', '2026-11-28')
+    store.recordDailyResult(52, 92, 'dev', '2026-11-28') // keeps higher score
+    for (let d = 1; d <= 16; d++) {
+      const day = `2026-10-${String(d).padStart(2, '0')}`
+      store.recordDailyResult(50 + d, 95, 'dev', day)
+    }
+    await nextTick()
+
+    expect(store.dailyBestByDate['2026-11-28']).toBe(68)
+    expect(Object.keys(store.dailyBestByDate)).toHaveLength(14)
+  })
+
+  it('formats shareable summary text cleanly for timed, daily_seed, and sudden_death modes', () => {
+    const timedText = formatTypingSummaryText({
+      mode: 'timed',
+      wpm: 78,
+      accuracy: 97,
+      rank: 'S+',
+      maxCombo: 18,
+      pack: 'dev',
+      durationSeconds: 30,
+    })
+    expect(timedText).toContain('Tính giờ 30s')
+    expect(timedText).toContain('78 WPM')
+    expect(timedText).toContain('Hạng S+')
+
+    const dailyText = formatTypingSummaryText({
+      mode: 'daily_seed',
+      wpm: 64,
+      accuracy: 92,
+      rank: 'S',
+      maxCombo: 11,
+      pack: 'vietnamese',
+      dateKey: '2026-11-28',
+    })
+    expect(dailyText).toContain('Daily Seed (2026-11-28)')
+    expect(dailyText).toContain('Tiếng Việt')
+
+    const sdText = formatTypingSummaryText({
+      mode: 'sudden_death',
+      wpm: 50,
+      accuracy: 89,
+      rank: 'A',
+      maxCombo: 9,
+      pack: 'syntax',
+      elapsedSeconds: 42,
+    })
+    expect(sdText).toContain('Sudden Death (42s)')
   })
 })

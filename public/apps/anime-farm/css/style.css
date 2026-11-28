@@ -86,6 +86,15 @@ body.weather-rain .sunbeam {
   opacity: 0 !important;
 }
 
+body.weather-rain .bg-panoramic {
+  filter: brightness(0.88) saturate(0.85) contrast(1.03);
+  transition: filter 0.8s ease;
+}
+
+body.weather-rain .ambient-petal {
+  opacity: 0 !important;
+}
+
 .ambient-petal {
   position: absolute;
   top: -20px;

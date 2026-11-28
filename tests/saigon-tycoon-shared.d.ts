@@ -16,6 +16,7 @@ declare module '../public/apps/saigon-tycoon/shared/constants.js' {
     MORTGAGE_INTEREST_RATE: number
     BANK_LIMITS: { houses: number | null; hotels: number | null }
     MAX_JAIL_TURNS: number
+    MAX_ROUNDS: number
     RAILROAD_RENTS: number[]
     UTILITY_MULTIPLIERS: number[]
     COLOR_GROUPS: Record<string, ColorGroupMeta>
@@ -40,9 +41,37 @@ declare module '../public/apps/saigon-tycoon/shared/data/board-data.js' {
     houseCost?: number
     mortgage?: number
     amount?: number
+    action?: string
   }
 
   export const SAIGON_BOARD_DATA: BoardTile[]
+}
+
+declare module '../public/apps/saigon-tycoon/shared/data/chance-cards.js' {
+  export interface SaigonCard {
+    id: string
+    title: string
+    desc: string
+    icon: string
+    action: {
+      type: string
+      amount?: number
+      target?: number
+      passGoReward?: boolean
+      steps?: number
+      doubleRent?: boolean
+      multiplier?: number
+      houseFee?: number
+      hotelFee?: number
+    }
+  }
+
+  export const CHANCE_CARDS: SaigonCard[]
+}
+
+declare module '../public/apps/saigon-tycoon/shared/data/chest-cards.js' {
+  import type { SaigonCard } from '../public/apps/saigon-tycoon/shared/data/chance-cards.js'
+  export const CHEST_CARDS: SaigonCard[]
 }
 
 declare module '../public/apps/saigon-tycoon/shared/rules.js' {
@@ -54,6 +83,8 @@ declare module '../public/apps/saigon-tycoon/shared/rules.js' {
     isMortgaged: boolean
   }
 
+  export type BotPersonality = 'cautious' | 'balanced' | 'standard' | 'tycoon' | null
+
   export interface PlayerState {
     id: string
     name: string
@@ -64,6 +95,8 @@ declare module '../public/apps/saigon-tycoon/shared/rules.js' {
     hasJailCard: boolean
     isBankrupt: boolean
     isBot: boolean
+    personality?: BotPersonality
+    mood?: number
   }
 
   export interface BuildCheckResult {
@@ -73,6 +106,37 @@ declare module '../public/apps/saigon-tycoon/shared/rules.js' {
     isHotel?: boolean
     cost?: number
     nextLevel?: number
+  }
+
+  export interface MortgageCheckResult {
+    canMortgage: boolean
+    reason?: string
+    mortgageValue?: number
+  }
+
+  export interface UnmortgageCheckResult {
+    canUnmortgage: boolean
+    reason?: string
+    unmortgageCost?: number
+  }
+
+  export interface SellHouseCheckResult {
+    canSell: boolean
+    reason?: string
+    refund?: number
+    nextHouses?: number
+  }
+
+  export interface TradeCheckResult {
+    canTrade: boolean
+    reason?: string
+  }
+
+  export interface LiquidationPlan {
+    sells: number[]
+    mortgages: number[]
+    cash: number
+    enough: boolean
   }
 
   export interface PhaseStatus {
@@ -113,11 +177,46 @@ declare module '../public/apps/saigon-tycoon/shared/rules.js' {
       player: PlayerState,
       propertiesState: Record<number, PropertyState>,
     ): number
+    comparePlayersNetWorth(
+      a: PlayerState,
+      b: PlayerState,
+      propertiesState: Record<number, PropertyState>,
+    ): number
+    calculateMaxLiquidation(
+      player: PlayerState,
+      propertiesState: Record<number, PropertyState>,
+    ): number
+    canMortgage(
+      tile: BoardTile,
+      player: PlayerState,
+      propertiesState: Record<number, PropertyState>,
+    ): MortgageCheckResult
+    canUnmortgage(
+      tile: BoardTile,
+      player: PlayerState,
+      propertiesState: Record<number, PropertyState>,
+    ): UnmortgageCheckResult
+    canSellHouse(
+      tile: BoardTile,
+      player: PlayerState,
+      propertiesState: Record<number, PropertyState>,
+    ): SellHouseCheckResult
+    canTradeProperty(
+      tile: BoardTile,
+      propertiesState: Record<number, PropertyState>,
+      ownerId?: string | null,
+    ): TradeCheckResult
+    getLiquidationPlan(
+      player: PlayerState,
+      amountOwed: number,
+      propertiesState: Record<number, PropertyState>,
+    ): LiquidationPlan
   }
 }
 
 declare module '../public/apps/saigon-tycoon/shared/engine.js' {
   import type { BoardTile } from '../public/apps/saigon-tycoon/shared/data/board-data.js'
+  import type { SaigonCard } from '../public/apps/saigon-tycoon/shared/data/chance-cards.js'
   import type { PlayerState, PropertyState } from '../public/apps/saigon-tycoon/shared/rules.js'
 
   export const TURN_STATES: {
@@ -132,16 +231,50 @@ declare module '../public/apps/saigon-tycoon/shared/engine.js' {
   export function hashString(str: string): number
   export function createMulberry32(seed: number | string): () => number
 
+  export interface AuctionState {
+    tile: BoardTile
+    currentBid: number
+    highestBidder: string | null
+    activePlayerIds: string[]
+    currentTurnPlayerId: string
+  }
+
+  export interface PendingActionState {
+    type: string
+    playerId?: string
+    debtType?: string
+    creditorId?: string | null
+    amount?: number
+    tileId?: number
+    card?: SaigonCard
+    result?: {
+      message?: string
+      moveTarget?: number
+      doubleRent?: boolean
+      utility10x?: boolean
+    }
+    [key: string]: unknown
+  }
+
   export interface EngineState {
     seed: number | string
     players: PlayerState[]
     properties: Record<number, PropertyState>
+    chanceDeck: SaigonCard[]
+    chestDeck: SaigonCard[]
     currentTurnIndex: number
     turnState: string
     consecutiveDoubles: number
+    lastRoll: { val1: number; val2: number; total: number; isDoubles: boolean } | null
+    pendingAction: PendingActionState | null
+    auction?: AuctionState | null
+    jackpotPot: number
     round: number
     isEndless: boolean
     maxRounds: number | null
+    winner?: PlayerState | null
+    isGameOver?: boolean
+    endReason?: string
   }
 
   export interface EngineAction {
@@ -150,6 +283,14 @@ declare module '../public/apps/saigon-tycoon/shared/engine.js' {
     val2?: number
     tileId?: number
     position?: number
+    playerId?: string
+    amount?: number
+    senderId?: string
+    receiverId?: string
+    offerMoney?: number
+    offerTiles?: number[]
+    requestMoney?: number
+    requestTiles?: number[]
   }
 
   export interface EngineActionResult {
@@ -162,18 +303,110 @@ declare module '../public/apps/saigon-tycoon/shared/engine.js' {
     val2?: number
     total?: number
     isDoubles?: boolean
+    rent?: number
+    amount?: number
+    taxAmount?: number
+    winningBid?: number
+    winner?: PlayerState | null
+    ranked?: PlayerState[]
+    bankruptPlayer?: PlayerState
+    card?: SaigonCard
+    auction?: AuctionState | null
     state?: EngineState
   }
 
   export class GameEngine {
     state: EngineState
     constructor(
-      playerConfigs?: Array<{ id?: string; name?: string; token?: string; money?: number; isBot?: boolean }>,
-      options?: { seed?: number | string; rng?: () => number; fastMode?: boolean; isEndless?: boolean },
+      playerConfigs?: Array<{
+        id?: string
+        name?: string
+        token?: string
+        money?: number
+        isBot?: boolean
+        personality?: 'cautious' | 'balanced' | 'standard' | 'tycoon'
+      }>,
+      options?: {
+        seed?: number | string
+        rng?: () => number
+        fastMode?: boolean
+        isEndless?: boolean
+        maxRounds?: number
+      },
     )
     getTile(id: number): BoardTile
     getCurrentPlayer(): PlayerState
+    getOwner(tileId: number): PlayerState | null
+    drawCard(deckType: 'chance' | 'chest'): SaigonCard
+    executeCard(
+      player: PlayerState,
+      card: SaigonCard,
+    ): {
+      amount?: number
+      actionType?: string
+      message: string
+      moveTarget?: number
+      doubleRent?: boolean
+      utility10x?: boolean
+    }
+    evaluateLanding(
+      player: PlayerState,
+      landingPos: number,
+      action?: Record<string, unknown>,
+    ): EngineActionResult
     sendToJail(player: PlayerState): void
+    declareBankruptcy(
+      player: PlayerState,
+      creditor?: PlayerState | null,
+    ): EngineActionResult | null
     applyAction(action: EngineAction): EngineActionResult
+    loadState(state: EngineState): EngineState
+  }
+}
+
+declare module '../public/apps/saigon-tycoon/shared/BotAI.js' {
+  import type { BoardTile } from '../public/apps/saigon-tycoon/shared/data/board-data.js'
+  import type { AuctionState, EngineState } from '../public/apps/saigon-tycoon/shared/engine.js'
+  import type { PlayerState } from '../public/apps/saigon-tycoon/shared/rules.js'
+
+  export interface BotProfile {
+    buyReserve: number
+    auctionMult: number
+    auctionReserve: number
+    buildReserve: number
+    tradeThreshold: number
+  }
+
+  export const BOT_PROFILES: Record<string, BotProfile>
+
+  export const BotAI: {
+    groupStatus(
+      group: string,
+      ownerId: string | undefined,
+      state: EngineState,
+    ): { total: number; owned: number; missing: number }
+    shouldBuyProperty(
+      bot: PlayerState,
+      tile: BoardTile,
+      state: EngineState,
+    ): { shouldBuy: boolean; reason: string }
+    getAuctionDecision(
+      bot: PlayerState,
+      auction: AuctionState,
+      state: EngineState,
+    ): { action: 'BID' | 'PASS' | 'WAIT'; amount?: number }
+    getUnmortgageDecisions(bot: PlayerState, state: EngineState): number[]
+    getBuildDecisions(bot: PlayerState, state: EngineState): number[]
+    evaluateTradeOffer(
+      bot: PlayerState,
+      tradeOffer: {
+        sender: PlayerState
+        offerMoney?: number
+        offerTiles?: number[]
+        requestMoney?: number
+        requestTiles?: number[]
+      },
+      state: EngineState,
+    ): { accept: boolean; reason: string }
   }
 }

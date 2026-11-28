@@ -3,7 +3,7 @@
     "slug": "oracle-tarot",
     "path": "/oracle-tarot",
     "name": "Bói Bài Oracle",
-    "description": "Trải bài 1 lá hôm nay hoặc 3 lá Quá khứ · Hiện tại · Tương lai từ 18 lá Oracle (hỗ trợ Xuôi/Ngược, chép lời giải & nhật ký 10 lần bói lưu qua Pinia).",
+    "description": "Trải bài 1 lá hôm nay hoặc 3 lá Quá khứ · Hiện tại · Tương lai từ trọn bộ 22 lá Major Arcana (hỗ trợ Xuôi/Ngược, chép lời giải & nhật ký 10 lần bói lưu qua Pinia).",
     "category": "spiritual",
     "author": "Truong Dinh Anh"
   },
@@ -19,7 +19,7 @@
     "slug": "co-tuong",
     "path": "/co-tuong",
     "name": "Cờ Tướng Master",
-    "description": "Game Cờ Tướng (Xiangqi) chuẩn luật quốc tế với AI Minimax Alpha-Beta 3 cấp độ, 6 Cờ Thế tàn cuộc, xuất biên bản, phím tắt nhanh và lưu ván tự động.",
+    "description": "Game Cờ Tướng (Xiangqi) chuẩn luật quốc tế với AI Minimax Alpha-Beta 3 cấp độ, 10 Cờ Thế tàn cuộc, xuất biên bản, phím tắt nhanh và lưu ván tự động.",
     "category": "game",
     "author": "Truong Dinh Anh"
   },
@@ -35,7 +35,7 @@
     "slug": "hom-nay-an-gi",
     "path": "/hom-nay-an-gi",
     "name": "Hôm Nay Ăn Gì",
-    "description": "Quay món ăn Việt Nam mượt có âm thanh Web Audio, lọc theo nhóm món · buổi ăn · mức giá, gợi ý Thực đơn cả ngày (Sáng–Trưa–Tối–Ăn vặt), lưu yêu thích & lịch sử qua Pinia.",
+    "description": "Quay món ăn Việt Nam mượt có âm thanh Web Audio, lọc theo tên món · nhóm · buổi ăn · giá, gợi ý & chép Thực đơn 4 bữa, lưu yêu thích & lịch sử qua Pinia.",
     "category": "tool",
     "author": "Truong Dinh Anh"
   },
@@ -43,7 +43,7 @@
     "slug": "mini-piano",
     "path": "/mini-piano",
     "name": "Mini Piano",
-    "description": "Đàn Synthesizer Piano 13 phím hỗ trợ đa âm (Polyphony), ngân âm Sustain, 3 quãng tám (C3–C5), 4 âm sắc, Thử thách Giai điệu chấm điểm và lưu 5 bản thu.",
+    "description": "Đàn Synthesizer Piano 13 phím hỗ trợ đa âm (Polyphony), ngân âm Sustain, 3 quãng tám (C3–C5), 4 âm sắc, 8 bản nhạc & Thử thách Giai điệu + lưu 5 bản thu.",
     "category": "creative",
     "author": "Vibe Team"
   },
@@ -59,7 +59,7 @@
     "slug": "ngare",
     "path": "/ngare",
     "name": "Ngã Rẽ Cuộc Đời",
-    "description": "Game mô phỏng cuộc đời giàu sự kiện hiện đại, chọn nhanh phím 1–4, bảng tổng kết hành trình, hệ thống nghề nghiệp, kỹ năng và kết thúc đa nhánh.",
+    "description": "Mô phỏng cuộc đời toàn diện: chọn tính cách, 4 chuỗi cốt truyện, đầu tư tài sản theo thị trường, hành động hàng năm, chuyển ngành, đồ thị tổng kết & 15 kết cục.",
     "category": "game",
     "author": "Vibe Team"
   },
@@ -75,7 +75,7 @@
     "slug": "oop-flashcards",
     "path": "/oop-flashcards",
     "name": "OOP Flashcards",
-    "description": "Ôn tập 27 câu hỏi phỏng vấn OOP, SOLID & Design Patterns với thẻ lật 3D, chế độ Quiz trắc nghiệm chấm điểm, lọc thẻ chưa thuộc & thống kê tiến độ.",
+    "description": "Ôn tập 32 câu hỏi phỏng vấn OOP, SOLID, Design Patterns & Kiến trúc với thẻ lật 3D, Quiz chấm điểm, lọc độ khó & thống kê tiến độ.",
     "category": "education",
     "author": "Truong Dinh Anh"
   }

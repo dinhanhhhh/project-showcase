@@ -125,12 +125,12 @@ describe('OOP Flashcards Engine & Store', () => {
     expect(store.bestQuizPercent).toBe(0)
   })
 
-  it('includes at least 27 unique cards covering Design Patterns and SOLID in solid-patterns group', () => {
-    expect(OOP_FLASHCARDS.length).toBeGreaterThanOrEqual(27)
+  it('includes 32 unique cards covering OOP, SOLID, Design Patterns, and Concurrency/Architecture plus difficulty filter', () => {
+    expect(OOP_FLASHCARDS).toHaveLength(32)
     const uniqueIds = new Set(OOP_FLASHCARDS.map((card) => card.id))
-    expect(uniqueIds.size).toBe(OOP_FLASHCARDS.length)
+    expect(uniqueIds.size).toBe(32)
 
-    for (const id of ['7.6', '7.7', '7.8', '7.9', '7.10', '7.11']) {
+    for (const id of ['7.6', '7.7', '7.8', '7.9', '7.10', '7.11', '7.12', '7.13', '7.14', '7.15', '7.16']) {
       expect(uniqueIds.has(id)).toBe(true)
     }
 
@@ -138,7 +138,22 @@ describe('OOP Flashcards Engine & Store', () => {
       (g) => g.id === 'solid-patterns',
     )
     expect(solidGroup).toBeDefined()
-    expect(solidGroup!.total).toBeGreaterThanOrEqual(11)
+    expect(solidGroup!.total).toBe(16)
     expect(solidGroup!.mastered).toBe(3)
+
+    const advancedDeck = buildDeck(OOP_FLASHCARDS, 'all', [], false, Math.random, [], 'Nâng cao')
+    expect(advancedDeck.length).toBeGreaterThan(0)
+    expect(advancedDeck.every((card) => card.difficulty === 'Nâng cao')).toBe(true)
+  })
+
+  it('treats HTML-like snippets as plain safe tokens and builds 1-option quiz for single-card pool', () => {
+    const tokens = tokenizeJavaCode('<script>alert(1)</script>')
+    expect(tokens.map((t) => t.text).join('')).toBe('<script>alert(1)</script>')
+    expect(tokens.some((t) => t.kind === 'plain')).toBe(true)
+
+    const singleQuiz = generateQuizQuestions([OOP_FLASHCARDS[0]], [OOP_FLASHCARDS[0]], 4)
+    expect(singleQuiz).toHaveLength(1)
+    expect(singleQuiz[0].options).toHaveLength(1)
+    expect(singleQuiz[0].options[0].isCorrect).toBe(true)
   })
 })

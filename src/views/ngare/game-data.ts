@@ -1,132 +1,50 @@
 /* ========================================
    NGÃ RẼ CUỘC ĐỜI — Data Management
    ======================================== */
-import type { 
-  Achievement, 
-  Stats, 
-  EngineRef, 
-  Career, 
-  GameEvent, 
-  PassiveItem, 
+import type {
+  Achievement,
   ActiveSkill,
-  GameDataJson
+  AssetDefinition,
+  Career,
+  CharacterTrait,
+  EndingDefinition,
+  GameDataJson,
+  GameEvent,
+  PassiveItem,
+  YearlyAction,
 } from './types'
 
-// Import data files statically
-import { CAREERS } from './data/careers'
-import { COMMON_EVENTS, MILESTONE_EVENTS, LATE_GAME_EVENTS } from './data/events-common'
+import { CAREERS, getCareerLevel, getNextCareerLevel, isExecutiveLevel } from './data/careers'
+import { COMMON_EVENTS, LATE_GAME_EVENTS, MILESTONE_EVENTS } from './data/events-common'
+import { ARC_EVENTS } from './data/events-arcs'
 import { CAREER_EVENTS } from './data/events-career'
 import { DANGEROUS_EVENTS } from './data/events-dangerous'
-import { PASSIVE_ITEMS, ACTIVE_SKILLS } from './data/items'
+import { ACTIVE_SKILLS, PASSIVE_ITEMS } from './data/items'
+import { ACHIEVEMENTS as DATA_ACHIEVEMENTS } from './data/achievements'
+import { CHARACTER_TRAITS } from './data/traits'
+import { INVESTMENT_ASSETS, YEARLY_ACTIONS } from './data/assets'
+import { ALL_ENDINGS } from './data/endings'
 
-// Re-export all types
 export * from './types'
+export { getCareerLevel, getNextCareerLevel, isExecutiveLevel }
 
-export const ACHIEVEMENTS: Achievement[] = [
-  {
-    id: 'rich_30',
-    title: 'Triệu phú tuổi 30',
-    emoji: '💎',
-    description: 'Đạt tài chính 80 trước tuổi 30',
-    condition: (s: Stats, engine: EngineRef) =>
-      engine.state !== null && engine.state.age <= 30 && s.money >= 80,
-  },
-  {
-    id: 'workaholic',
-    title: 'Kẻ cuồng việc',
-    emoji: '🧠',
-    description: 'Đạt kỹ năng 90',
-    condition: (s: Stats) => s.skill >= 90,
-  },
-  {
-    id: 'zen_master',
-    title: 'Bậc thầy Zen',
-    emoji: '🧘',
-    description: 'Giữ stress dưới 10',
-    condition: (s: Stats) => s.stress <= 10,
-  },
-  {
-    id: 'social_butterfly',
-    title: 'Giao thiệp rộng',
-    emoji: '🤝',
-    description: 'Đạt quan hệ 90',
-    condition: (s: Stats) => s.relationships >= 90,
-  },
-  {
-    id: 'healthy_life',
-    title: 'Sống khỏe dẻo dai',
-    emoji: '🏃',
-    description: 'Giữ sức khỏe trên 80 sau tuổi 50',
-    condition: (s: Stats, engine: EngineRef) =>
-      engine.state !== null && engine.state.age >= 50 && s.health >= 80,
-  },
-  {
-    id: 'cto_master',
-    title: 'Huyền thoại Công nghệ',
-    emoji: '🚀',
-    description: 'Trở thành CTO',
-    condition: (_s: Stats, engine: EngineRef) =>
-      engine.state?.currentLevel === 'Giám đốc công nghệ (CTO)',
-  },
-  {
-    id: 'ceo_legend',
-    title: 'Đế chế Kinh doanh',
-    emoji: '👑',
-    description: 'Trở thành CEO',
-    condition: (_s: Stats, engine: EngineRef) =>
-      engine.state?.currentLevel === 'CEO' ||
-      engine.state?.currentLevel === 'Giám đốc bệnh viện',
-  },
-  {
-    id: 'stress_free',
-    title: 'Cuộc sống không áp lực',
-    emoji: '🌈',
-    description: 'Đạt hạnh phúc 90 và stress dưới 20',
-    condition: (s: Stats) => s.happiness >= 90 && s.stress <= 20,
-  },
-  {
-    id: 'wealthy_sage',
-    title: 'Giàu có và sáng suốt',
-    emoji: '💰',
-    description: 'Đạt tài chính 90 và kỹ năng 85',
-    condition: (s: Stats) => s.money >= 90 && s.skill >= 85,
-  },
-  {
-    id: 'survivor',
-    title: 'Người sống sót',
-    emoji: '💪',
-    description: 'Phục hồi sức khỏe lên 50 sau khi từng nguy kịch',
-    condition: (s: Stats) => s.health >= 50,
-  },
-]
-
-export function getCareerLevel(
-  careerId: string,
-  skillLevel: number,
-  careers: Record<string, Career>,
-) {
-  const career = careers[careerId]
-  if (!career) return null
-  let currentLevel = career.levels[0]
-  for (const level of career.levels) {
-    if (skillLevel >= level.minSkill) {
-      currentLevel = level
-    }
-  }
-  return currentLevel
-}
+export const ACHIEVEMENTS: Achievement[] = DATA_ACHIEVEMENTS
 
 const GAME_DATA: GameDataJson = {
   careers: CAREERS as Record<string, Career>,
   commonEvents: [...COMMON_EVENTS, ...LATE_GAME_EVENTS] as GameEvent[],
+  arcEvents: ARC_EVENTS as GameEvent[],
   careerEvents: CAREER_EVENTS as Record<string, GameEvent[]>,
   dangerousEvents: DANGEROUS_EVENTS as GameEvent[],
   milestoneEvents: MILESTONE_EVENTS as GameEvent[],
   passiveItems: PASSIVE_ITEMS as PassiveItem[],
   activeSkills: ACTIVE_SKILLS as ActiveSkill[],
+  traits: CHARACTER_TRAITS as readonly CharacterTrait[],
+  assets: INVESTMENT_ASSETS as readonly AssetDefinition[],
+  yearlyActions: YEARLY_ACTIONS as readonly YearlyAction[],
+  endings: ALL_ENDINGS as readonly EndingDefinition[],
 }
 
 export async function loadGameData(): Promise<GameDataJson> {
-  // Now simply return the static object as a promise to keep compatibility
   return Promise.resolve(GAME_DATA)
 }

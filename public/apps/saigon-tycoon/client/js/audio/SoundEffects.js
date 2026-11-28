@@ -7,7 +7,11 @@
 class SoundManager {
   constructor() {
     this.ctx = null;
-    this.isMuted = localStorage.getItem("monopoly_sound_muted") === "true";
+    try {
+      this.isMuted = localStorage.getItem("monopoly_sound_muted") === "true";
+    } catch {
+      this.isMuted = false;
+    }
 
     // Nạp sẵn file âm thanh xúc xắc thực tế (sử dụng import.meta.url để tương thích mọi vị trí index.html)
     try {
@@ -36,7 +40,11 @@ class SoundManager {
 
   toggleMute() {
     this.isMuted = !this.isMuted;
-    localStorage.setItem("monopoly_sound_muted", this.isMuted);
+    try {
+      localStorage.setItem("monopoly_sound_muted", String(this.isMuted));
+    } catch {
+      // Ignore storage errors
+    }
     if (this.isMuted && this.diceAudio) {
       this.diceAudio.pause();
       this.diceAudio.currentTime = 0;

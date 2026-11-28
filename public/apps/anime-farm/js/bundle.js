@@ -175,6 +175,7 @@
       expCurrentLevel,
       expToNext,
       progress,
+      rewardCoins: currentLevel.rewardCoins,
       unlockNote: currentLevel.unlockNote,
       currentLevel,
       nextLevel
@@ -438,12 +439,17 @@
       const cur = this.getLevelData();
       this.notify('EXP_CHANGED', { amount, current: this.exp, levelData: cur });
       if (cur.level > prev) {
+        let totalRewardCoins = 0;
+        for (let lv = prev + 1; lv <= cur.level; lv++) {
+          const lvDef = LEVELS.find(item => item.level === lv);
+          if (lvDef && lvDef.rewardCoins > 0) totalRewardCoins += lvDef.rewardCoins;
+        }
         this.notify('LEVEL_UP', {
           newLevel: cur.level,
-          rewardCoins: cur.rewardCoins,
+          rewardCoins: totalRewardCoins,
           unlockNote: cur.unlockNote
         });
-        if (cur.rewardCoins > 0) this.addCoins(cur.rewardCoins);
+        if (totalRewardCoins > 0) this.addCoins(totalRewardCoins);
       }
       this.save();
     }
@@ -708,6 +714,9 @@
     }
 
     buySeeds(cropId, quantity = 1) {
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        return { success: false, reason: 'INVALID_QUANTITY' };
+      }
       const crop = CROPS[cropId];
       if (!crop) return { success: false };
       const total = crop.seedCost * quantity;
@@ -722,6 +731,9 @@
     }
 
     sellCrop(cropId, quantity = 1) {
+      if (!Number.isInteger(quantity) || quantity <= 0) {
+        return { success: false, reason: 'INVALID_QUANTITY' };
+      }
       const available = this.inventory.crops[cropId] || 0;
       if (available < quantity) return { success: false };
       const crop = CROPS[cropId];
@@ -1794,6 +1806,9 @@
       }
       document.body.classList.toggle('weather-rain', w.id === 'rain');
       document.body.classList.toggle('weather-rainbow', w.id === 'rainbow');
+      if (this.rainRenderer) {
+        this.rainRenderer.setActive(w.id === 'rain');
+      }
     }
 
     updateHUD() {
@@ -2966,10 +2981,210 @@
   let ui = null;
   let farmInteractions = null;
 
+  // 9.5 RAIN WEATHER CANVAS RENDERER (60fps zero-allocation)
+  class RainWeatherRenderer {
+    constructor(canvas) {
+      this.canvas = canvas || null;
+      this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+      this.active = false;
+      this.rafId = 0;
+      this.lastTs = 0;
+      this.width = 1280;
+      this.height = 720;
+      this.dpr = 1;
+
+      const maxDrops = (typeof window !== 'undefined' && window.innerWidth >= 768) ? 76 : 42;
+      this.drops = Array.from({ length: maxDrops }, () => ({
+        x: 0,
+        y: 0,
+        len: 14,
+        speed: 620,
+        depth: 0.8,
+        drift: 0,
+        alpha: 0.35,
+        width: 1.1,
+        landY: 500
+      }));
+
+      this.splashes = Array.from({ length: 20 }, () => ({
+        active: false,
+        x: 0,
+        y: 0,
+        life: 0,
+        maxLife: 0.36,
+        maxRx: 8
+      }));
+
+      this._onResize = () => this.resize();
+      this._onFrame = (ts) => this.frame(ts);
+
+      if (typeof window !== 'undefined' && this.canvas) {
+        this.resize();
+        this.seedAllDrops(true);
+        window.addEventListener('resize', this._onResize);
+      }
+    }
+
+    resize() {
+      if (!this.canvas || typeof window === 'undefined') return;
+      this.width = Math.max(320, window.innerWidth || 1280);
+      this.height = Math.max(320, window.innerHeight || 720);
+      this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.canvas.width = Math.round(this.width * this.dpr);
+      this.canvas.height = Math.round(this.height * this.dpr);
+      if (this.ctx) {
+        this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      }
+    }
+
+    resetDrop(drop, randomY = false) {
+      const depth = 0.45 + Math.random() * 0.8;
+      drop.depth = depth;
+      drop.x = Math.random() * (this.width + 260) - 80;
+      drop.y = randomY ? Math.random() * this.height : -30 - Math.random() * 140;
+      drop.len = 10 + depth * 13 + Math.random() * 5;
+      drop.speed = 460 + depth * 360 + Math.random() * 90;
+      drop.drift = (Math.random() - 0.5) * 0.08;
+      drop.alpha = 0.14 + depth * 0.22;
+      drop.width = 0.7 + depth * 0.65;
+      drop.landY = this.height * (0.45 + Math.random() * 0.5);
+    }
+
+    seedAllDrops(randomY) {
+      for (let i = 0; i < this.drops.length; i++) {
+        this.resetDrop(this.drops[i], randomY);
+      }
+    }
+
+    spawnSplash(x, y, depth) {
+      for (let i = 0; i < this.splashes.length; i++) {
+        const s = this.splashes[i];
+        if (!s.active) {
+          s.active = true;
+          s.x = x;
+          s.y = y;
+          s.life = 0;
+          s.maxLife = 0.28 + Math.random() * 0.14;
+          s.maxRx = 4.5 + depth * 4.5;
+          return;
+        }
+      }
+    }
+
+    setActive(shouldRun) {
+      if (typeof window === 'undefined' || !this.canvas || !this.ctx) return;
+      const reduced = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      const nextActive = Boolean(shouldRun) && !reduced;
+
+      if (nextActive === this.active) return;
+      this.active = nextActive;
+
+      if (this.active) {
+        this.resize();
+        this.seedAllDrops(true);
+        this.lastTs = performance.now();
+        this.rafId = window.requestAnimationFrame(this._onFrame);
+      } else {
+        if (this.rafId) {
+          window.cancelAnimationFrame(this.rafId);
+          this.rafId = 0;
+        }
+        for (let i = 0; i < this.splashes.length; i++) {
+          this.splashes[i].active = false;
+        }
+        this.ctx.clearRect(0, 0, this.width, this.height);
+      }
+    }
+
+    frame(now) {
+      if (!this.active || !this.ctx) return;
+      const dt = Math.min(0.05, Math.max(0.008, (now - this.lastTs) / 1000));
+      this.lastTs = now;
+
+      const ctx = this.ctx;
+      ctx.clearRect(0, 0, this.width, this.height);
+      const baseWind = -0.22 - Math.sin(now * 0.0007) * 0.06;
+
+      ctx.lineCap = 'round';
+      for (let i = 0; i < this.drops.length; i++) {
+        const d = this.drops[i];
+        const slope = baseWind + d.drift;
+        const dy = d.speed * dt;
+        const dx = dy * slope;
+        d.x += dx;
+        d.y += dy;
+
+        ctx.strokeStyle = `rgba(219, 242, 255, ${d.alpha.toFixed(2)})`;
+        ctx.lineWidth = d.width;
+        ctx.beginPath();
+        ctx.moveTo(d.x, d.y);
+        ctx.lineTo(d.x - d.len * slope, d.y - d.len);
+        ctx.stroke();
+
+        if (d.depth > 0.82 && d.y >= d.landY) {
+          this.spawnSplash(d.x, d.landY, d.depth);
+          this.resetDrop(d, false);
+        } else if (d.y > this.height + 40 || d.x < -120) {
+          this.resetDrop(d, false);
+        }
+      }
+
+      for (let i = 0; i < this.splashes.length; i++) {
+        const s = this.splashes[i];
+        if (!s.active) continue;
+        s.life += dt;
+        if (s.life >= s.maxLife) {
+          s.active = false;
+          continue;
+        }
+        const t = s.life / s.maxLife;
+        const rx = s.maxRx * (0.3 + t * 0.7);
+        const ry = rx * 0.42;
+        const alpha = (1 - t) * 0.42;
+
+        ctx.strokeStyle = `rgba(219, 242, 255, ${alpha.toFixed(2)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const hop = Math.sin(t * Math.PI) * 5;
+        ctx.fillStyle = `rgba(224, 242, 254, ${(alpha * 1.15).toFixed(2)})`;
+        ctx.fillRect(s.x - rx * 0.45, s.y - hop - 1.5, 1.8, 1.8);
+        ctx.fillRect(s.x + rx * 0.45, s.y - hop * 0.75 - 1.5, 1.8, 1.8);
+      }
+
+      this.rafId = window.requestAnimationFrame(this._onFrame);
+    }
+
+    destroy() {
+      this.setActive(false);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', this._onResize);
+      }
+    }
+  }
+
+  globalThis.__ANIME_FARM_API__ = {
+    CROPS,
+    LEVELS,
+    WEATHER_TYPES,
+    getLevelInfo,
+    getRemainingRealSeconds,
+    GameState,
+    OrderSystem,
+    getPlantSvg,
+    state,
+    orderSystem
+  };
+
   // 10. KHỞI CHẠY GAME
   document.addEventListener('DOMContentLoaded', () => {
     const loadInfo = state.load();
     ui = new UIManager();
+    const rainRenderer = new RainWeatherRenderer(document.getElementById('weather-rain-canvas'));
+    ui.rainRenderer = rainRenderer;
+    ui.updateWeatherHUD();
 
     const gridEl = document.getElementById('farm-grid');
     const renderer = new FarmRenderer(gridEl);
@@ -2979,6 +3194,10 @@
 
     farmInteractions = new FarmInteractions(gridEl, renderer);
     window.farmInteractions = farmInteractions;
+
+    window.addEventListener('beforeunload', () => {
+      rainRenderer.destroy();
+    });
 
     if (loadInfo.loaded && loadInfo.maturedCount > 0) {
       ui.showToast(`Chào mừng trở lại! Có ${loadInfo.maturedCount} cây đã chín sẵn trong lúc bạn vắng mặt 🌾✨`, 'success');

@@ -1,26 +1,10 @@
 import { onUnmounted } from 'vue'
-
-interface ExtendedWindow extends Window {
-  webkitAudioContext?: typeof AudioContext
-}
+import { createSafeAudioManager } from '@/utils/audio'
 
 export type CoTuongSoundEffect = 'move' | 'capture' | 'check' | 'gameover'
 
 export function useCoTuongAudio() {
-  let ctx: AudioContext | null = null
-
-  function ensureContext(): AudioContext | null {
-    if (typeof window === 'undefined') return null
-    if (!ctx) {
-      const AudioCtor = window.AudioContext || (window as unknown as ExtendedWindow).webkitAudioContext
-      if (!AudioCtor) return null
-      ctx = new AudioCtor()
-    }
-    if (ctx.state === 'suspended') {
-      void ctx.resume()
-    }
-    return ctx
-  }
+  const { ensureContext, closeContext } = createSafeAudioManager()
 
   function playTone(
     freqStart: number,
@@ -33,22 +17,26 @@ export function useCoTuongAudio() {
     const audioCtx = ensureContext()
     if (!audioCtx) return
 
-    const startTime = audioCtx.currentTime + delay
-    const osc = audioCtx.createOscillator()
-    const gain = audioCtx.createGain()
+    try {
+      const startTime = audioCtx.currentTime + delay
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
 
-    osc.type = type
-    osc.frequency.setValueAtTime(freqStart, startTime)
-    osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), startTime + duration)
+      osc.type = type
+      osc.frequency.setValueAtTime(freqStart, startTime)
+      osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), startTime + duration)
 
-    gain.gain.setValueAtTime(volume, startTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration)
+      gain.gain.setValueAtTime(volume, startTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration)
 
-    osc.connect(gain)
-    gain.connect(audioCtx.destination)
+      osc.connect(gain)
+      gain.connect(audioCtx.destination)
 
-    osc.start(startTime)
-    osc.stop(startTime + duration)
+      osc.start(startTime)
+      osc.stop(startTime + duration)
+    } catch {
+      // Ignore restricted Web Audio playback errors
+    }
   }
 
   function playSound(effect: CoTuongSoundEffect, enabled: boolean) {
@@ -73,10 +61,7 @@ export function useCoTuongAudio() {
   }
 
   onUnmounted(() => {
-    if (ctx) {
-      void ctx.close()
-      ctx = null
-    }
+    closeContext()
   })
 
   return { playSound }

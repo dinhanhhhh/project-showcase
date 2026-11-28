@@ -212,8 +212,8 @@ export class GameEngine {
         let totalCost = 0;
         let housesCount = 0;
         let hotelsCount = 0;
-        Object.entries(this.state.properties || {}).forEach(([tId, prop]) => {
-          if (prop.ownerId === player.id) {
+        Object.values(this.state.properties || {}).forEach((prop) => {
+          if (prop.owner === player.id) {
             if (prop.houses === 5) {
               hotelsCount += 1;
               totalCost += act.hotelFee || 1_000_000;
@@ -361,6 +361,8 @@ export class GameEngine {
             player.jailTurns += 1;
             if (player.jailTurns >= GAME_CONSTANTS.MAX_JAIL_TURNS) {
               player.money -= GAME_CONSTANTS.JAIL_FINE;
+              this.state.jackpotPot =
+                (this.state.jackpotPot || 0) + GAME_CONSTANTS.JAIL_FINE;
               player.inJail = false;
               player.jailTurns = 0;
               this.state.turnState = TURN_STATES.MOVING;
@@ -760,12 +762,19 @@ export class GameEngine {
         if (!bidder || bidder.isBankrupt)
           return { success: false, error: "Người đấu giá không hợp lệ" };
         if (
-          bidAmount <= this.state.auction.currentBid &&
-          this.state.auction.highestBidder !== null
+          typeof bidAmount !== "number" ||
+          !Number.isFinite(bidAmount) ||
+          bidAmount <= 0 ||
+          (this.state.auction.highestBidder === null
+            ? bidAmount < this.state.auction.currentBid
+            : bidAmount <= this.state.auction.currentBid)
         ) {
           return {
             success: false,
-            error: "Mức giá đấu phải cao hơn giá hiện tại",
+            error:
+              this.state.auction.highestBidder === null
+                ? "Mức giá đấu phải lớn hơn hoặc bằng giá khởi điểm"
+                : "Mức giá đấu phải cao hơn giá hiện tại",
           };
         }
         if (bidder.money < bidAmount) {
@@ -916,8 +925,24 @@ export class GameEngine {
         const sender = this.state.players.find((p) => p.id === senderId);
         const receiver = this.state.players.find((p) => p.id === receiverId);
 
-        if (!sender || !receiver || sender.isBankrupt || receiver.isBankrupt) {
+        if (
+          !sender ||
+          !receiver ||
+          sender.id === receiver.id ||
+          sender.isBankrupt ||
+          receiver.isBankrupt
+        ) {
           return { success: false, error: "Người chơi không hợp lệ" };
+        }
+        if (
+          typeof offerMoney !== "number" ||
+          typeof requestMoney !== "number" ||
+          !Number.isFinite(offerMoney) ||
+          !Number.isFinite(requestMoney) ||
+          offerMoney < 0 ||
+          requestMoney < 0
+        ) {
+          return { success: false, error: "Số tiền giao dịch không hợp lệ" };
         }
         if (offerMoney > 0 && sender.money < offerMoney) {
           return {

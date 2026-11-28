@@ -137,8 +137,11 @@ describe('Co Tuong Engine', () => {
     expect(isRepetition(history)).toBe(true)
   })
 
-  it('validates all 6 endgame puzzles have legal start states and forced checkmates', () => {
-    expect(XIANGQI_PUZZLES).toHaveLength(6)
+  it('validates all 10 endgame puzzles have legal start states and forced checkmates', () => {
+    expect(XIANGQI_PUZZLES).toHaveLength(10)
+
+    const puzzleIds = new Set(XIANGQI_PUZZLES.map((p) => p.id))
+    expect(puzzleIds.size).toBe(10)
 
     for (const puzzle of XIANGQI_PUZZLES) {
       expect(isKingInCheck('red', puzzle.boardState)).toBe(false)
@@ -194,6 +197,41 @@ describe('Co Tuong Engine', () => {
     const p6Chariot = getPieceAt(p6, { file: 5, rank: 4 })!
     const p6Mate = applyMove(p6, p6Chariot, { file: 5, rank: 0 })
     expect(getGameStatus('black', p6Mate)).toBe('checkmate')
+
+    // Thế 7: Song Xa Tỏa Môn — Xe (8,4) -> (8,0) chiếu bí 1 nước
+    const p7 = cloneBoardState(XIANGQI_PUZZLES[6].boardState)
+    const p7Chariot = getPieceAt(p7, { file: 8, rank: 4 })!
+    expect(getLegalMovesForPiece(p7Chariot, p7)).toContainEqual({ file: 8, rank: 0 })
+    const p7Mate = applyMove(p7, p7Chariot, { file: 8, rank: 0 })
+    expect(getGameStatus('black', p7Mate)).toBe('checkmate')
+
+    // Thế 8: Điền Giác Mã — Mã (4,4) -> (5,2) chiếu bí 1 nước nhờ Mặt Tướng
+    const p8 = cloneBoardState(XIANGQI_PUZZLES[7].boardState)
+    const p8Horse = getPieceAt(p8, { file: 4, rank: 4 })!
+    expect(getLegalMovesForPiece(p8Horse, p8)).toContainEqual({ file: 5, rank: 2 })
+    const p8Mate = applyMove(p8, p8Horse, { file: 5, rank: 2 })
+    expect(getGameStatus('black', p8Mate)).toBe('checkmate')
+
+    // Thế 9: Bạch Mã Khóa Tâm — Xe (0,4) -> (0,0) chiếu bí 1 nước
+    const p9 = cloneBoardState(XIANGQI_PUZZLES[8].boardState)
+    const p9Chariot = getPieceAt(p9, { file: 0, rank: 4 })!
+    expect(getLegalMovesForPiece(p9Chariot, p9)).toContainEqual({ file: 0, rank: 0 })
+    const p9Mate = applyMove(p9, p9Chariot, { file: 0, rank: 0 })
+    expect(getGameStatus('black', p9Mate)).toBe('checkmate')
+
+    // Thế 10: Khai Thiên Mã — Mã (3,3)->(5,2), Tướng Đen buộc (4,0)->(4,1), Xe (1,3)->(1,1) chiếu bí
+    const p10 = cloneBoardState(XIANGQI_PUZZLES[9].boardState)
+    const p10Horse = getPieceAt(p10, { file: 3, rank: 3 })!
+    expect(getLegalMovesForPiece(p10Horse, p10)).toContainEqual({ file: 5, rank: 2 })
+    const p10Step1 = applyMove(p10, p10Horse, { file: 5, rank: 2 })
+    expect(getGameStatus('black', p10Step1)).toBe('check')
+
+    const p10BlackGen = getPieceAt(p10Step1, { file: 4, rank: 0 })!
+    expect(getLegalMovesForPiece(p10BlackGen, p10Step1)).toEqual([{ file: 4, rank: 1 }])
+    const p10Step2 = applyMove(p10Step1, p10BlackGen, { file: 4, rank: 1 })
+    const p10Chariot = getPieceAt(p10Step2, { file: 1, rank: 3 })!
+    const p10Mate = applyMove(p10Step2, p10Chariot, { file: 1, rank: 1 })
+    expect(getGameStatus('black', p10Mate)).toBe('checkmate')
   })
 
   it('exports Vietnamese move notation text grouped by full turns cleanly', () => {
@@ -398,5 +436,109 @@ describe('Co Tuong Engine', () => {
     }
     expect(persisted.stats?.wins).toBe(1)
     expect(persisted.solvedPuzzleIds).toContain('puzzle-1')
+  })
+
+  it('detects stalemate when general has zero legal moves without being in check', () => {
+    const stalemateBoard: BoardState = {
+      pieces: [
+        { id: 'b_gen', side: 'black', type: 'general', position: { file: 4, rank: 0 } },
+        { id: 'r_gen', side: 'red', type: 'general', position: { file: 3, rank: 9 } },
+        { id: 'r_chariot_file5', side: 'red', type: 'chariot', position: { file: 5, rank: 5 } },
+        { id: 'r_chariot_rank1', side: 'red', type: 'chariot', position: { file: 1, rank: 1 } },
+      ],
+    }
+
+    // Đen ở (4,0) không bị chiếu trực tiếp nhưng (3,0) dính mặt Tướng, (5,0) có Xe cột 5, (4,1) có Xe hàng 1
+    expect(isKingInCheck('black', stalemateBoard)).toBe(false)
+    expect(getGameStatus('black', stalemateBoard)).toBe('stalemate')
+    expect(findBestMove(stalemateBoard, 'black', 'easy')).toBeNull()
+  })
+
+  it('evaluates advantage symmetry and replays move history captures cleanly', () => {
+    const startBoard = createInitialBoardState()
+    expect(calculateRedAdvantagePercent(startBoard)).toBe(50)
+
+    const redCannon = getPieceAt(startBoard, { file: 1, rank: 7 })!
+    const blackHorse = getPieceAt(startBoard, { file: 1, rank: 0 })!
+    const step1: MoveRecord = {
+      moveNumber: 1,
+      side: 'red',
+      from: { file: 1, rank: 7 },
+      to: { file: 4, rank: 7 },
+      piece: redCannon,
+      notation: 'Pháo 8 bình 5',
+    }
+    const step2: MoveRecord = {
+      moveNumber: 1,
+      side: 'black',
+      from: { file: 1, rank: 0 },
+      to: { file: 2, rank: 2 },
+      piece: blackHorse,
+      notation: 'Mã 2 tấn 3',
+    }
+    const replayed = replayHistory([step1, step2], startBoard)
+    expect(getPieceAt(replayed, { file: 4, rank: 7 })?.id).toBe(redCannon.id)
+    expect(getPieceAt(replayed, { file: 2, rank: 2 })?.id).toBe(blackHorse.id)
+    expect(getPieceAt(replayed, { file: 1, rank: 7 })).toBeUndefined()
+
+    const heavilyFavoredRed: BoardState = {
+      pieces: [
+        { id: 'r_gen', side: 'red', type: 'general', position: { file: 4, rank: 9 } },
+        { id: 'b_gen', side: 'black', type: 'general', position: { file: 3, rank: 0 } },
+        { id: 'r_ch1', side: 'red', type: 'chariot', position: { file: 0, rank: 5 } },
+        { id: 'r_ch2', side: 'red', type: 'chariot', position: { file: 8, rank: 5 } },
+        { id: 'r_cn1', side: 'red', type: 'cannon', position: { file: 1, rank: 7 } },
+      ],
+    }
+    expect(calculateRedAdvantagePercent(heavilyFavoredRed)).toBeGreaterThanOrEqual(90)
+  })
+
+  it('blocks horse movement across all 4 cardinal leg positions and detects true repetition cycle', () => {
+    const blockedBoard: BoardState = {
+      pieces: [
+        { id: 'r_gen', side: 'red', type: 'general', position: { file: 4, rank: 9 } },
+        { id: 'b_gen', side: 'black', type: 'general', position: { file: 5, rank: 0 } },
+        { id: 'r_horse', side: 'red', type: 'horse', position: { file: 4, rank: 5 } },
+        { id: 'blk_n', side: 'red', type: 'soldier', position: { file: 4, rank: 4 } },
+        { id: 'blk_s', side: 'red', type: 'soldier', position: { file: 4, rank: 6 } },
+        { id: 'blk_w', side: 'red', type: 'soldier', position: { file: 3, rank: 5 } },
+        { id: 'blk_e', side: 'red', type: 'soldier', position: { file: 5, rank: 5 } },
+      ],
+    }
+    const horse = getPieceAt(blockedBoard, { file: 4, rank: 5 })!
+    expect(getLegalMovesForPiece(horse, blockedBoard)).toEqual([])
+
+    const rc: Piece = { id: 'r_c', side: 'red', type: 'chariot', position: { file: 0, rank: 9 } }
+    const bc: Piece = { id: 'b_c', side: 'black', type: 'chariot', position: { file: 8, rank: 0 } }
+    const rFwd: MoveRecord = { moveNumber: 1, side: 'red', from: { file: 0, rank: 9 }, to: { file: 0, rank: 8 }, piece: rc, notation: 'X9.1' }
+    const bFwd: MoveRecord = { moveNumber: 1, side: 'black', from: { file: 8, rank: 0 }, to: { file: 8, rank: 1 }, piece: bc, notation: 'X9.1' }
+    const rBack: MoveRecord = { moveNumber: 2, side: 'red', from: { file: 0, rank: 8 }, to: { file: 0, rank: 9 }, piece: rc, notation: 'X9/1' }
+    const bBack: MoveRecord = { moveNumber: 2, side: 'black', from: { file: 8, rank: 1 }, to: { file: 8, rank: 0 }, piece: bc, notation: 'X9/1' }
+    expect(isRepetition([rFwd, bFwd, rBack, bBack, rFwd, bFwd, rBack, bBack])).toBe(true)
+  })
+
+  it('finds free captures across easy/medium/hard AI and formats Red vs Black notation', () => {
+    const redCannon: Piece = { id: 'r_cn', side: 'red', type: 'cannon', position: { file: 1, rank: 7 } }
+    const blackChariot: Piece = { id: 'b_ch', side: 'black', type: 'chariot', position: { file: 0, rank: 0 } }
+    expect(formatNotation(redCannon, { file: 1, rank: 7 }, { file: 4, rank: 7 })).toBe('Pháo 8 bình 5')
+    expect(formatNotation(blackChariot, { file: 0, rank: 0 }, { file: 0, rank: 3 })).toBe('Xe 1 tấn 3')
+    expect(formatNotation(blackChariot, { file: 0, rank: 3 }, { file: 0, rank: 1 })).toBe('Xe 1 thoái 2')
+
+    // Red chariot can immediately capture an undefended Black chariot at (2, 5)
+    const captureBoard: BoardState = {
+      pieces: [
+        { id: 'r_gen', side: 'red', type: 'general', position: { file: 4, rank: 9 } },
+        { id: 'b_gen', side: 'black', type: 'general', position: { file: 5, rank: 0 } },
+        { id: 'r_ch', side: 'red', type: 'chariot', position: { file: 2, rank: 8 } },
+        { id: 'b_ch', side: 'black', type: 'chariot', position: { file: 2, rank: 5 } },
+      ],
+    }
+
+    for (const diff of ['easy', 'medium', 'hard'] as const) {
+      const best = findBestMove(captureBoard, 'red', diff, () => 0.5)
+      expect(best).not.toBeNull()
+      expect(best!.piece.id).toBe('r_ch')
+      expect(best!.to).toEqual({ file: 2, rank: 5 })
+    }
   })
 })

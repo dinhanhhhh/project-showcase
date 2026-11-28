@@ -273,6 +273,8 @@ onUnmounted(() => {
             v-if="backupStatus"
             class="backup-status"
             :class="backupStatus.kind"
+            role="status"
+            aria-live="polite"
           >
             {{ backupStatus.text }}
           </p>
@@ -383,7 +385,7 @@ onUnmounted(() => {
 
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.6rem;
 }
 
@@ -541,13 +543,13 @@ onUnmounted(() => {
 }
 
 .btn-danger:hover {
-  background: rgba(255, 85, 85, 0.22);
+  background: var(--danger-bg);
   border-color: var(--danger);
 }
 
 .btn-danger.confirming {
   background: var(--danger);
-  color: #ffffff;
+  color: var(--text-inverse);
   border-color: var(--danger);
 }
 

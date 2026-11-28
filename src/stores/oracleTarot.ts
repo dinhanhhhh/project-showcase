@@ -31,7 +31,8 @@ export const useOracleTarotStore = defineStore('oracle-tarot', {
 
   actions: {
     addReading(record: OracleReadingRecord) {
-      this.history = [record, ...this.history].slice(0, 10)
+      const prev = Array.isArray(this.history) ? this.history : []
+      this.history = [record, ...prev].slice(0, 10)
     },
 
     clearHistory() {

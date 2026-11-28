@@ -45,6 +45,11 @@ body {
   min-height: 100vh;
 }
 
+:is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .page-transition-enter-active,
 .page-transition-leave-active {
   transition: opacity 0.22s ease, transform 0.22s ease;

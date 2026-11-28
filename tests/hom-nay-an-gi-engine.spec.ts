@@ -7,6 +7,7 @@ import { SAMPLE_FOODS } from '@/views/hom-nay-an-gi/data'
 import {
   filterFoods,
   filterFoodsAdvanced,
+  formatDailyMealPlanText,
   generateDailyMealPlan,
   getSpinDelays,
   isSafeHttpUrl,
@@ -168,5 +169,65 @@ describe('Hom Nay An Gi Engine & Store', () => {
     const oneMorningDish = [SAMPLE_FOODS[0]]
     const plan = generateDailyMealPlan(oneMorningDish, () => 0)
     expect(plan.sang?.id).toBe(oneMorningDish[0].id)
+  })
+
+  it('filters dishes by Vietnamese accented or unaccented searchQuery and formats 4-meal plan text', () => {
+    const byAccented = filterFoodsAdvanced(SAMPLE_FOODS, {
+      category: 'all',
+      mealTime: 'all',
+      priceTier: 'all',
+      favoriteIds: [],
+      searchQuery: 'Phở',
+    })
+    expect(byAccented.length).toBeGreaterThan(0)
+    expect(byAccented.every((item) => item.name.toLowerCase().includes('phở'))).toBe(true)
+
+    const byAscii = filterFoodsAdvanced(SAMPLE_FOODS, {
+      category: 'all',
+      mealTime: 'all',
+      priceTier: 'all',
+      favoriteIds: [],
+      searchQuery: 'pho',
+    })
+    expect(byAscii.map((item) => item.id)).toEqual(byAccented.map((item) => item.id))
+
+    const fullPlan = generateDailyMealPlan(SAMPLE_FOODS, () => 0)
+    const formatted = formatDailyMealPlanText(fullPlan)
+    expect(formatted).toContain('🍽️ Thực đơn Hôm Nay Ăn Gì:')
+    expect(formatted).toContain(fullPlan.sang!.name)
+    expect(formatted).toContain(fullPlan.toi!.name)
+
+    expect(
+      formatDailyMealPlanText({ sang: null, trua: null, toi: null, anVat: null }),
+    ).toBe('')
+  })
+
+  it('blocks data/file/vbscript image URLs and supports unaccented bun cha & banh mi lookup', () => {
+    for (const unsafeUrl of [
+      'data:text/html,<script>alert(1)</script>',
+      'file:///etc/passwd',
+      'vbscript:msgbox(1)',
+    ]) {
+      expect(isSafeHttpUrl(unsafeUrl)).toBe(false)
+      expect(validateFoodInput('Món An Toàn', unsafeUrl, SAMPLE_FOODS).valid).toBe(false)
+    }
+
+    const bunCha = filterFoodsAdvanced(SAMPLE_FOODS, {
+      category: 'all',
+      mealTime: 'all',
+      priceTier: 'all',
+      favoriteIds: [],
+      searchQuery: 'bun cha',
+    })
+    expect(bunCha.some((item) => item.name === 'Bún chả')).toBe(true)
+
+    const banhMi = filterFoodsAdvanced(SAMPLE_FOODS, {
+      category: 'all',
+      mealTime: 'all',
+      priceTier: 'all',
+      favoriteIds: [],
+      searchQuery: 'banh mi',
+    })
+    expect(banhMi.some((item) => item.name.toLowerCase().includes('bánh mì'))).toBe(true)
   })
 })

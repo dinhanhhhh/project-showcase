@@ -50,8 +50,24 @@ const KEYS = {
   sortMode: 'vibe:sort-mode',
 } as const
 
+function safeGetItem(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function safeSetItem(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    // Ignore storage quota or private browsing errors
+  }
+}
+
 function safeReadBoolean(key: string, fallback: boolean): boolean {
-  const raw = localStorage.getItem(key)
+  const raw = safeGetItem(key)
   if (raw === null) return fallback
   try {
     const parsed: unknown = JSON.parse(raw)
@@ -62,18 +78,18 @@ function safeReadBoolean(key: string, fallback: boolean): boolean {
 }
 
 function readStoredViewMode(): LauncherViewMode {
-  const saved = localStorage.getItem(KEYS.viewMode)
+  const saved = safeGetItem(KEYS.viewMode)
   return saved === 'list' ? 'list' : 'grid'
 }
 
 function readStoredSortMode(): LauncherSortMode {
-  const saved = localStorage.getItem(KEYS.sortMode)
+  const saved = safeGetItem(KEYS.sortMode)
   if (saved === 'alpha' || saved === 'recent') return saved
   return 'featured'
 }
 
 function readStoredTheme(): VibeThemeId {
-  const saved = localStorage.getItem(KEYS.theme)
+  const saved = safeGetItem(KEYS.theme)
   if (saved && VALID_THEMES.has(saved)) {
     return saved as VibeThemeId
   }
@@ -87,9 +103,9 @@ export function applyThemeToDocument(theme: VibeThemeId) {
 }
 
 export function useHomeSettings() {
-  const userName = ref(localStorage.getItem(KEYS.userName) || 'Quản trị viên')
-  const userRole = ref(localStorage.getItem(KEYS.userRole) || 'Nhà phát triển')
-  const enableParticles = ref(localStorage.getItem(KEYS.enableParticles) !== 'false')
+  const userName = ref(safeGetItem(KEYS.userName) || 'Quản trị viên')
+  const userRole = ref(safeGetItem(KEYS.userRole) || 'Nhà phát triển')
+  const enableParticles = ref(safeGetItem(KEYS.enableParticles) !== 'false')
   const isSidebarCollapsed = ref(safeReadBoolean(KEYS.sidebarCollapsed, false))
   const theme = ref<VibeThemeId>(readStoredTheme())
   const viewMode = ref<LauncherViewMode>(readStoredViewMode())
@@ -98,20 +114,16 @@ export function useHomeSettings() {
 
   applyThemeToDocument(theme.value)
 
-  watch(userName, (val) => localStorage.setItem(KEYS.userName, val))
-  watch(userRole, (val) => localStorage.setItem(KEYS.userRole, val))
-  watch(enableParticles, (val) =>
-    localStorage.setItem(KEYS.enableParticles, val.toString()),
-  )
-  watch(isSidebarCollapsed, (val) =>
-    localStorage.setItem(KEYS.sidebarCollapsed, JSON.stringify(val)),
-  )
+  watch(userName, (val) => safeSetItem(KEYS.userName, val))
+  watch(userRole, (val) => safeSetItem(KEYS.userRole, val))
+  watch(enableParticles, (val) => safeSetItem(KEYS.enableParticles, val.toString()))
+  watch(isSidebarCollapsed, (val) => safeSetItem(KEYS.sidebarCollapsed, JSON.stringify(val)))
   watch(theme, (val) => {
-    localStorage.setItem(KEYS.theme, val)
+    safeSetItem(KEYS.theme, val)
     applyThemeToDocument(val)
   })
-  watch(viewMode, (val) => localStorage.setItem(KEYS.viewMode, val))
-  watch(sortMode, (val) => localStorage.setItem(KEYS.sortMode, val))
+  watch(viewMode, (val) => safeSetItem(KEYS.viewMode, val))
+  watch(sortMode, (val) => safeSetItem(KEYS.sortMode, val))
 
   function toggleSidebar() {
     isSidebarCollapsed.value = !isSidebarCollapsed.value

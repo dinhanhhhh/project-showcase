@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { getDailyDateKey, upsertDailyBest } from '@/utils/daily-seed'
 import type { ColorFormat } from '@/views/color-game/types'
 
 interface FormatStatEntry {
@@ -12,6 +13,7 @@ interface ColorGameState {
   bestStreak: number
   soundEnabled: boolean
   formatStats: Record<ColorFormat, FormatStatEntry>
+  dailyBestByDate: Record<string, number>
 }
 
 function createEmptyFormatStats(): Record<ColorFormat, FormatStatEntry> {
@@ -29,6 +31,7 @@ export const useColorGameStore = defineStore('color-game', {
     bestStreak: 0,
     soundEnabled: true,
     formatStats: createEmptyFormatStats(),
+    dailyBestByDate: {},
   }),
 
   actions: {
@@ -39,6 +42,11 @@ export const useColorGameStore = defineStore('color-game', {
 
     recordTimeAttack(score: number, streak: number) {
       if (score > this.bestTimeAttackScore) this.bestTimeAttackScore = score
+      if (streak > this.bestStreak) this.bestStreak = streak
+    },
+
+    recordDailyScore(score: number, streak: number, dateKey: string = getDailyDateKey()) {
+      this.dailyBestByDate = upsertDailyBest(this.dailyBestByDate, dateKey, score)
       if (streak > this.bestStreak) this.bestStreak = streak
     },
 
@@ -64,6 +72,13 @@ export const useColorGameStore = defineStore('color-game', {
   persist: {
     key: 'vibe_color_game',
     storage: localStorage,
-    pick: ['bestClassicScore', 'bestTimeAttackScore', 'bestStreak', 'soundEnabled', 'formatStats'],
+    pick: [
+      'bestClassicScore',
+      'bestTimeAttackScore',
+      'bestStreak',
+      'soundEnabled',
+      'formatStats',
+      'dailyBestByDate',
+    ],
   },
 })

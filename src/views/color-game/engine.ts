@@ -1,19 +1,25 @@
+import { createDailyRng, getDailyDateKey } from '@/utils/daily-seed'
 import type { ColorFormat, ColorRound, ColorSwatch, GridSize, HslValue } from './types'
 
 export const TIME_ATTACK_START_SECONDS = 45
 export const TIME_ATTACK_BONUS_SECONDS = 2
 export const TIME_ATTACK_PENALTY_SECONDS = 3
 export const MAX_LIFELINES = 2
+export const DAILY_COLOR_ROUNDS = 10
+
+export function clampChannel(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.min(255, Math.round(n)))
+}
 
 export function toHexChannel(n: number): string {
-  const clamped = Math.max(0, Math.min(255, Math.round(n)))
-  return clamped.toString(16).padStart(2, '0').toUpperCase()
+  return clampChannel(n).toString(16).padStart(2, '0').toUpperCase()
 }
 
 export function rgbToHsl(r: number, g: number, b: number): HslValue {
-  const rn = r / 255
-  const gn = g / 255
-  const bn = b / 255
+  const rn = clampChannel(r) / 255
+  const gn = clampChannel(g) / 255
+  const bn = clampChannel(b) / 255
 
   const max = Math.max(rn, gn, bn)
   const min = Math.min(rn, gn, bn)
@@ -43,13 +49,16 @@ export function rgbToHsl(r: number, g: number, b: number): HslValue {
 }
 
 export function createSwatch(r: number, g: number, b: number): ColorSwatch {
-  const hslValue = rgbToHsl(r, g, b)
+  const cr = clampChannel(r)
+  const cg = clampChannel(g)
+  const cb = clampChannel(b)
+  const hslValue = rgbToHsl(cr, cg, cb)
   return {
-    r,
-    g,
-    b,
-    rgb: `rgb(${r}, ${g}, ${b})`,
-    hex: `#${toHexChannel(r)}${toHexChannel(g)}${toHexChannel(b)}`,
+    r: cr,
+    g: cg,
+    b: cb,
+    rgb: `rgb(${cr}, ${cg}, ${cb})`,
+    hex: `#${toHexChannel(cr)}${toHexChannel(cg)}${toHexChannel(cb)}`,
     hsl: `hsl(${hslValue.h}°, ${hslValue.s}%, ${hslValue.l}%)`,
     hslValue,
   }
@@ -135,7 +144,34 @@ export function getRoundPoints(gridSize: GridSize, nextStreak: number): number {
   return base * getComboMultiplier(nextStreak)
 }
 
+export function buildDailyColorRound(
+  dateKey: string = getDailyDateKey(),
+  roundNumber: number = 1,
+  gridSize: GridSize = 6,
+): ColorRound {
+  const rng = createDailyRng(`color-game-${dateKey}-r${roundNumber}-g${gridSize}`)
+  return buildColorRound(gridSize, rng)
+}
+
 export function getFormatAccuracy(hits: number, attempts: number): number {
   if (attempts <= 0) return 0
   return Math.round((hits / attempts) * 100)
+}
+
+export const MAX_PALETTE_HISTORY = 12
+
+export function formatColorPaletteSummary(
+  swatches: readonly ColorSwatch[],
+  score: number,
+  mode: ColorGameMode,
+): string {
+  if (swatches.length === 0) return ''
+  const modeLabel =
+    mode === 'daily_seed'
+      ? 'Daily Seed'
+      : mode === 'time_attack'
+        ? 'Time Attack'
+        : 'Tự do'
+  const hexList = swatches.map((item) => item.hex).join(' · ')
+  return `🎨 Color Game [${modeLabel}] — ${score} điểm (${swatches.length} màu):\n${hexList}`
 }

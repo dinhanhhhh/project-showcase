@@ -2,11 +2,18 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useMiniPianoStore } from '@/stores/miniPiano'
+import { createSafeAudioManager } from '@/utils/audio'
+import { copyTextWithFallback } from '@/utils/clipboard'
+import { getDailyDateKey } from '@/utils/daily-seed'
+import { hasOpenDialog, isEditableEventTarget } from '@/utils/keyboard'
+import PianoKeyboard from './components/PianoKeyboard.vue'
 import {
   SONG_PRESETS,
   calculateChallengeAccuracy,
   formatMelodyDuration,
   formatPitchForOctave,
+  formatRecordedMelodyText,
+  getDailyFeaturedSong,
   getKeysForOctave,
   getSynthReleaseSeconds,
   scoreChallengeHit,
@@ -20,10 +27,6 @@ import type {
   SavedMelody,
   SongPreset,
 } from './types'
-
-interface ExtendedWindow extends Window {
-  webkitAudioContext?: typeof AudioContext
-}
 
 const store = useMiniPianoStore()
 
@@ -55,11 +58,13 @@ const isPlayingRecording = ref(false)
 const recordedNotes = ref<RecordedNoteEvent[]>([])
 let recordStartMs = 0
 
-let audioCtx: AudioContext | null = null
+const { ensureContext: ensureAudio, closeContext: closeAudio } = createSafeAudioManager()
 const noteTimers = new Map<string, ReturnType<typeof setTimeout>>()
 let wrongTimer: ReturnType<typeof setTimeout> | null = null
 let autoPlayTimer: ReturnType<typeof setInterval> | null = null
 let playbackTimers: Array<ReturnType<typeof setTimeout>> = []
+const copiedMelody = ref(false)
+let copyMelodyTimer: ReturnType<typeof setTimeout> | null = null
 
 const octaveKeys = computed(() => getKeysForOctave(octave.value))
 const whiteKeys = computed(() => octaveKeys.value.whiteKeys)
@@ -76,40 +81,36 @@ const currentSongBestScore = computed(
   () => store.bestScoreBySong?.[selectedSong.value.id] ?? 0,
 )
 
-function ensureAudio(): AudioContext | null {
-  if (typeof window === 'undefined') return null
-  if (!audioCtx) {
-    const AudioCtor = window.AudioContext || (window as unknown as ExtendedWindow).webkitAudioContext
-    if (!AudioCtor) return null
-    audioCtx = new AudioCtor()
-  }
-  if (audioCtx.state === 'suspended') {
-    void audioCtx.resume()
-  }
-  return audioCtx
-}
+const todayKey = getDailyDateKey()
+const dailyFeaturedSong = computed(() => getDailyFeaturedSong(todayKey))
+const dailyBestScore = computed(() => store.dailyBestByDate?.[todayKey] ?? 0)
+const isPlayingDailySong = computed(() => selectedSong.value.id === dailyFeaturedSong.value.id)
 
 function playSynthTone(freq: number) {
   const ctx = ensureAudio()
   if (!ctx) return
 
-  const now = ctx.currentTime
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-  const releaseSec = getSynthReleaseSeconds(store.sustainEnabled)
+  try {
+    const now = ctx.currentTime
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    const releaseSec = getSynthReleaseSeconds(store.sustainEnabled)
 
-  osc.type = waveform.value
-  osc.frequency.setValueAtTime(freq, now)
+    osc.type = waveform.value
+    osc.frequency.setValueAtTime(freq, now)
 
-  gain.gain.setValueAtTime(0.001, now)
-  gain.gain.linearRampToValueAtTime(0.36, now + 0.015)
-  gain.gain.exponentialRampToValueAtTime(0.001, now + releaseSec)
+    gain.gain.setValueAtTime(0.001, now)
+    gain.gain.linearRampToValueAtTime(0.36, now + 0.015)
+    gain.gain.exponentialRampToValueAtTime(0.001, now + releaseSec)
 
-  osc.connect(gain)
-  gain.connect(ctx.destination)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
 
-  osc.start(now)
-  osc.stop(now + releaseSec + 0.03)
+    osc.start(now)
+    osc.stop(now + releaseSec + 0.03)
+  } catch {
+    // Ignore restricted Web Audio playback errors
+  }
 }
 
 function resetChallengeStats() {
@@ -158,6 +159,9 @@ function triggerKey(key: PianoKey, isAutomated = false) {
       if (songStepIndex.value + 1 >= selectedSong.value.notes.length) {
         challenge.value.completed = true
         store.recordSongScore(selectedSong.value.id, challenge.value.score)
+        if (isPlayingDailySong.value) {
+          store.recordDailyScore(challenge.value.score, todayKey)
+        }
       } else {
         songStepIndex.value += 1
       }
@@ -205,6 +209,13 @@ function selectNextSong() {
   const idx = SONG_PRESETS.findIndex((s) => s.id === selectedSong.value.id)
   const next = SONG_PRESETS[(idx + 1) % SONG_PRESETS.length]
   selectSong(next)
+}
+
+function startDailySongChallenge() {
+  stopAutoPlay()
+  selectedSong.value = dailyFeaturedSong.value
+  playMode.value = 'challenge'
+  resetChallengeStats()
 }
 
 function stopAutoPlay() {
@@ -262,6 +273,19 @@ function clearRecording() {
   recordedNotes.value = []
 }
 
+async function copyRecordedMelody() {
+  if (recordedNotes.value.length === 0) return
+  const text = formatRecordedMelodyText(melodyNameInput.value, recordedNotes.value)
+  if (!text) return
+  const ok = await copyTextWithFallback(text)
+  if (!ok) return
+  copiedMelody.value = true
+  if (copyMelodyTimer) clearTimeout(copyMelodyTimer)
+  copyMelodyTimer = setTimeout(() => {
+    copiedMelody.value = false
+  }, 2000)
+}
+
 function saveCurrentRecording() {
   if (recordedNotes.value.length === 0) return
   store.saveMelody(melodyNameInput.value, recordedNotes.value)
@@ -309,7 +333,7 @@ function playRecording() {
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  if (e.repeat || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+  if (e.repeat || isEditableEventTarget(e.target) || hasOpenDialog()) {
     return
   }
   if (e.ctrlKey || e.metaKey || e.altKey) return
@@ -344,10 +368,8 @@ onUnmounted(() => {
   }
   noteTimers.clear()
   if (wrongTimer) clearTimeout(wrongTimer)
-  if (audioCtx) {
-    void audioCtx.close()
-    audioCtx = null
-  }
+  if (copyMelodyTimer) clearTimeout(copyMelodyTimer)
+  closeAudio()
 })
 </script>
 
@@ -426,6 +448,14 @@ onUnmounted(() => {
           >
             🎯 Thử thách giai điệu
           </button>
+          <button
+            type="button"
+            :class="{ active: playMode === 'challenge' && isPlayingDailySong }"
+            :title="`Bài nổi bật hôm nay: ${dailyFeaturedSong.title}`"
+            @click="startDailySongChallenge"
+          >
+            📅 Bài Hôm Nay
+          </button>
         </div>
 
         <div class="segmented">
@@ -474,6 +504,15 @@ onUnmounted(() => {
             @click="saveCurrentRecording"
           >
             💾 Lưu
+          </button>
+          <button
+            v-if="recordedNotes.length > 0 && !isRecording"
+            type="button"
+            class="save-rec-btn"
+            title="Chép chuỗi nốt vừa thu âm"
+            @click="copyRecordedMelody"
+          >
+            {{ copiedMelody ? '✅ Đã chép' : '📋 Chép nốt' }}
           </button>
           <button
             v-if="recordedNotes.length > 0"
@@ -528,8 +567,8 @@ onUnmounted(() => {
           <strong class="neon">{{ challenge.score }}</strong>
         </div>
         <div class="ch-stat">
-          <span>KỶ LỤC BÀI</span>
-          <strong class="neon">{{ currentSongBestScore }}</strong>
+          <span>{{ isPlayingDailySong ? 'DAILY PB' : 'KỶ LỤC BÀI' }}</span>
+          <strong class="neon">{{ isPlayingDailySong ? dailyBestScore : currentSongBestScore }}</strong>
         </div>
         <div class="ch-stat">
           <span>COMBO</span>
@@ -642,49 +681,15 @@ onUnmounted(() => {
       </section>
 
       <!-- Bàn phím Piano 13 phím (8 Trắng + 5 Đen) -->
-      <main class="keyboard-frame">
-        <div class="keyboard-stage">
-          <!-- 8 Phím Trắng -->
-          <div class="white-keys-row">
-            <button
-              v-for="wk in whiteKeys"
-              :key="wk.note"
-              type="button"
-              class="white-key"
-              :class="{
-                active: activeNotes[wk.note],
-                hint: !challenge.completed && expectedPitchClass === wk.pitchClass,
-                wrong: wrongFlashNote === wk.note,
-              }"
-              @mousedown="triggerKey(wk)"
-              @touchstart.prevent="triggerKey(wk)"
-            >
-              <span class="wk-kbd">{{ wk.kbd }}</span>
-              <span class="wk-note">{{ wk.note }}</span>
-              <span class="wk-label">{{ wk.label }}</span>
-            </button>
-          </div>
-
-          <!-- 5 Phím Đen (♯) -->
-          <button
-            v-for="bk in blackKeys"
-            :key="bk.note"
-            type="button"
-            class="black-key"
-            :class="{
-              active: activeNotes[bk.note],
-              hint: !challenge.completed && expectedPitchClass === bk.pitchClass,
-              wrong: wrongFlashNote === bk.note,
-            }"
-            :style="{ left: `${bk.leftPercent}%` }"
-            @mousedown.stop="triggerKey(bk)"
-            @touchstart.stop.prevent="triggerKey(bk)"
-          >
-            <span class="bk-kbd">{{ bk.kbd }}</span>
-            <span class="bk-label">{{ bk.label }}</span>
-          </button>
-        </div>
-      </main>
+      <PianoKeyboard
+        :white-keys="whiteKeys"
+        :black-keys="blackKeys"
+        :active-notes="activeNotes"
+        :challenge-completed="challenge.completed"
+        :expected-pitch-class="expectedPitchClass"
+        :wrong-flash-note="wrongFlashNote"
+        @trigger-key="triggerKey"
+      />
     </div>
   </div>
 </template>
@@ -1013,127 +1018,6 @@ kbd {
   box-shadow: 0 0 12px var(--primary-glow);
 }
 
-.keyboard-frame {
-  background: linear-gradient(180deg, #162340 0%, #0b1326 100%);
-  padding: 1.5rem 1.25rem 1.35rem;
-  border-radius: 26px;
-  border: 1px solid var(--outline-strong);
-  box-shadow: var(--shadow-card);
-}
-
-.keyboard-stage {
-  position: relative;
-  width: 100%;
-  user-select: none;
-}
-
-.white-keys-row {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
-}
-
-.white-key {
-  height: 265px;
-  background: linear-gradient(180deg, #ffffff 0%, #eef2ff 90%, #dbe4ff 100%);
-  border: 1px solid #cbd5e1;
-  border-radius: 6px 6px 14px 14px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  padding-bottom: 1.1rem;
-  gap: 0.25rem;
-  color: #1e293b;
-  box-shadow: 0 8px 0 #94a3b8, 0 14px 24px rgba(0, 0, 0, 0.45);
-  transition: transform 0.08s ease, background 0.1s ease, box-shadow 0.08s ease;
-}
-
-.white-key.hint {
-  box-shadow: 0 8px 0 var(--primary), 0 0 22px var(--primary-glow);
-}
-
-.white-key.active {
-  background: linear-gradient(180deg, #e0f9ff 0%, var(--primary) 100%);
-  transform: translateY(6px);
-  box-shadow: 0 2px 0 #38bdf8, 0 6px 14px rgba(109, 221, 255, 0.45);
-}
-
-.white-key.wrong {
-  background: linear-gradient(180deg, #fee2e2 0%, #f87171 100%);
-}
-
-.wk-kbd {
-  padding: 0.15rem 0.45rem;
-  border-radius: 6px;
-  background: #e2e8f0;
-  color: #475569;
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-.wk-note {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #64748b;
-}
-
-.wk-label {
-  font-family: 'Manrope', sans-serif;
-  font-size: 0.92rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.black-key {
-  position: absolute;
-  top: 0;
-  width: 7.8%;
-  height: 162px;
-  transform: translateX(-50%);
-  background: linear-gradient(180deg, #27324b 0%, #0f172a 85%, #020617 100%);
-  border: 1px solid #334155;
-  border-radius: 0 0 10px 10px;
-  color: #f8fafc;
-  cursor: pointer;
-  z-index: 4;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  padding-bottom: 0.75rem;
-  gap: 0.25rem;
-  box-shadow: 0 6px 0 #020617, 0 12px 18px rgba(0, 0, 0, 0.65);
-  transition: transform 0.08s ease, background 0.1s ease;
-}
-
-.black-key.hint {
-  border-color: var(--primary);
-  box-shadow: 0 6px 0 var(--primary), 0 0 18px var(--primary-glow);
-}
-
-.black-key.active {
-  background: linear-gradient(180deg, var(--accent) 0%, #7e22ce 100%);
-  transform: translateX(-50%) translateY(5px);
-}
-
-.black-key.wrong {
-  background: linear-gradient(180deg, #ef4444 0%, #991b1b 100%);
-}
-
-.bk-kbd {
-  font-size: 0.68rem;
-  color: var(--primary);
-  font-weight: 800;
-}
-
-.bk-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #cbd5e1;
-}
-
 @media (max-width: 768px) {
   .piano-page {
     padding: 0.8rem 0.65rem 2.2rem;
@@ -1217,29 +1101,6 @@ kbd {
     padding: 0.85rem;
     border-radius: 16px;
   }
-
-  .white-keys-row {
-    gap: 3px;
-  }
-
-  .white-key {
-    height: 175px;
-    padding-bottom: 0.55rem;
-  }
-
-  .black-key {
-    height: 108px;
-    width: 8.6%;
-  }
-
-  .wk-kbd,
-  .bk-kbd {
-    display: none;
-  }
-
-  .wk-label {
-    font-size: 0.68rem;
-  }
 }
 
 .melody-name-input {
@@ -1321,6 +1182,6 @@ kbd {
 }
 
 .saved-del:hover {
-  color: #f43f5e;
+  color: var(--danger);
 }
 </style>

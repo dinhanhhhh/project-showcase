@@ -207,6 +207,77 @@ export const XIANGQI_PUZZLES: readonly XiangqiPuzzle[] = [
       ],
     },
   },
+  {
+    id: 'song-xa-toa-mon',
+    title: 'Thế 7: Song Xa Tỏa Môn',
+    difficulty: 'Cơ bản',
+    description: 'Đỏ đi trước — Kinh điển Song Xa phong tỏa hoàn toàn cung Tướng Đen và kết liễu chỉ trong 1 nước!',
+    hint: 'Đẩy Xe cánh phải từ (8,4) thẳng lên hàng đáy (8,0) — Xe cánh trái (1,1) đã khóa chặt đường lên (4,1).',
+    boardState: {
+      pieces: [
+        createPiece('p7_b_gen', 'black', 'general', 4, 0),
+        createPiece('p7_b_adv', 'black', 'advisor', 3, 0),
+        createPiece('p7_b_sol', 'black', 'soldier', 6, 5),
+        createPiece('p7_r_gen', 'red', 'general', 3, 9),
+        createPiece('p7_r_chariot_1', 'red', 'chariot', 1, 1),
+        createPiece('p7_r_chariot_2', 'red', 'chariot', 8, 4),
+      ],
+    },
+  },
+  {
+    id: 'dien-giac-ma',
+    title: 'Thế 8: Điền Giác Mã',
+    difficulty: 'Trung bình',
+    description: 'Đỏ đi trước — Thế Mã góc cung kết hợp Tướng Đỏ đối mặt và Xe khóa ngang chiếu bí 1 nước!',
+    hint: 'Nhảy Mã trục giữa lên góc cung (Mã 5 tấn 4) — Tướng Đen không thể qua trái vì luật Mặt Tướng với (3,9).',
+    boardState: {
+      pieces: [
+        createPiece('p8_b_gen', 'black', 'general', 4, 0),
+        createPiece('p8_b_adv', 'black', 'advisor', 5, 0),
+        createPiece('p8_b_ele', 'black', 'elephant', 2, 0),
+        createPiece('p8_b_sol', 'black', 'soldier', 7, 6),
+        createPiece('p8_r_gen', 'red', 'general', 3, 9),
+        createPiece('p8_r_chariot', 'red', 'chariot', 1, 1),
+        createPiece('p8_r_horse', 'red', 'horse', 4, 4),
+      ],
+    },
+  },
+  {
+    id: 'bach-ma-khoa-tam',
+    title: 'Thế 9: Bạch Mã Khóa Tâm',
+    difficulty: 'Trung bình',
+    description: 'Đỏ đi trước — Mã chốt cửa tâm cung ép Tướng Đen nằm im chịu trận trước đòn Xe thẳng đáy!',
+    hint: 'Đẩy Xe biên trái thẳng lên hàng đáy (Xe 9 tấn 4) — Mã (2,2) đang khóa chặt ô chạy xuống (4,1).',
+    boardState: {
+      pieces: [
+        createPiece('p9_b_gen', 'black', 'general', 4, 0),
+        createPiece('p9_b_ele', 'black', 'elephant', 6, 0),
+        createPiece('p9_b_sol', 'black', 'soldier', 7, 6),
+        createPiece('p9_r_gen', 'red', 'general', 5, 9),
+        createPiece('p9_r_chariot', 'red', 'chariot', 0, 4),
+        createPiece('p9_r_horse', 'red', 'horse', 2, 2),
+      ],
+    },
+  },
+  {
+    id: 'khai-thien-ma',
+    title: 'Thế 10: Khai Thiên Mã (2 nước)',
+    difficulty: 'Cao thủ',
+    description: 'Đỏ đi trước — Phối hợp Mã góc cung ép Tướng xuống tâm trước khi Xe khóa ngang kết liễu trong 2 nước!',
+    hint: 'Nước 1: Nhảy Mã từ (3,3) vào (5,2) ép Tướng Đen chạy xuống (4,1). Nước 2: Đẩy Xe (1,3) lên (1,1) chiếu bí!',
+    boardState: {
+      pieces: [
+        createPiece('p10_b_gen', 'black', 'general', 4, 0),
+        createPiece('p10_b_adv1', 'black', 'advisor', 3, 0),
+        createPiece('p10_b_adv2', 'black', 'advisor', 5, 0),
+        createPiece('p10_b_ele', 'black', 'elephant', 8, 2),
+        createPiece('p10_r_gen', 'red', 'general', 3, 9),
+        createPiece('p10_r_horse', 'red', 'horse', 3, 3),
+        createPiece('p10_r_soldier', 'red', 'soldier', 3, 2),
+        createPiece('p10_r_chariot', 'red', 'chariot', 1, 3),
+      ],
+    },
+  },
 ]
 
 export function cloneBoardState(board: BoardState): BoardState {

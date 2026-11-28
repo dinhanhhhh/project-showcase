@@ -1,26 +1,12 @@
-export function useFoodAudio() {
-  let ctx: AudioContext | null = null
+import { createSafeAudioManager } from '@/utils/audio'
 
-  function getAudioContext(): AudioContext | null {
-    if (typeof window === 'undefined') return null
-    if (!ctx) {
-      const AudioCtor =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-      if (AudioCtor) {
-        ctx = new AudioCtor()
-      }
-    }
-    if (ctx && ctx.state === 'suspended') {
-      void ctx.resume().catch(() => {})
-    }
-    return ctx
-  }
+export function useFoodAudio() {
+  const { ensureContext, closeContext } = createSafeAudioManager()
 
   function playTick(stepIndex: number, totalSteps: number, muted = false) {
     if (muted) return
     try {
-      const audio = getAudioContext()
+      const audio = ensureContext()
       if (!audio) return
       const osc = audio.createOscillator()
       const gain = audio.createGain()
@@ -46,7 +32,7 @@ export function useFoodAudio() {
   function playReveal(muted = false) {
     if (muted) return
     try {
-      const audio = getAudioContext()
+      const audio = ensureContext()
       if (!audio) return
       const notes = [523.25, 659.25, 783.99]
       const now = audio.currentTime
@@ -71,16 +57,9 @@ export function useFoodAudio() {
     }
   }
 
-  function cleanup() {
-    if (ctx) {
-      void ctx.close().catch(() => {})
-      ctx = null
-    }
-  }
-
   return {
     playTick,
     playReveal,
-    cleanup,
+    cleanup: closeContext,
   }
 }

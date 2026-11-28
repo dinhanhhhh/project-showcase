@@ -1,6 +1,6 @@
 export type WordPackId = 'dev' | 'vietnamese' | 'quotes_vn' | 'syntax' | 'english'
 
-export type TypingMode = 'timed' | 'sudden_death'
+export type TypingMode = 'timed' | 'sudden_death' | 'daily_seed'
 
 export type TypingRank = 'S+' | 'S' | 'A' | 'B' | 'C'
 
